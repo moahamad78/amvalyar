@@ -39,6 +39,13 @@ $processTypes = [
         </div>
 
 
+        <a
+            href="{{ route('asset-settings.specialist-approval-routes.index', request()->only('company_id')) }}"
+            class="btn btn-outline-primary"
+        >
+            مسیرهای تأیید تخصصی گروه‌ها
+        </a>
+
         @if(
             $currentUser->isSuperAdmin()
             ||

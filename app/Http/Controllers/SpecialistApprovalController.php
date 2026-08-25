@@ -83,6 +83,35 @@ final class SpecialistApprovalController extends Controller
                             $employee->id
                         );
                     }
+
+
+                    /*
+                     * Role queue:
+                     * every active user whose current role matches the
+                     * configured specialist role may see the pending branch.
+                     */
+                    if (
+                        $user->role_id
+                        !==
+                        null
+                    ) {
+
+                        $query->orWhere(
+                            function ($query) use (
+                                $user
+                            ): void {
+
+                                $query->where(
+                                    'approver_type',
+                                    'role'
+                                )
+                                ->where(
+                                    'approver_reference_id',
+                                    $user->role_id
+                                );
+                            }
+                        );
+                    }
                 }
             );
         }
@@ -518,10 +547,30 @@ final class SpecialistApprovalController extends Controller
             (int) $employee->id;
 
 
+        $roleMatches =
+            $branch->approver_type
+            ===
+            'role'
+            &&
+            $branch->approver_reference_id
+            !==
+            null
+            &&
+            $user->role_id
+            !==
+            null
+            &&
+            (int) $branch->approver_reference_id
+            ===
+            (int) $user->role_id;
+
+
         if (
             !$userMatches
             &&
             !$employeeMatches
+            &&
+            !$roleMatches
         ) {
 
             abort(404);

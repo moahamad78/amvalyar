@@ -27,6 +27,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\WorkflowStepController;
+use App\Http\Controllers\AssetCategoryApprovalRouteController;
 use App\Http\Controllers\MyApprovalController;
 use App\Http\Controllers\InventoryRequestController;
 use App\Http\Controllers\UserController;
@@ -802,6 +803,52 @@ Route::post('/workflows/{workflow}/steps/reorder', [
 | My Approvals
 |--------------------------------------------------------------------------
 */
+
+/*
+|--------------------------------------------------------------------------
+| Specialist Approval Route Settings
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/asset-settings/specialist-approval-routes', [
+    AssetCategoryApprovalRouteController::class,
+    'index',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:workflows.view',
+    ])
+    ->name('asset-settings.specialist-approval-routes.index');
+
+Route::post('/asset-settings/specialist-approval-routes', [
+    AssetCategoryApprovalRouteController::class,
+    'store',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:workflows.edit',
+    ])
+    ->name('asset-settings.specialist-approval-routes.store');
+
+Route::put('/asset-settings/specialist-approval-routes/{approvalRoute}', [
+    AssetCategoryApprovalRouteController::class,
+    'update',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:workflows.edit',
+    ])
+    ->name('asset-settings.specialist-approval-routes.update');
+
+Route::delete('/asset-settings/specialist-approval-routes/{approvalRoute}', [
+    AssetCategoryApprovalRouteController::class,
+    'destroy',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:workflows.edit',
+    ])
+    ->name('asset-settings.specialist-approval-routes.destroy');
 
 Route::get('/approvals', [
     MyApprovalController::class,
