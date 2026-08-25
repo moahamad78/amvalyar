@@ -1,0 +1,5131 @@
+﻿============================================================
+ASSET CODE - MASTER ARCHITECTURE DIAGNOSTIC
+Generated: 2026-08-20 22:16:29
+============================================================
+
+============================================================
+SITE MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToCompany;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+final class Site extends Model
+{
+    use BelongsToCompany;
+
+    protected $fillable = [
+        'company_id',
+        'name',
+        'code',
+        'type',
+        'address',
+        'description',
+        'is_active',
+        'sort_order',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+            'sort_order' => 'integer',
+        ];
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(
+            Company::class
+        );
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(
+            Location::class
+        );
+    }
+
+    public function employees(): HasMany
+    {
+        return $this->hasMany(
+            Employee::class
+        );
+    }
+}
+
+
+============================================================
+SITE CONTROLLER
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\SiteRequest;
+use App\Models\Company;
+use App\Models\Site;
+use App\Models\User;
+use App\Services\AuditLogService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+final class SiteController extends Controller
+{
+    public function index(
+        Request $request
+    ): View {
+
+        $query =
+            Site::query()
+                ->withCount([
+                    'locations',
+                    'employees',
+                ])
+                ->orderBy('sort_order')
+                ->orderBy('name');
+
+
+        /*
+         * Super Admin ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط´ط±ع©طھ ط±ط§ ظپغŒظ„طھط± ع©ظ†ط¯.
+         */
+        if (
+            $request->user()->isSuperAdmin()
+            &&
+            $request->filled('company_id')
+        ) {
+
+            $query->where(
+                'company_id',
+                $request->integer(
+                    'company_id'
+                )
+            );
+        }
+
+
+        $sites =
+            $query->paginate(20)
+                ->withQueryString();
+
+
+        $companies =
+            $request->user()->isSuperAdmin()
+                ? Company::query()
+                    ->orderBy('name')
+                    ->get([
+                        'id',
+                        'name',
+                        'code',
+                    ])
+                : collect();
+
+
+        return view(
+            'sites.index',
+            compact(
+                'sites',
+                'companies'
+            )
+        );
+    }
+
+
+    public function create(
+        Request $request
+    ): View {
+
+        $companies =
+            $request->user()->isSuperAdmin()
+                ? Company::query()
+                    ->orderBy('name')
+                    ->get([
+                        'id',
+                        'name',
+                        'code',
+                    ])
+                : collect();
+
+
+        return view(
+            'sites.create',
+            compact(
+                'companies'
+            )
+        );
+    }
+
+
+    public function store(
+        SiteRequest $request,
+        AuditLogService $auditLogService
+    ): RedirectResponse {
+
+        $data =
+            $request->validated();
+
+
+        if (
+            !$request->user()
+                ->isSuperAdmin()
+        ) {
+
+            $data['company_id'] =
+                $request->user()
+                    ->company_id;
+        }
+
+
+        $data['is_active'] =
+            $request->boolean(
+                'is_active'
+            );
+
+
+        $data['sort_order'] =
+            (int) (
+                $data['sort_order']
+                ?? 0
+            );
+
+
+        $site =
+            Site::query()->create(
+                $data
+            );
+
+
+        $auditLogService->log(
+            action:
+                'site.created',
+
+            subject:
+                $site,
+
+            newValues:
+                $site->only([
+                    'company_id',
+                    'name',
+                    'code',
+                    'type',
+                    'address',
+                    'description',
+                    'is_active',
+                    'sort_order',
+                ]),
+
+            description:
+                'ط§غŒط¬ط§ط¯ ط³ط§غŒطھ - '
+                . $site->name,
+
+            request:
+                $request
+        );
+
+
+        return redirect()
+            ->route('sites.index')
+            ->with(
+                'success',
+                'ط³ط§غŒطھ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط«ط¨طھ ط´ط¯.'
+            );
+    }
+
+
+    public function edit(
+        Request $request,
+        Site $site
+    ): View {
+
+        $this->ensureVisible(
+            $request->user(),
+            $site
+        );
+
+
+        return view(
+            'sites.edit',
+            compact(
+                'site'
+            )
+        );
+    }
+
+
+    public function update(
+        SiteRequest $request,
+        Site $site,
+        AuditLogService $auditLogService
+    ): RedirectResponse {
+
+        $this->ensureVisible(
+            $request->user(),
+            $site
+        );
+
+
+        $oldValues =
+            $site->only([
+                'company_id',
+                'name',
+                'code',
+                'type',
+                'address',
+                'description',
+                'is_active',
+                'sort_order',
+            ]);
+
+
+        $data =
+            $request->validated();
+
+
+        /*
+         * Tenant ط¨ط¹ط¯ ط§ط² ط§غŒط¬ط§ط¯ Site
+         * ط§ط² ط·ط±غŒظ‚ ظپط±ظ… ظ‚ط§ط¨ظ„ طھط؛غŒغŒط± ظ†غŒط³طھ.
+         */
+        unset(
+            $data['company_id']
+        );
+
+
+        $data['is_active'] =
+            $request->boolean(
+                'is_active'
+            );
+
+
+        $data['sort_order'] =
+            (int) (
+                $data['sort_order']
+                ?? 0
+            );
+
+
+        $site->update(
+            $data
+        );
+
+
+        $site->refresh();
+
+
+        $newValues =
+            $site->only([
+                'company_id',
+                'name',
+                'code',
+                'type',
+                'address',
+                'description',
+                'is_active',
+                'sort_order',
+            ]);
+
+
+        $auditLogService->log(
+            action:
+                'site.updated',
+
+            subject:
+                $site,
+
+            oldValues:
+                $oldValues,
+
+            newValues:
+                $newValues,
+
+            description:
+                'ظˆغŒط±ط§غŒط´ ط³ط§غŒطھ - '
+                . $site->name,
+
+            request:
+                $request
+        );
+
+
+        return redirect()
+            ->route('sites.index')
+            ->with(
+                'success',
+                'ط³ط§غŒطھ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ظˆغŒط±ط§غŒط´ ط´ط¯.'
+            );
+    }
+
+
+    public function destroy(
+        Request $request,
+        Site $site,
+        AuditLogService $auditLogService
+    ): RedirectResponse {
+
+        $this->ensureVisible(
+            $request->user(),
+            $site
+        );
+
+
+        /*
+         * ط³ط§غŒطھ ط¯ط§ط±ط§غŒ ط³ط§ط®طھط§ط± ط³ط§ط²ظ…ط§ظ†غŒ
+         * ظ†ط¨ط§غŒط¯ ط­ط°ظپ ظپغŒط²غŒع©غŒ ط´ظˆط¯.
+         */
+        if (
+            $site->locations()
+                ->exists()
+            ||
+            $site->employees()
+                ->exists()
+        ) {
+
+            return back()
+                ->withErrors([
+                    'site' =>
+                        'ط§غŒظ† ط³ط§غŒطھ ط¯ط§ط±ط§غŒ ظ…ط­ظ„ غŒط§ ظ¾ط±ط³ظ†ظ„ ط§ط³طھ ظˆ ظ‚ط§ط¨ظ„ ط­ط°ظپ ظ†غŒط³طھ. ط¯ط± طµظˆط±طھ ظ†غŒط§ط² ط¢ظ† ط±ط§ ط؛غŒط±ظپط¹ط§ظ„ ع©ظ†غŒط¯.',
+                ]);
+        }
+
+
+        $oldValues =
+            $site->only([
+                'company_id',
+                'name',
+                'code',
+                'type',
+                'address',
+                'description',
+                'is_active',
+                'sort_order',
+            ]);
+
+
+        /*
+         * Audit ظ‚ط¨ظ„ ط§ط² ط­ط°ظپ ط«ط¨طھ ظ…غŒâ€Œط´ظˆط¯
+         * طھط§ ط§ط·ظ„ط§ط¹ط§طھ Site ط§ط² ط¨غŒظ† ظ†ط±ظˆط¯.
+         */
+        $auditLogService->log(
+            action:
+                'site.deleted',
+
+            subject:
+                $site,
+
+            oldValues:
+                $oldValues,
+
+            description:
+                'ط­ط°ظپ ط³ط§غŒطھ - '
+                . $site->name,
+
+            request:
+                $request
+        );
+
+
+        $site->delete();
+
+
+        return redirect()
+            ->route('sites.index')
+            ->with(
+                'success',
+                'ط³ط§غŒطھ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط­ط°ظپ ط´ط¯.'
+            );
+    }
+
+
+    private function ensureVisible(
+        User $currentUser,
+        Site $site
+    ): void {
+
+        if (
+            $currentUser->isSuperAdmin()
+        ) {
+            return;
+        }
+
+
+        if (
+            (int) $site->company_id
+            !==
+            (int) $currentUser->company_id
+        ) {
+            abort(404);
+        }
+    }
+}
+
+
+============================================================
+ASSET CATEGORY MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class AssetCategory extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+        'code',
+        'coding_code',
+        'description',
+        'sort_order',
+        'is_active',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'sort_order' => 'integer',
+            'is_active'  => 'boolean',
+        ];
+    }
+
+    public function assets(): HasMany
+    {
+        return $this->hasMany(
+            Asset::class
+        );
+    }
+
+    public function isActive(): bool
+    {
+        return $this->is_active === true;
+    }
+
+    public function assetTypes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(
+            \App\Models\AssetType::class,
+            'asset_category_id'
+        );
+    }
+
+}
+
+
+============================================================
+ASSET TYPE MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+final class AssetType extends Model
+{
+    protected $fillable = [
+
+        'company_id',
+        'asset_category_id',
+
+        'name',
+        'code',
+        'coding_code',
+
+        'description',
+
+        'is_active',
+        'sort_order',
+    ];
+
+
+    protected $casts = [
+
+        'is_active' =>
+            'boolean',
+
+        'sort_order' =>
+            'integer',
+    ];
+
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(
+            Company::class
+        );
+    }
+
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(
+            AssetCategory::class,
+            'asset_category_id'
+        );
+    }
+
+
+    public function assets(): HasMany
+    {
+        return $this->hasMany(
+            Asset::class,
+            'asset_type_id'
+        );
+    }
+
+
+    public function requestItems(): HasMany
+    {
+        return $this->hasMany(
+            InventoryRequestItem::class,
+            'asset_type_id'
+        );
+    }
+
+
+    public function attributeDefinitions(): HasMany
+    {
+        return $this->hasMany(
+            AssetAttributeDefinition::class,
+            'asset_type_id'
+        )
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+}
+
+
+============================================================
+ASSET MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\EnforcesCompanyAssetLimit;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Asset extends Model
+{
+    /*
+     * Asset code is immutable after creation.
+     *
+     * The system may generate asset_code during creation,
+     * but normal model updates are not allowed to replace it.
+     */
+    protected static function booted(): void
+    {
+        static::updating(
+            function (Asset $asset): void {
+
+                if (
+                    $asset->isDirty(
+                        'asset_code'
+                    )
+                ) {
+
+                    $asset->asset_code =
+                        $asset->getOriginal(
+                            'asset_code'
+                        );
+                }
+            }
+        );
+    }
+
+    use BelongsToCompany, EnforcesCompanyAssetLimit;
+    use HasFactory;
+
+    protected $fillable = [
+                'company_id',
+'asset_category_id',
+        'asset_type_id',
+        'coding_site_id',
+        'code_main_nature_id',
+        'code_sub_nature_id',
+        'coding_site_code_snapshot',
+        'main_nature_code_snapshot',
+        'sub_nature_code_snapshot',
+        'inventory_code',
+        'asset_code',
+        'title',
+        'brand',
+        'model',
+        'serial_number',
+        'manufacturer',
+        'country',
+        'purchase_date',
+        'purchase_price',
+        'description',
+        'is_active',
+        'status',
+        'plate_number',
+        'custody_type',
+        'custody_user_id',
+        'custody_employee_id',
+        'custody_department_id',
+        'current_site_id',
+        'current_location_id',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'purchase_date'  => 'date',
+            'purchase_price' => 'decimal:2',
+            'is_active'      => 'boolean',
+        ];
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(
+            AssetCategory::class,
+            'asset_category_id'
+        );
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(AssetTransaction::class);
+    }
+
+
+    public function isActive(): bool
+    {
+        return $this->is_active === true;
+    }
+
+
+    public function assetType(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(
+            AssetType::class,
+            'asset_type_id'
+        );
+    }
+
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(
+            AssetPhoto::class
+        )
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+
+    public function primaryPhoto(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(
+            AssetPhoto::class
+        )
+            ->where(
+                'is_primary',
+                true
+            );
+    }
+
+
+    public function attributeValues(): HasMany
+    {
+        return $this->hasMany(
+            AssetAttributeValue::class
+        );
+    }
+    public function custodyEmployee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Employee::class, 'custody_employee_id');
+    }
+
+    public function custodyDepartment(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Department::class, 'custody_department_id');
+    }
+
+    public function currentSite(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Site::class, 'current_site_id');
+    }
+
+    public function currentLocation(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Location::class, 'current_location_id');
+    }
+
+    public function codingSite(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(
+            \App\Models\Site::class,
+            'coding_site_id'
+        );
+    }
+}
+
+
+
+============================================================
+ASSET CONTROLLER
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\AssetRequest;
+use App\Models\Asset;
+use App\Models\AssetAttributeDefinition;
+use App\Models\AssetCategory;
+use App\Models\AssetType;
+use App\Models\User;
+use App\Services\AssetAttributeValueService;
+use App\Services\AssetCodeService;
+use App\Services\AssetPhotoService;
+use App\Support\JalaliDate;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+
+final class AssetController extends Controller
+{
+    public function index(
+        Request $request
+    ): View {
+
+        $assets =
+            Asset::query()
+                ->with([
+                    'category',
+                    'assetType',
+                ])
+                ->latest()
+                ->paginate(15);
+
+
+        return view(
+            'assets.index',
+            compact(
+                'assets'
+            )
+        );
+    }
+
+
+    public function create(
+        Request $request
+    ): View {
+
+        $categories =
+            AssetCategory::query()
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy('name')
+                ->get();
+
+
+        $types =
+            AssetType::query()
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->when(
+                    !$request->user()
+                        ->isSuperAdmin(),
+
+                    fn ($query) =>
+                        $query->where(
+                            'company_id',
+                            $request->user()
+                                ->company_id
+                        )
+                )
+                ->with([
+                    'attributeDefinitions' =>
+                        function ($query) {
+
+                            $query
+                                ->where(
+                                    'is_active',
+                                    true
+                                )
+                                ->with([
+                                    'options' =>
+                                        function ($optionQuery) {
+
+                                            $optionQuery
+                                                ->where(
+                                                    'is_active',
+                                                    true
+                                                )
+                                                ->orderBy(
+                                                    'sort_order'
+                                                )
+                                                ->orderBy(
+                                                    'id'
+                                                );
+                                        },
+                                ]);
+                        },
+                ])
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+
+
+        $dynamicValues =
+            collect();
+
+
+        return view(
+            'assets.create',
+            compact(
+                'categories',
+                'types',
+                'dynamicValues'
+            )
+        );
+    }
+
+
+    public function store(
+        AssetRequest $request,
+        AssetCodeService $assetCodeService,
+        AssetPhotoService $assetPhotoService,
+        AssetAttributeValueService $attributeValueService
+    ): RedirectResponse {
+
+        $data =
+            $request->validated();
+
+
+        unset(
+            $data['photos'],
+            $data['dynamic_attributes'],
+            $data['dynamic_attribute_files']
+        );
+
+
+        $data['status'] =
+            'warehouse';
+
+
+        $data['plate_number'] =
+            null;
+
+
+        if (
+            !$request->user()
+                ->isSuperAdmin()
+        ) {
+
+            $data['company_id'] =
+                $request->user()
+                    ->company_id;
+        }
+
+
+        $companyId =
+            (int) (
+                $data['company_id']
+                ??
+                0
+            );
+
+
+        if (
+            $companyId <= 0
+        ) {
+
+            throw ValidationException::withMessages([
+                'company_id' =>
+                    'ط´ط±ع©طھ ط¯ط§ط±ط§غŒغŒ ظ…ط´ط®طµ ظ†ط´ط¯ظ‡ ط§ط³طھ.',
+            ]);
+        }
+$asset =
+            DB::transaction(
+                function () use (
+                    $request,
+                    $data,
+                    $assetCodeService,
+                    $companyId,
+                    $assetPhotoService,
+                    $attributeValueService
+                ): Asset {
+
+                    $data['asset_code'] =
+                        $assetCodeService->generate(
+                            companyId:
+                                $companyId,
+
+                            assetCategoryId:
+                                isset(
+                                    $data['asset_category_id']
+                                )
+                                    ? (int) $data['asset_category_id']
+                                    : null,
+
+                            assetTypeId:
+                                isset(
+                                    $data['asset_type_id']
+                                )
+                                    ? (int) $data['asset_type_id']
+                                    : null,
+                        );
+
+
+                    $asset =
+                        Asset::query()
+                            ->create(
+                                $data
+                            );
+
+
+                    $assetPhotoService
+                        ->storeUploadedPhotos(
+                            asset:
+                                $asset,
+
+                            files:
+                                $request->file(
+                                    'photos',
+                                    []
+                                ),
+
+                            user:
+                                $request->user()
+                        );
+
+
+                    $attributeValueService
+                        ->sync(
+                            $asset,
+                            $request,
+                            $request->user()
+                        );
+
+
+                    return $asset;
+                }
+            );
+
+
+        return redirect()
+            ->route(
+                'assets.index'
+            )
+            ->with(
+                'success',
+                'ط¯ط§ط±ط§غŒغŒ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط«ط¨طھ ط´ط¯.'
+            );
+    }
+
+
+    public function show(
+        Request $request,
+        Asset $asset
+    ): View {
+
+        $this->ensureAssetIsVisible(
+            $request->user(),
+            $asset
+        );
+
+
+        $asset->load([
+
+            'category',
+            'assetType',
+            'photos',
+
+            'attributeValues.definition',
+            'attributeValues.option',
+
+            'transactions' =>
+                function ($query) {
+
+                    $query->latest('id');
+                },
+
+            'transactions.fromUser',
+            'transactions.toUser',
+            'transactions.creator',
+        ]);
+
+
+        $currentHolder =
+            null;
+
+
+        if (
+            $asset->status
+            ===
+            'assigned'
+        ) {
+
+            $lastAssignment =
+                $asset->transactions
+                    ->first(
+                        function (
+                            $transaction
+                        ): bool {
+
+                            return in_array(
+                                $transaction->type,
+                                [
+                                    'delivery',
+                                    'transfer',
+                                ],
+                                true
+                            )
+                            &&
+                            $transaction->toUser
+                            !==
+                            null;
+                        }
+                    );
+
+
+            $currentHolder =
+                $lastAssignment?->toUser;
+        }
+
+
+        return view(
+            'assets.show',
+            compact(
+                'asset',
+                'currentHolder'
+            )
+        );
+    }
+
+
+    public function edit(
+        Request $request,
+        Asset $asset
+    ): View {
+
+        $this->ensureAssetIsVisible(
+            $request->user(),
+            $asset
+        );
+
+
+        $categories =
+            AssetCategory::query()
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy('name')
+                ->get();
+
+
+        $types =
+            AssetType::query()
+                ->where(
+                    'company_id',
+                    $asset->company_id
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->with([
+                    'attributeDefinitions' =>
+                        function ($query) {
+
+                            $query
+                                ->where(
+                                    'is_active',
+                                    true
+                                )
+                                ->with([
+                                    'options' =>
+                                        function ($optionQuery) {
+
+                                            $optionQuery
+                                                ->where(
+                                                    'is_active',
+                                                    true
+                                                )
+                                                ->orderBy(
+                                                    'sort_order'
+                                                )
+                                                ->orderBy(
+                                                    'id'
+                                                );
+                                        },
+                                ]);
+                        },
+                ])
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+
+
+        $asset->load([
+            'photos',
+            'attributeValues',
+        ]);
+
+
+        $dynamicValues =
+            $asset->attributeValues
+                ->keyBy(
+                    'asset_attribute_definition_id'
+                );
+
+
+        return view(
+            'assets.edit',
+            compact(
+                'asset',
+                'categories',
+                'types',
+                'dynamicValues'
+            )
+        );
+    }
+
+
+    public function update(
+        AssetRequest $request,
+        Asset $asset,
+        AssetPhotoService $assetPhotoService,
+        AssetAttributeValueService $attributeValueService
+    ): RedirectResponse {
+
+        $this->ensureAssetIsVisible(
+            $request->user(),
+            $asset
+        );
+
+
+        $data =
+            $request->validated();
+
+
+        unset(
+            $data['company_id'],
+            $data['photos'],
+            $data['dynamic_attributes'],
+            $data['dynamic_attribute_files']
+        );
+
+
+        DB::transaction(
+            function () use (
+                $request,
+                $asset,
+                $data,
+                $assetPhotoService,
+                $attributeValueService
+            ): void {
+
+                $asset->update(
+                    $data
+                );
+
+
+                $assetPhotoService
+                    ->storeUploadedPhotos(
+                        asset:
+                            $asset,
+
+                        files:
+                            $request->file(
+                                'photos',
+                                []
+                            ),
+
+                        user:
+                            $request->user()
+                    );
+
+
+                $attributeValueService
+                    ->sync(
+                        $asset,
+                        $request,
+                        $request->user()
+                    );
+            }
+        );
+
+
+        return redirect()
+            ->route(
+                'assets.index'
+            )
+            ->with(
+                'success',
+                'ط¯ط§ط±ط§غŒغŒ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ظˆغŒط±ط§غŒط´ ط´ط¯.'
+            );
+    }
+
+
+    public function destroy(
+        Request $request,
+        Asset $asset
+    ): RedirectResponse {
+
+        $this->ensureAssetIsVisible(
+            $request->user(),
+            $asset
+        );
+
+
+        if (
+            $asset->transactions()
+                ->exists()
+        ) {
+
+            return back()
+                ->withErrors([
+                    'asset' =>
+                        'ط§غŒظ† ط¯ط§ط±ط§غŒغŒ ط¯ط§ط±ط§غŒ ط³ط§ط¨ظ‚ظ‡ ع¯ط±ط¯ط´ ط§ط³طھ ظˆ ظ‚ط§ط¨ظ„ ط­ط°ظپ ظ†غŒط³طھ.',
+                ]);
+        }
+
+
+        $asset->delete();
+
+
+        return redirect()
+            ->route(
+                'assets.index'
+            )
+            ->with(
+                'success',
+                'ط¯ط§ط±ط§غŒغŒ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط­ط°ظپ ط´ط¯.'
+            );
+    }
+
+
+    private function ensureAssetIsVisible(
+        User $currentUser,
+        Asset $asset
+    ): void {
+
+        if (
+            $currentUser->isSuperAdmin()
+        ) {
+            return;
+        }
+
+
+        if (
+            $asset->company_id
+            ===
+            null
+        ) {
+            abort(404);
+        }
+
+
+        if (
+            (int) $asset->company_id
+            !==
+            (int) $currentUser->company_id
+        ) {
+            abort(404);
+        }
+    }
+}
+
+
+============================================================
+ASSET REQUEST
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use App\Models\Asset;
+use App\Models\AssetAttributeDefinition;
+use App\Models\AssetAttributeOption;
+use App\Models\AssetType;
+use App\Support\JalaliDate;
+use Closure;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+final class AssetRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return auth()->check();
+    }
+
+
+    public function rules(): array
+    {
+        $user =
+            $this->user();
+
+        $asset =
+            $this->route('asset');
+
+        $companyId =
+            null;
+
+
+        if (
+            $asset instanceof Asset
+        ) {
+
+            $companyId =
+                $asset->company_id;
+
+        } elseif (
+            $user !== null
+            &&
+            !$user->isSuperAdmin()
+        ) {
+
+            $companyId =
+                $user->company_id;
+        }
+
+
+        $inventoryCodeRule =
+            Rule::unique(
+                'assets',
+                'inventory_code'
+            );
+
+
+        if (
+            $companyId !== null
+        ) {
+
+            $inventoryCodeRule->where(
+                'company_id',
+                $companyId
+            );
+        }
+
+
+        if (
+            $asset instanceof Asset
+        ) {
+
+            $inventoryCodeRule->ignore(
+                $asset->id
+            );
+        }
+
+
+        $rules = [
+
+            'asset_category_id' => [
+                'required',
+                'integer',
+                'exists:asset_categories,id',
+            ],
+
+
+            'asset_type_id' => [
+                'required',
+                'integer',
+
+                function (
+                    string $attribute,
+                    mixed $value,
+                    Closure $fail
+                ) use (
+                    $companyId
+                ): void {
+
+                    $type =
+                        AssetType::query()
+                            ->whereKey(
+                                $value
+                            )
+                            ->where(
+                                'is_active',
+                                true
+                            )
+                            ->first();
+
+
+                    if (
+                        $type === null
+                    ) {
+
+                        $fail(
+                            'ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ…ط¹طھط¨ط± غŒط§ ظپط¹ط§ظ„ ظ†غŒط³طھ.'
+                        );
+
+                        return;
+                    }
+
+
+                    if (
+                        (int) $type->asset_category_id
+                        !==
+                        (int) $this->input(
+                            'asset_category_id'
+                        )
+                    ) {
+
+                        $fail(
+                            'ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ…طھط¹ظ„ظ‚ ط¨ظ‡ ط¯ط³طھظ‡â€Œط¨ظ†ط¯غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ†غŒط³طھ.'
+                        );
+
+                        return;
+                    }
+
+
+                    if (
+                        $companyId !== null
+                        &&
+                        (int) $type->company_id
+                        !==
+                        (int) $companyId
+                    ) {
+
+                        $fail(
+                            'ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ…طھط¹ظ„ظ‚ ط¨ظ‡ ط´ط±ع©طھ ط¯غŒع¯ط±غŒ ط§ط³طھ.'
+                        );
+                    }
+                },
+            ],
+
+
+            'inventory_code' => [
+                'nullable',
+                'string',
+                'max:100',
+                $inventoryCodeRule,
+            ],
+
+
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+
+            'brand' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+
+            'model' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+
+            'serial_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+
+            'manufacturer' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+
+            'country' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+
+            'purchase_date' => [
+                'nullable',
+                'string',
+
+                function (
+                    string $attribute,
+                    mixed $value,
+                    Closure $fail
+                ): void {
+
+                    if (
+                        $value === null
+                        ||
+                        trim(
+                            (string) $value
+                        ) === ''
+                    ) {
+
+                        return;
+                    }
+
+
+                    try {
+
+                        JalaliDate::toGregorianDate(
+                            (string) $value
+                        );
+
+                    } catch (\Throwable) {
+
+                        $fail(
+                            'طھط§ط±غŒط® ط®ط±غŒط¯ ظ…ط¹طھط¨ط± ظ†غŒط³طھ. ظ†ظ…ظˆظ†ظ‡ طµط­غŒط­: 1405/05/16'
+                        );
+                    }
+                },
+            ],
+
+
+            'purchase_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+
+            'description' => [
+                'nullable',
+                'string',
+            ],
+
+
+            'photos' => [
+                'nullable',
+                'array',
+                'max:8',
+            ],
+
+
+            'photos.*' => [
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+
+
+            'dynamic_attributes' => [
+                'nullable',
+                'array',
+            ],
+
+
+            'dynamic_attribute_files' => [
+                'nullable',
+                'array',
+            ],
+
+
+            'is_active' => [
+                'nullable',
+                'boolean',
+            ],
+        ];
+
+
+        $typeId =
+            (int) $this->input(
+                'asset_type_id',
+                0
+            );
+
+
+        if (
+            $typeId > 0
+        ) {
+
+            $definitions =
+                AssetAttributeDefinition::query()
+                    ->where(
+                        'asset_type_id',
+                        $typeId
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->when(
+                        $companyId !== null,
+                        fn ($query) =>
+                            $query->where(
+                                'company_id',
+                                $companyId
+                            )
+                    )
+                    ->with([
+                        'options' => function ($query) {
+                            $query->where(
+                                'is_active',
+                                true
+                            );
+                        },
+                    ])
+                    ->get();
+
+
+            foreach (
+                $definitions as $definition
+            ) {
+
+                $id =
+                    (int) $definition->id;
+
+
+                $requiredAtWarehouse =
+                    $definition->required_stage
+                    ===
+                    'warehouse_entry';
+
+
+                if (
+                    $definition->data_type
+                    ===
+                    'photo'
+                ) {
+
+                    $field =
+                        'dynamic_attribute_files.'
+                        . $id;
+
+
+                    $photoRules = [
+                        'nullable',
+                        'file',
+                        'image',
+                        'mimes:jpg,jpeg,png,webp',
+                        'max:5120',
+                    ];
+
+
+                    if (
+                        $requiredAtWarehouse
+                        &&
+                        !(
+                            $asset instanceof Asset
+                            &&
+                            $asset->attributeValues()
+                                ->where(
+                                    'asset_attribute_definition_id',
+                                    $id
+                                )
+                                ->whereNotNull(
+                                    'file_path'
+                                )
+                                ->exists()
+                        )
+                    ) {
+
+                        $photoRules[0] =
+                            'required';
+                    }
+
+
+                    $rules[$field] =
+                        $photoRules;
+
+
+                    continue;
+                }
+
+
+                $field =
+                    'dynamic_attributes.'
+                    . $id;
+
+
+                $fieldRules = [
+                    $requiredAtWarehouse
+                        ? 'required'
+                        : 'nullable',
+                ];
+
+
+                switch (
+                    $definition->data_type
+                ) {
+
+                    case 'number':
+
+                        $fieldRules[] =
+                            'numeric';
+
+                        break;
+
+
+                    case 'date':
+
+                        $fieldRules[] =
+                            'date';
+
+                        break;
+
+
+                    case 'boolean':
+
+                        $fieldRules[] =
+                            'boolean';
+
+                        break;
+
+
+                    case 'select':
+
+                        $fieldRules[] =
+                            'integer';
+
+                        $fieldRules[] =
+                            function (
+                                string $attribute,
+                                mixed $value,
+                                Closure $fail
+                            ) use (
+                                $definition
+                            ): void {
+
+                                if (
+                                    $value === null
+                                    ||
+                                    $value === ''
+                                ) {
+                                    return;
+                                }
+
+
+                                $valid =
+                                    AssetAttributeOption::query()
+                                        ->whereKey(
+                                            $value
+                                        )
+                                        ->where(
+                                            'asset_attribute_definition_id',
+                                            $definition->id
+                                        )
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->exists();
+
+
+                                if (!$valid) {
+
+                                    $fail(
+                                        'ع¯ط²غŒظ†ظ‡ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ط¨ط±ط§غŒ '
+                                        . $definition->name
+                                        . ' ظ…ط¹طھط¨ط± ظ†غŒط³طھ.'
+                                    );
+                                }
+                            };
+
+                        break;
+
+
+                    case 'textarea':
+
+                        $fieldRules[] =
+                            'string';
+
+                        break;
+
+
+                    case 'text':
+                    default:
+
+                        $fieldRules[] =
+                            'string';
+
+                        $fieldRules[] =
+                            'max:2000';
+
+                        break;
+                }
+
+
+                $rules[$field] =
+                    $fieldRules;
+            }
+        }
+
+
+        return $rules;
+    }
+
+
+    protected function prepareForValidation(): void
+    {
+        /*
+         * Checkbox/Booleanظ‡ط§غŒ Dynamic ط§ع¯ط± ط§ط±ط³ط§ظ„ ظ†ط´ط¯ظ‡ ط¨ط§ط´ظ†ط¯ null ط¨ط§ظ‚غŒ
+         * ظ…غŒâ€Œظ…ط§ظ†ظ†ط¯. ط§غŒظ† ط±ظپطھط§ط± ط¨ط±ط§غŒ Optional ظ…ظ†ط§ط³ط¨ ط§ط³طھ.
+         */
+    }
+
+
+    public function messages(): array
+    {
+        return [
+
+            'asset_category_id.required' =>
+                'ط¯ط³طھظ‡â€Œط¨ظ†ط¯غŒ ط§ظ„ط²ط§ظ…غŒ ط§ط³طھ.',
+
+            'asset_category_id.exists' =>
+                'ط¯ط³طھظ‡â€Œط¨ظ†ط¯غŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.',
+
+            'asset_type_id.required' =>
+                'ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط§ظ„ط²ط§ظ…غŒ ط§ط³طھ.',
+
+            'asset_type_id.integer' =>
+                'ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.',
+
+            'inventory_code.unique' =>
+                'ط§غŒظ† ع©ط¯ ط§ظ†ط¨ط§ط± ظ‚ط¨ظ„ط§ظ‹ ط¯ط± ظ‡ظ…غŒظ† ط´ط±ع©طھ ط«ط¨طھ ط´ط¯ظ‡ ط§ط³طھ.',
+
+            'title.required' =>
+                'ط¹ظ†ظˆط§ظ† ط¯ط§ط±ط§غŒغŒ ط§ظ„ط²ط§ظ…غŒ ط§ط³طھ.',
+
+            'purchase_price.numeric' =>
+                'ظ…ط¨ظ„ط؛ ط®ط±غŒط¯ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.',
+        ];
+    }
+}
+
+
+============================================================
+ASSET CODE SERVICE
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\AssetCodeSequence;
+use App\Services\AssetCode\AssetCodePolicyEngine;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+
+final class AssetCodeService
+{
+    public function __construct(
+        private readonly AssetCodePolicyEngine $policyEngine,
+    ) {
+    }
+
+
+    public function generate(
+        int $companyId,
+        ?int $assetCategoryId = null,
+        ?int $assetTypeId = null,
+    ): string {
+
+        $policy =
+            $this->policyEngine->resolve(
+                companyId:
+                    $companyId,
+
+                assetCategoryId:
+                    $assetCategoryId,
+
+                assetTypeId:
+                    $assetTypeId,
+            );
+
+
+        $prefix =
+            $policy->prefix;
+
+
+        return DB::transaction(
+            function () use (
+                $companyId,
+                $policy,
+                $prefix
+            ): string {
+
+                $sequence =
+                    AssetCodeSequence::query()
+                        ->where(
+                            'company_id',
+                            $companyId
+                        )
+                        ->where(
+                            'prefix',
+                            $prefix
+                        )
+                        ->lockForUpdate()
+                        ->first();
+
+
+                if ($sequence === null) {
+
+                    try {
+
+                        $sequence =
+                            AssetCodeSequence::query()
+                                ->create([
+                                    'company_id' =>
+                                        $companyId,
+
+                                    'prefix' =>
+                                        $prefix,
+
+                                    'last_sequence' =>
+                                        0,
+                                ]);
+
+                    } catch (\Throwable) {
+
+                        /*
+                         * Another transaction may have created
+                         * the sequence row concurrently.
+                         */
+                        $sequence =
+                            AssetCodeSequence::query()
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->where(
+                                    'prefix',
+                                    $prefix
+                                )
+                                ->lockForUpdate()
+                                ->first();
+                    }
+                }
+
+
+                if ($sequence === null) {
+                    throw new RuntimeException(
+                        'Unable to initialize asset code sequence.'
+                    );
+                }
+
+
+                $next =
+                    ((int) $sequence->last_sequence)
+                    + 1;
+
+
+                $sequence->last_sequence =
+                    $next;
+
+                $sequence->save();
+
+
+                return $policy->format(
+                    $next
+                );
+            },
+            3
+        );
+    }
+}
+
+
+============================================================
+ASSET CODE POLICY ENGINE
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\AssetCode;
+
+use App\Models\AssetCategory;
+use App\Models\AssetCodePolicySetting;
+use App\Models\AssetType;
+use InvalidArgumentException;
+use RuntimeException;
+
+final class AssetCodePolicyEngine
+{
+    public function resolve(
+        int $companyId,
+        ?int $assetCategoryId = null,
+        ?int $assetTypeId = null,
+    ): AssetCodePolicy {
+
+        if ($companyId <= 0) {
+            throw new InvalidArgumentException(
+                'Company ID must be greater than zero.'
+            );
+        }
+
+
+        $settings =
+            AssetCodePolicySetting::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->first()
+            ??
+            AssetCodePolicySetting::defaultsFor(
+                $companyId
+            );
+
+
+        if ($assetCategoryId === null) {
+
+            return $this->buildPolicy(
+                categoryCode:
+                    null,
+
+                typeCode:
+                    null,
+
+                settings:
+                    $settings,
+            );
+        }
+
+
+        $category =
+            AssetCategory::query()
+                ->whereKey(
+                    $assetCategoryId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->first();
+
+
+        if ($category === null) {
+            throw new RuntimeException(
+                'Active asset category was not found.'
+            );
+        }
+
+
+        if ($assetTypeId === null) {
+
+            return $this->buildPolicy(
+                categoryCode:
+                    (string) $category->code,
+
+                typeCode:
+                    null,
+
+                settings:
+                    $settings,
+            );
+        }
+
+
+        $type =
+            AssetType::query()
+                ->whereKey(
+                    $assetTypeId
+                )
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'asset_category_id',
+                    $assetCategoryId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->first();
+
+
+        if ($type === null) {
+            throw new RuntimeException(
+                'Active asset type was not found for the selected company and category.'
+            );
+        }
+
+
+        return $this->buildPolicy(
+            categoryCode:
+                (string) $category->code,
+
+            typeCode:
+                (string) $type->code,
+
+            settings:
+                $settings,
+        );
+    }
+
+
+    public function buildPolicy(
+        ?string $categoryCode,
+        ?string $typeCode,
+        ?AssetCodePolicySetting $settings = null,
+    ): AssetCodePolicy {
+
+        $settings ??=
+            AssetCodePolicySetting::defaultsFor(
+                1
+            );
+
+
+        $fallback =
+            $this->normalizeSegment(
+                $settings->fallback_prefix
+            )
+            ??
+            'AST';
+
+
+        $separator =
+            in_array(
+                $settings->separator,
+                [
+                    '-',
+                    '_',
+                    '/',
+                    '.',
+                ],
+                true
+            )
+                ? $settings->separator
+                : '-';
+
+
+        $padding =
+            max(
+                1,
+                min(
+                    12,
+                    (int) $settings->padding
+                )
+            );
+
+
+        /*
+         * Legacy mode intentionally ignores category/type.
+         */
+        if (
+            $settings->mode
+            ===
+            AssetCodePolicySetting::MODE_LEGACY
+        ) {
+
+            return new AssetCodePolicy(
+                prefix:
+                    $fallback,
+
+                padding:
+                    $padding,
+
+                separator:
+                    $separator,
+            );
+        }
+
+
+        $category =
+            $this->normalizeSegment(
+                $categoryCode
+            );
+
+
+        $type =
+            $this->normalizeSegment(
+                $typeCode
+            );
+
+
+        $segments = [];
+
+
+        if (
+            $settings->include_category
+            &&
+            $category !== null
+        ) {
+            $segments[] =
+                $category;
+        }
+
+
+        if ($settings->include_type) {
+
+            if ($type !== null) {
+
+                $segments[] =
+                    $type;
+
+            } elseif (
+                $category !== null
+                &&
+                $settings->include_category
+            ) {
+
+                /*
+                 * Preserve current category-only behavior:
+                 *
+                 * COMPUTER-ASSET-000001
+                 */
+                $segments[] =
+                    'ASSET';
+            }
+        }
+
+
+        if ($segments === []) {
+
+            return new AssetCodePolicy(
+                prefix:
+                    $fallback,
+
+                padding:
+                    $padding,
+
+                separator:
+                    $separator,
+            );
+        }
+
+
+        return new AssetCodePolicy(
+            prefix:
+                implode(
+                    $separator,
+                    $segments
+                ),
+
+            padding:
+                $padding,
+
+            separator:
+                $separator,
+        );
+    }
+
+
+    private function normalizeSegment(
+        ?string $value
+    ): ?string {
+
+        if ($value === null) {
+            return null;
+        }
+
+
+        $value =
+            strtoupper(
+                trim(
+                    $value
+                )
+            );
+
+
+        if ($value === '') {
+            return null;
+        }
+
+
+        $value =
+            preg_replace(
+                '/[^A-Z0-9]+/',
+                '-',
+                $value
+            );
+
+
+        if ($value === null) {
+            return null;
+        }
+
+
+        $value =
+            trim(
+                $value,
+                '-'
+            );
+
+
+        return $value !== ''
+            ? $value
+            : null;
+    }
+}
+
+
+============================================================
+ASSET CODE POLICY
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\AssetCode;
+
+use InvalidArgumentException;
+
+final readonly class AssetCodePolicy
+{
+    public function __construct(
+        public string $prefix,
+        public int $padding = 6,
+        public string $separator = '-',
+    ) {
+        if (trim($this->prefix) === '') {
+            throw new InvalidArgumentException(
+                'Asset code prefix cannot be empty.'
+            );
+        }
+
+        if ($this->padding < 1 || $this->padding > 12) {
+            throw new InvalidArgumentException(
+                'Asset code padding must be between 1 and 12.'
+            );
+        }
+    }
+
+    public function format(int $sequence): string
+    {
+        if ($sequence < 1) {
+            throw new InvalidArgumentException(
+                'Asset code sequence must be greater than zero.'
+            );
+        }
+
+        return $this->prefix
+            . $this->separator
+            . str_pad(
+                (string) $sequence,
+                $this->padding,
+                '0',
+                STR_PAD_LEFT
+            );
+    }
+
+    public function parseSequence(string $code): ?int
+    {
+        $pattern =
+            '/^'
+            . preg_quote(
+                $this->prefix . $this->separator,
+                '/'
+            )
+            . '(\d{'
+            . $this->padding
+            . ',})$/';
+
+        if (
+            preg_match(
+                $pattern,
+                trim($code),
+                $matches
+            ) !== 1
+        ) {
+            return null;
+        }
+
+        $sequence = (int) $matches[1];
+
+        return $sequence > 0
+            ? $sequence
+            : null;
+    }
+
+    public function likePattern(): string
+    {
+        return $this->prefix
+            . $this->separator
+            . '%';
+    }
+}
+
+
+============================================================
+ASSET CODE POLICY SETTING MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+final class AssetCodePolicySetting extends Model
+{
+    public const MODE_SEMANTIC = 'semantic';
+    public const MODE_LEGACY = 'legacy';
+
+
+    protected $fillable = [
+        'company_id',
+        'mode',
+        'fallback_prefix',
+        'padding',
+        'separator',
+        'include_category',
+        'include_type',
+    ];
+
+
+    protected function casts(): array
+    {
+        return [
+            'company_id' =>
+                'integer',
+
+            'padding' =>
+                'integer',
+
+            'include_category' =>
+                'boolean',
+
+            'include_type' =>
+                'boolean',
+        ];
+    }
+
+
+    public static function defaultsFor(
+        int $companyId
+    ): self {
+
+        $setting = new self();
+
+        $setting->company_id =
+            $companyId;
+
+        $setting->mode =
+            self::MODE_SEMANTIC;
+
+        $setting->fallback_prefix =
+            'AST';
+
+        $setting->padding =
+            6;
+
+        $setting->separator =
+            '-';
+
+        $setting->include_category =
+            true;
+
+        $setting->include_type =
+            true;
+
+        return $setting;
+    }
+}
+
+
+============================================================
+ASSET CODE SEQUENCE MODEL
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+final class AssetCodeSequence extends Model
+{
+    protected $fillable = [
+        'company_id',
+        'prefix',
+        'last_sequence',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'company_id' =>
+                'integer',
+
+            'last_sequence' =>
+                'integer',
+        ];
+    }
+}
+
+
+============================================================
+POLICY PANEL CONTROLLER
+============================================================
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Models\AssetCategory;
+use App\Models\AssetCodePolicySetting;
+use App\Models\AssetCodeSequence;
+use App\Models\AssetType;
+use App\Models\Company;
+use App\Services\AssetCode\AssetCodePolicyEngine;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+
+final class AssetCodePolicySettingsController extends Controller
+{
+    public function index(
+        Request $request,
+        AssetCodePolicyEngine $engine
+    ): View {
+
+        $company =
+            $this->resolveCompany(
+                $request
+            );
+
+
+        $settings =
+            AssetCodePolicySetting::query()
+                ->where(
+                    'company_id',
+                    $company->id
+                )
+                ->first()
+            ??
+            AssetCodePolicySetting::defaultsFor(
+                (int) $company->id
+            );
+
+
+        $companies =
+            $request->user()
+                ->isSuperAdmin()
+
+                ? Company::query()
+                    ->orderBy(
+                        'name'
+                    )
+                    ->get()
+
+                : collect();
+
+
+        $category =
+            AssetCategory::query()
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy(
+                    'sort_order'
+                )
+                ->orderBy(
+                    'id'
+                )
+                ->first();
+
+
+        $type =
+            $category !== null
+
+                ? AssetType::withoutGlobalScopes()
+                    ->where(
+                        'company_id',
+                        $company->id
+                    )
+                    ->where(
+                        'asset_category_id',
+                        $category->id
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->orderBy(
+                        'sort_order'
+                    )
+                    ->orderBy(
+                        'id'
+                    )
+                    ->first()
+
+                : null;
+
+
+        $preview =
+            $engine
+                ->buildPolicy(
+                    categoryCode:
+                        $category?->code,
+
+                    typeCode:
+                        $type?->code,
+
+                    settings:
+                        $settings,
+                )
+                ->format(
+                    1
+                );
+
+
+        $sequences =
+            AssetCodeSequence::query()
+                ->where(
+                    'company_id',
+                    $company->id
+                )
+                ->orderBy(
+                    'prefix'
+                )
+                ->get();
+
+
+        return view(
+            'asset_settings.code_policy.index',
+            compact(
+                'company',
+                'companies',
+                'settings',
+                'preview',
+                'sequences',
+            )
+        );
+    }
+
+
+    public function update(
+        Request $request
+    ): RedirectResponse {
+
+        $company =
+            $this->resolveCompany(
+                $request
+            );
+
+
+        $validated =
+            $request->validate([
+                'mode' => [
+                    'required',
+                    Rule::in([
+                        AssetCodePolicySetting::MODE_SEMANTIC,
+                        AssetCodePolicySetting::MODE_LEGACY,
+                    ]),
+                ],
+
+                'fallback_prefix' => [
+                    'required',
+                    'string',
+                    'max:50',
+                    'regex:/^[A-Za-z0-9_-]+$/',
+                ],
+
+                'padding' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                    'max:12',
+                ],
+
+                'separator' => [
+                    'required',
+                    Rule::in([
+                        '-',
+                        '_',
+                        '/',
+                        '.',
+                    ]),
+                ],
+            ]);
+
+
+        $includeCategory =
+            $request->boolean(
+                'include_category'
+            );
+
+
+        $includeType =
+            $request->boolean(
+                'include_type'
+            );
+
+
+        if (
+            $validated['mode']
+            ===
+            AssetCodePolicySetting::MODE_SEMANTIC
+            &&
+            !$includeCategory
+            &&
+            !$includeType
+        ) {
+
+            throw ValidationException::withMessages([
+                'include_category' =>
+                    'ط¯ط± ط­ط§ظ„طھ ظ…ط¹ظ†ط§غŒغŒ ط­ط¯ط§ظ‚ظ„ ط¯ط³طھظ‡ ط¯ط§ط±ط§غŒغŒ غŒط§ ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ ط¨ط§غŒط¯ ط¯ط± ع©ط¯ ط§ط³طھظپط§ط¯ظ‡ ط´ظˆط¯.',
+            ]);
+        }
+
+
+        AssetCodePolicySetting::query()
+            ->updateOrCreate(
+                [
+                    'company_id' =>
+                        $company->id,
+                ],
+                [
+                    'mode' =>
+                        $validated['mode'],
+
+                    'fallback_prefix' =>
+                        strtoupper(
+                            $validated[
+                                'fallback_prefix'
+                            ]
+                        ),
+
+                    'padding' =>
+                        (int) $validated[
+                            'padding'
+                        ],
+
+                    'separator' =>
+                        $validated[
+                            'separator'
+                        ],
+
+                    'include_category' =>
+                        $includeCategory,
+
+                    'include_type' =>
+                        $includeType,
+                ]
+            );
+
+
+        return redirect()
+            ->route(
+                'asset-settings.code-policy.index',
+                $request->user()
+                    ->isSuperAdmin()
+                        ? [
+                            'company_id' =>
+                                $company->id,
+                        ]
+                        : []
+            )
+            ->with(
+                'success',
+                'ط³غŒط§ط³طھ ع©ط¯ع¯ط°ط§ط±غŒ ط§ظ…ظˆط§ظ„ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط°ط®غŒط±ظ‡ ط´ط¯.'
+            );
+    }
+
+
+    private function resolveCompany(
+        Request $request
+    ): Company {
+
+        $user =
+            $request->user();
+
+
+        if ($user->isSuperAdmin()) {
+
+            $companyId =
+                (int) (
+                    $request->input(
+                        'company_id'
+                    )
+                    ??
+                    $request->query(
+                        'company_id'
+                    )
+                    ??
+                    $user->company_id
+                    ??
+                    0
+                );
+
+
+            if ($companyId <= 0) {
+
+                $companyId =
+                    (int) Company::query()
+                        ->orderBy(
+                            'id'
+                        )
+                        ->value(
+                            'id'
+                        );
+            }
+
+
+            return Company::query()
+                ->findOrFail(
+                    $companyId
+                );
+        }
+
+
+        return Company::query()
+            ->findOrFail(
+                (int) $user->company_id
+            );
+    }
+}
+
+
+============================================================
+POLICY PANEL VIEW
+============================================================
+@extends('layouts.app')
+
+@section('content')
+
+<div dir="rtl" style="max-width:1100px;margin:0 auto;padding:24px;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;">
+        <div>
+            <h1 style="margin:0 0 8px;font-size:26px;">
+                طھظ†ط¸غŒظ…ط§طھ ع©ط¯ ط§ظ…ظˆط§ظ„
+            </h1>
+
+            <div style="color:#666;">
+                ط´ط±ع©طھ:
+                <strong>{{ $company->name }}</strong>
+            </div>
+        </div>
+
+        <a href="{{ route('asset-settings.types.index') }}"
+           style="text-decoration:none;padding:10px 14px;border:1px solid #ccc;border-radius:8px;">
+            ط§ظ†ظˆط§ط¹ ط¯ط§ط±ط§غŒغŒ
+        </a>
+    </div>
+
+
+    @if(session('success'))
+        <div style="padding:12px 16px;margin-bottom:18px;border:1px solid #9bd3a8;border-radius:8px;">
+            {{ session('success') }}
+        </div>
+    @endif
+
+
+    @if($errors->any())
+        <div style="padding:12px 16px;margin-bottom:18px;border:1px solid #e1a0a0;border-radius:8px;">
+            <ul style="margin:0;">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+
+    @if(auth()->user()->isSuperAdmin() && $companies->isNotEmpty())
+
+        <form method="GET"
+              action="{{ route('asset-settings.code-policy.index') }}"
+              style="margin-bottom:20px;padding:18px;border:1px solid #ddd;border-radius:10px;">
+
+            <label for="company_id">
+                ط§ظ†طھط®ط§ط¨ ط´ط±ع©طھ
+            </label>
+
+            <div style="display:flex;gap:10px;margin-top:8px;">
+
+                <select name="company_id"
+                        id="company_id"
+                        style="min-width:280px;padding:10px;">
+
+                    @foreach($companies as $item)
+
+                        <option value="{{ $item->id }}"
+                            @selected((int)$item->id === (int)$company->id)>
+
+                            {{ $item->name }}
+                            ({{ $item->code }})
+
+                        </option>
+
+                    @endforeach
+
+                </select>
+
+                <button type="submit"
+                        style="padding:10px 18px;cursor:pointer;">
+                    ظ†ظ…ط§غŒط´
+                </button>
+
+            </div>
+
+        </form>
+
+    @endif
+
+
+    <div style="padding:20px;border:1px solid #ddd;border-radius:10px;margin-bottom:22px;">
+
+        <div style="font-size:14px;color:#666;margin-bottom:6px;">
+            ظ¾غŒط´â€Œظ†ظ…ط§غŒط´ ع©ط¯ ط¬ط¯غŒط¯
+        </div>
+
+        <div style="font-family:monospace;font-size:24px;font-weight:700;direction:ltr;text-align:right;">
+            {{ $preview }}
+        </div>
+
+        <div style="margin-top:10px;font-size:13px;color:#777;">
+            طھط؛غŒغŒط± ط§غŒظ† طھظ†ط¸غŒظ…ط§طھ ظپظ‚ط· ط±ظˆغŒ ط¯ط§ط±ط§غŒغŒâ€Œظ‡ط§غŒ ط¬ط¯غŒط¯ ط§ط«ط± ط¯ط§ط±ط¯ ظˆ ع©ط¯ ط§ظ…ظˆط§ظ„ ظ‚ط¨ظ„غŒ طھط؛غŒغŒط± ظ†ظ…غŒâ€Œع©ظ†ط¯.
+        </div>
+
+    </div>
+
+
+    <form method="POST"
+          action="{{ route('asset-settings.code-policy.update') }}"
+          style="padding:22px;border:1px solid #ddd;border-radius:10px;">
+
+        @csrf
+        @method('PUT')
+
+        @if(auth()->user()->isSuperAdmin())
+            <input type="hidden"
+                   name="company_id"
+                   value="{{ $company->id }}">
+        @endif
+
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;">
+
+            <div>
+                <label for="mode">
+                    ط­ط§ظ„طھ ع©ط¯ع¯ط°ط§ط±غŒ
+                </label>
+
+                <select name="mode"
+                        id="mode"
+                        style="display:block;width:100%;padding:10px;margin-top:7px;">
+
+                    <option value="semantic"
+                        @selected(old('mode', $settings->mode) === 'semantic')>
+                        ظ…ط¹ظ†ط§غŒغŒ â€” ط¯ط³طھظ‡ / ظ†ظˆط¹ / ط´ظ…ط§ط±ظ‡
+                    </option>
+
+                    <option value="legacy"
+                        @selected(old('mode', $settings->mode) === 'legacy')>
+                        ط³ط§ط¯ظ‡ â€” Prefix / ط´ظ…ط§ط±ظ‡
+                    </option>
+
+                </select>
+            </div>
+
+
+            <div>
+                <label for="fallback_prefix">
+                    Prefix ظ¾غŒط´â€Œظپط±ط¶
+                </label>
+
+                <input type="text"
+                       name="fallback_prefix"
+                       id="fallback_prefix"
+                       value="{{ old('fallback_prefix', $settings->fallback_prefix) }}"
+                       style="display:block;width:100%;padding:10px;margin-top:7px;box-sizing:border-box;"
+                       maxlength="50">
+            </div>
+
+
+            <div>
+                <label for="padding">
+                    طھط¹ط¯ط§ط¯ ط§ط±ظ‚ط§ظ… ط´ظ…ط§ط±ظ‡ ط³ط±غŒط§ظ„
+                </label>
+
+                <input type="number"
+                       min="1"
+                       max="12"
+                       name="padding"
+                       id="padding"
+                       value="{{ old('padding', $settings->padding) }}"
+                       style="display:block;width:100%;padding:10px;margin-top:7px;box-sizing:border-box;">
+            </div>
+
+
+            <div>
+                <label for="separator">
+                    ط¬ط¯ط§ع©ظ†ظ†ط¯ظ‡
+                </label>
+
+                <select name="separator"
+                        id="separator"
+                        style="display:block;width:100%;padding:10px;margin-top:7px;">
+
+                    @foreach(['-' => '-', '_' => '_', '/' => '/', '.' => '.'] as $value => $label)
+
+                        <option value="{{ $value }}"
+                            @selected(old('separator', $settings->separator) === $value)>
+                            {{ $label }}
+                        </option>
+
+                    @endforeach
+
+                </select>
+            </div>
+
+        </div>
+
+
+        <div style="margin-top:22px;display:flex;gap:24px;flex-wrap:wrap;">
+
+            <label>
+                <input type="checkbox"
+                       name="include_category"
+                       value="1"
+                       @checked(old('include_category', $settings->include_category))>
+
+                ط§ط³طھظپط§ط¯ظ‡ ط§ط² ع©ط¯ ط¯ط³طھظ‡ ط¯ط§ط±ط§غŒغŒ
+            </label>
+
+
+            <label>
+                <input type="checkbox"
+                       name="include_type"
+                       value="1"
+                       @checked(old('include_type', $settings->include_type))>
+
+                ط§ط³طھظپط§ط¯ظ‡ ط§ط² ع©ط¯ ظ†ظˆط¹ ط¯ط§ط±ط§غŒغŒ
+            </label>
+
+        </div>
+
+
+        <div style="margin-top:24px;">
+
+            <button type="submit"
+                    style="padding:11px 22px;font-weight:700;cursor:pointer;">
+                ط°ط®غŒط±ظ‡ طھظ†ط¸غŒظ…ط§طھ ع©ط¯ ط§ظ…ظˆط§ظ„
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <div style="margin-top:24px;padding:20px;border:1px solid #ddd;border-radius:10px;">
+
+        <h2 style="margin-top:0;font-size:19px;">
+            ط´ظ…ط§ط±ظ†ط¯ظ‡â€Œظ‡ط§غŒ ظپط¹ط§ظ„
+        </h2>
+
+        @if($sequences->isEmpty())
+
+            <div style="color:#777;">
+                ظ‡ظ†ظˆط² ط´ظ…ط§ط±ظ†ط¯ظ‡â€Œط§غŒ ط¨ط±ط§غŒ ط§غŒظ† ط´ط±ع©طھ ط«ط¨طھ ظ†ط´ط¯ظ‡ ط§ط³طھ.
+            </div>
+
+        @else
+
+            <div style="overflow-x:auto;">
+
+                <table style="width:100%;border-collapse:collapse;">
+
+                    <thead>
+                        <tr>
+                            <th style="text-align:right;padding:10px;border-bottom:1px solid #ddd;">
+                                Prefix
+                            </th>
+                            <th style="text-align:right;padding:10px;border-bottom:1px solid #ddd;">
+                                ط¢ط®ط±غŒظ† ط´ظ…ط§ط±ظ‡
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach($sequences as $sequence)
+
+                            <tr>
+                                <td style="padding:10px;border-bottom:1px solid #eee;font-family:monospace;direction:ltr;text-align:right;">
+                                    {{ $sequence->prefix }}
+                                </td>
+
+                                <td style="padding:10px;border-bottom:1px solid #eee;">
+                                    {{ number_format($sequence->last_sequence) }}
+                                </td>
+                            </tr>
+
+                        @endforeach
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        @endif
+
+    </div>
+
+</div>
+
+@endsection
+
+
+============================================================
+SITE DATABASE SCHEMA
+============================================================
+array:11 [
+  0 => {#7212
+    +"cid": 0
+    +"name": "id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 1
+  }
+  1 => {#7209
+    +"cid": 1
+    +"name": "company_id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  2 => {#7208
+    +"cid": 2
+    +"name": "name"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  3 => {#7207
+    +"cid": 3
+    +"name": "code"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  4 => {#7206
+    +"cid": 4
+    +"name": "type"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": "'site'"
+    +"pk": 0
+  }
+  5 => {#7205
+    +"cid": 5
+    +"name": "address"
+    +"type": "varchar"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  6 => {#7204
+    +"cid": 6
+    +"name": "description"
+    +"type": "TEXT"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  7 => {#7203
+    +"cid": 7
+    +"name": "is_active"
+    +"type": "tinyint(1)"
+    +"notnull": 1
+    +"dflt_value": "'1'"
+    +"pk": 0
+  }
+  8 => {#7202
+    +"cid": 8
+    +"name": "sort_order"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": "'0'"
+    +"pk": 0
+  }
+  9 => {#7201
+    +"cid": 9
+    +"name": "created_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  10 => {#7200
+    +"cid": 10
+    +"name": "updated_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:2 [
+  0 => {#7202
+    +"seq": 0
+    +"name": "sites_company_id_is_active_index"
+    +"unique": 0
+    +"origin": "c"
+    +"partial": 0
+  }
+  1 => {#7203
+    +"seq": 1
+    +"name": "sites_company_id_code_unique"
+    +"unique": 1
+    +"origin": "c"
+    +"partial": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:2
+
+
+============================================================
+ASSET CATEGORY DATABASE SCHEMA
+============================================================
+array:9 [
+  0 => {#7212
+    +"cid": 0
+    +"name": "id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 1
+  }
+  1 => {#7209
+    +"cid": 1
+    +"name": "name"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  2 => {#7208
+    +"cid": 2
+    +"name": "code"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  3 => {#7207
+    +"cid": 3
+    +"name": "description"
+    +"type": "TEXT"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  4 => {#7206
+    +"cid": 4
+    +"name": "sort_order"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": "'0'"
+    +"pk": 0
+  }
+  5 => {#7205
+    +"cid": 5
+    +"name": "is_active"
+    +"type": "tinyint(1)"
+    +"notnull": 1
+    +"dflt_value": "'1'"
+    +"pk": 0
+  }
+  6 => {#7204
+    +"cid": 6
+    +"name": "created_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  7 => {#7203
+    +"cid": 7
+    +"name": "updated_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  8 => {#7202
+    +"cid": 8
+    +"name": "coding_code"
+    +"type": "varchar"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:1 [
+  0 => {#7204
+    +"seq": 0
+    +"name": "asset_categories_code_unique"
+    +"unique": 1
+    +"origin": "c"
+    +"partial": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:2
+
+
+============================================================
+ASSET TYPE DATABASE SCHEMA
+============================================================
+array:11 [
+  0 => {#7212
+    +"cid": 0
+    +"name": "id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 1
+  }
+  1 => {#7209
+    +"cid": 1
+    +"name": "company_id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  2 => {#7208
+    +"cid": 2
+    +"name": "asset_category_id"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  3 => {#7207
+    +"cid": 3
+    +"name": "name"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  4 => {#7206
+    +"cid": 4
+    +"name": "code"
+    +"type": "varchar"
+    +"notnull": 1
+    +"dflt_value": null
+    +"pk": 0
+  }
+  5 => {#7205
+    +"cid": 5
+    +"name": "description"
+    +"type": "TEXT"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  6 => {#7204
+    +"cid": 6
+    +"name": "is_active"
+    +"type": "tinyint(1)"
+    +"notnull": 1
+    +"dflt_value": "'1'"
+    +"pk": 0
+  }
+  7 => {#7203
+    +"cid": 7
+    +"name": "sort_order"
+    +"type": "INTEGER"
+    +"notnull": 1
+    +"dflt_value": "'10'"
+    +"pk": 0
+  }
+  8 => {#7202
+    +"cid": 8
+    +"name": "created_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  9 => {#7201
+    +"cid": 9
+    +"name": "updated_at"
+    +"type": "datetime"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+  10 => {#7200
+    +"cid": 10
+    +"name": "coding_code"
+    +"type": "varchar"
+    +"notnull": 0
+    +"dflt_value": null
+    +"pk": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:2 [
+  0 => {#7202
+    +"seq": 0
+    +"name": "asset_types_company_id_asset_category_id_is_active_index"
+    +"unique": 0
+    +"origin": "c"
+    +"partial": 0
+  }
+  1 => {#7203
+    +"seq": 1
+    +"name": "asset_types_company_code_unique"
+    +"unique": 1
+    +"origin": "c"
+    +"partial": 0
+  }
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:2
+
+
+============================================================
+ASSET DATABASE CODING COLUMNS
+============================================================
+{#7323
+  +"cid": 1
+  +"name": "asset_category_id"
+  +"type": "INTEGER"
+  +"notnull": 1
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7322
+  +"cid": 2
+  +"name": "inventory_code"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7321
+  +"cid": 3
+  +"name": "asset_code"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7305
+  +"cid": 19
+  +"name": "asset_type_id"
+  +"type": "INTEGER"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7304
+  +"cid": 20
+  +"name": "custody_type"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7300
+  +"cid": 24
+  +"name": "current_site_id"
+  +"type": "INTEGER"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7298
+  +"cid": 26
+  +"name": "coding_site_id"
+  +"type": "INTEGER"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7297
+  +"cid": 27
+  +"name": "code_main_nature_id"
+  +"type": "INTEGER"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7296
+  +"cid": 28
+  +"name": "code_sub_nature_id"
+  +"type": "INTEGER"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7295
+  +"cid": 29
+  +"name": "coding_site_code_snapshot"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7294
+  +"cid": 30
+  +"name": "main_nature_code_snapshot"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+{#7293
+  +"cid": 31
+  +"name": "sub_nature_code_snapshot"
+  +"type": "varchar"
+  +"notnull": 0
+  +"dflt_value": null
+  +"pk": 0
+} // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT SITES
+============================================================
+array:11 [
+  "id" => 2
+  "company_id" => 3
+  "name" => "╪│╪د█î╪ز ╪ز╪│╪ز ╪│╪د╪▓┘à╪د┘█î"
+  "code" => "ORG-TEST-01"
+  "type" => "site"
+  "address" => null
+  "description" => null
+  "is_active" => true
+  "sort_order" => 0
+  "created_at" => "2026-08-08T17:55:04.000000Z"
+  "updated_at" => "2026-08-08T17:55:04.000000Z"
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT ASSET CATEGORIES
+============================================================
+array:9 [
+  "id" => 1
+  "name" => "╪ز╪ش┘ç█î╪▓╪د╪ز ╪▒╪د█î╪د┘┘ç\u{200C}╪د█î"
+  "code" => "COMPUTER"
+  "description" => null
+  "sort_order" => 10
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 2
+  "name" => "╪ز╪ش┘ç█î╪▓╪د╪ز ╪د╪»╪د╪▒█î"
+  "code" => "OFFICE"
+  "description" => null
+  "sort_order" => 20
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 3
+  "name" => "┘à╪ذ┘┘à╪د┘ ┘ê ╪د╪س╪د╪س█î┘ç"
+  "code" => "FURNITURE"
+  "description" => null
+  "sort_order" => 30
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 4
+  "name" => "╪ز╪ش┘ç█î╪▓╪د╪ز ╪┤╪ذ┌ر┘ç"
+  "code" => "NETWORK"
+  "description" => null
+  "sort_order" => 40
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 5
+  "name" => "╪د╪ذ╪▓╪د╪▒ ┘ê ╪ز╪ش┘ç█î╪▓╪د╪ز ┘┘█î"
+  "code" => "TECHNICAL"
+  "description" => null
+  "sort_order" => 50
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 6
+  "name" => "┘ê╪│╪د█î┘ ┘┘é┘█î┘ç"
+  "code" => "VEHICLE"
+  "description" => null
+  "sort_order" => 60
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:9 [
+  "id" => 7
+  "name" => "╪│╪د█î╪▒"
+  "code" => "OTHER"
+  "description" => null
+  "sort_order" => 100
+  "is_active" => true
+  "created_at" => "2026-07-31T15:35:30.000000Z"
+  "updated_at" => "2026-07-31T15:35:30.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT ASSET TYPES
+============================================================
+array:11 [
+  "id" => 1
+  "company_id" => 2
+  "asset_category_id" => 1
+  "name" => "┘┘╛\u{200C}╪ز╪د┘╛"
+  "code" => "LAPTOP"
+  "description" => null
+  "is_active" => true
+  "sort_order" => 10
+  "created_at" => "2026-08-13T09:58:03.000000Z"
+  "updated_at" => "2026-08-13T09:58:03.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:11 [
+  "id" => 2
+  "company_id" => 2
+  "asset_category_id" => 1
+  "name" => "┘à╪د┘ê╪│"
+  "code" => "MOUSE"
+  "description" => null
+  "is_active" => true
+  "sort_order" => 20
+  "created_at" => "2026-08-13T09:58:03.000000Z"
+  "updated_at" => "2026-08-13T09:58:03.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:11 [
+  "id" => 3
+  "company_id" => 2
+  "asset_category_id" => 1
+  "name" => "┘à╪د┘█î╪ز┘ê╪▒"
+  "code" => "MONITOR"
+  "description" => null
+  "is_active" => true
+  "sort_order" => 30
+  "created_at" => "2026-08-13T09:58:03.000000Z"
+  "updated_at" => "2026-08-13T09:58:03.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:11 [
+  "id" => 4
+  "company_id" => 2
+  "asset_category_id" => 1
+  "name" => "┘╛╪▒█î┘╪ز╪▒"
+  "code" => "PRINTER"
+  "description" => null
+  "is_active" => true
+  "sort_order" => 40
+  "created_at" => "2026-08-13T09:58:03.000000Z"
+  "updated_at" => "2026-08-13T09:58:03.000000Z"
+  "coding_code" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT ASSET CODE POLICY SETTINGS
+============================================================
+array:10 [
+  "id" => 1
+  "company_id" => 1
+  "mode" => "legacy"
+  "fallback_prefix" => "KIMIA"
+  "padding" => 11
+  "separator" => "."
+  "include_category" => true
+  "include_type" => true
+  "created_at" => "2026-08-20T18:07:29.000000Z"
+  "updated_at" => "2026-08-20T18:08:01.000000Z"
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT ASSET CODE SEQUENCES
+============================================================
+array:6 [
+  "id" => 1
+  "company_id" => 2
+  "prefix" => "AST"
+  "last_sequence" => 1
+  "created_at" => "2026-08-20T17:52:19.000000Z"
+  "updated_at" => "2026-08-20T17:52:19.000000Z"
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+CURRENT ASSETS CODING DATA
+============================================================
+array:8 [
+  "id" => 1
+  "company_id" => 1
+  "asset_category_id" => 1
+  "asset_type_id" => null
+  "asset_code" => "AST-0001"
+  "current_site_id" => null
+  "coding_site_id" => null
+  "coding_site_code_snapshot" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:8 [
+  "id" => 2
+  "company_id" => 2
+  "asset_category_id" => 1
+  "asset_type_id" => null
+  "asset_code" => "MOVEMENT-BROWSER-001"
+  "current_site_id" => null
+  "coding_site_id" => null
+  "coding_site_code_snapshot" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+array:8 [
+  "id" => 3
+  "company_id" => 2
+  "asset_category_id" => 1
+  "asset_type_id" => 1
+  "asset_code" => "AST-000001"
+  "current_site_id" => null
+  "coding_site_id" => null
+  "coding_site_code_snapshot" => null
+] // vendor\psy\psysh\src\ExecutionClosure.php(41) : eval()'d code:1
+
+
+============================================================
+ASSET CODE RELATED MIGRATIONS
+============================================================
+
+---------------- 2026_07_31_153128_make_asset_code_nullable_in_assets_table.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('assets', function (Blueprint $table): void {
+            $table->string('asset_code', 100)
+                ->nullable()
+                ->change();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('assets', function (Blueprint $table): void {
+            $table->string('asset_code', 100)
+                ->nullable(false)
+                ->change();
+        });
+    }
+};
+
+---------------- 2026_08_07_095358_make_asset_codes_unique_per_company.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('assets', function (Blueprint $table) {
+
+            /*
+             * ط­ط°ظپ Unique ط³ط±ط§ط³ط±غŒ
+             */
+            $table->dropUnique(
+                'assets_asset_code_unique'
+            );
+
+            $table->dropUnique(
+                'assets_inventory_code_unique'
+            );
+
+
+            /*
+             * Unique ط¯ط§ط®ظ„ ظ‡ط± ط´ط±ع©طھ
+             */
+            $table->unique(
+                [
+                    'company_id',
+                    'asset_code',
+                ],
+                'assets_company_asset_code_unique'
+            );
+
+            $table->unique(
+                [
+                    'company_id',
+                    'inventory_code',
+                ],
+                'assets_company_inventory_code_unique'
+            );
+        });
+    }
+
+
+    public function down(): void
+    {
+        Schema::table('assets', function (Blueprint $table) {
+
+            $table->dropUnique(
+                'assets_company_asset_code_unique'
+            );
+
+            $table->dropUnique(
+                'assets_company_inventory_code_unique'
+            );
+
+
+            $table->unique(
+                'asset_code',
+                'assets_asset_code_unique'
+            );
+
+            $table->unique(
+                'inventory_code',
+                'assets_inventory_code_unique'
+            );
+        });
+    }
+};
+
+---------------- 2026_08_20_212200_create_asset_code_sequences_table.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(
+            'asset_code_sequences',
+            function (Blueprint $table): void {
+
+                $table->id();
+
+                $table->unsignedBigInteger(
+                    'company_id'
+                );
+
+                $table->string(
+                    'prefix',
+                    150
+                );
+
+                $table->unsignedBigInteger(
+                    'last_sequence'
+                )
+                    ->default(
+                        0
+                    );
+
+                $table->timestamps();
+
+                $table->unique(
+                    [
+                        'company_id',
+                        'prefix',
+                    ],
+                    'asset_code_sequences_company_prefix_unique'
+                );
+            }
+        );
+
+
+        /*
+         * Backfill from existing semantic codes.
+         *
+         * Examples:
+         *
+         * COMPUTER-LAPTOP-000001
+         * COMPUTER-MOUSE-000004
+         *
+         * Legacy values such as:
+         *
+         * AST-0001
+         * MOVEMENT-BROWSER-001
+         *
+         * are intentionally ignored unless they match
+         * the current six-digit policy structure.
+         */
+        $assets =
+            DB::table(
+                'assets'
+            )
+                ->select([
+                    'company_id',
+                    'asset_code',
+                ])
+                ->whereNotNull(
+                    'company_id'
+                )
+                ->whereNotNull(
+                    'asset_code'
+                )
+                ->get();
+
+
+        $maxima = [];
+
+
+        foreach ($assets as $asset) {
+
+            $code =
+                trim(
+                    (string) $asset->asset_code
+                );
+
+
+            if (
+                preg_match(
+                    '/^(.+)-(\d{6,})$/',
+                    $code,
+                    $matches
+                ) !== 1
+            ) {
+                continue;
+            }
+
+
+            $companyId =
+                (int) $asset->company_id;
+
+            $prefix =
+                trim(
+                    (string) $matches[1]
+                );
+
+            $sequence =
+                (int) $matches[2];
+
+
+            if (
+                $companyId <= 0
+                || $prefix === ''
+                || $sequence <= 0
+            ) {
+                continue;
+            }
+
+
+            $key =
+                $companyId
+                . '|'
+                . $prefix;
+
+
+            if (
+                !isset(
+                    $maxima[$key]
+                )
+                ||
+                $sequence
+                >
+                $maxima[$key]['sequence']
+            ) {
+
+                $maxima[$key] = [
+                    'company_id' =>
+                        $companyId,
+
+                    'prefix' =>
+                        $prefix,
+
+                    'sequence' =>
+                        $sequence,
+                ];
+            }
+        }
+
+
+        foreach ($maxima as $item) {
+
+            DB::table(
+                'asset_code_sequences'
+            )
+                ->insert([
+                    'company_id' =>
+                        $item[
+                            'company_id'
+                        ],
+
+                    'prefix' =>
+                        $item[
+                            'prefix'
+                        ],
+
+                    'last_sequence' =>
+                        $item[
+                            'sequence'
+                        ],
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+        }
+    }
+
+
+    public function down(): void
+    {
+        Schema::dropIfExists(
+            'asset_code_sequences'
+        );
+    }
+};
+
+---------------- 2026_08_20_212900_create_asset_code_policy_settings_table.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(
+            'asset_code_policy_settings',
+            function (Blueprint $table): void {
+
+                $table->id();
+
+                $table->unsignedBigInteger(
+                    'company_id'
+                )
+                    ->unique();
+
+                $table->string(
+                    'mode',
+                    20
+                )
+                    ->default(
+                        'semantic'
+                    );
+
+                $table->string(
+                    'fallback_prefix',
+                    50
+                )
+                    ->default(
+                        'AST'
+                    );
+
+                $table->unsignedTinyInteger(
+                    'padding'
+                )
+                    ->default(
+                        6
+                    );
+
+                $table->string(
+                    'separator',
+                    1
+                )
+                    ->default(
+                        '-'
+                    );
+
+                $table->boolean(
+                    'include_category'
+                )
+                    ->default(
+                        true
+                    );
+
+                $table->boolean(
+                    'include_type'
+                )
+                    ->default(
+                        true
+                    );
+
+                $table->timestamps();
+            }
+        );
+    }
+
+
+    public function down(): void
+    {
+        Schema::dropIfExists(
+            'asset_code_policy_settings'
+        );
+    }
+};
+
+---------------- 2026_08_20_220000_create_asset_code_classification_layer.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Main Nature
+        |--------------------------------------------------------------------------
+        |
+        | Company-specific coding dictionary.
+        |
+        | Examples:
+        | 01 = Land
+        | 02 = Building
+        | 03 = Machinery
+        |
+        */
+
+        Schema::create(
+            'asset_code_main_natures',
+            function (Blueprint $table): void {
+
+                $table->id();
+
+                $table->foreignId(
+                    'company_id'
+                )
+                    ->constrained(
+                        'companies'
+                    )
+                    ->cascadeOnDelete();
+
+                $table->string(
+                    'name',
+                    255
+                );
+
+                $table->string(
+                    'code',
+                    30
+                );
+
+                $table->text(
+                    'description'
+                )
+                    ->nullable();
+
+                $table->boolean(
+                    'is_active'
+                )
+                    ->default(
+                        true
+                    );
+
+                $table->unsignedInteger(
+                    'sort_order'
+                )
+                    ->default(
+                        10
+                    );
+
+                $table->timestamps();
+
+                $table->unique(
+                    [
+                        'company_id',
+                        'code',
+                    ],
+                    'asset_code_main_natures_company_code_unique'
+                );
+
+                $table->index(
+                    [
+                        'company_id',
+                        'is_active',
+                    ],
+                    'asset_code_main_natures_company_active_idx'
+                );
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sub Nature
+        |--------------------------------------------------------------------------
+        |
+        | Child coding dictionary.
+        |
+        | Example:
+        | Machinery (03)
+        |   -> Forklift (012)
+        |   -> Compressor (013)
+        |
+        */
+
+        Schema::create(
+            'asset_code_sub_natures',
+            function (Blueprint $table): void {
+
+                $table->id();
+
+                $table->foreignId(
+                    'company_id'
+                )
+                    ->constrained(
+                        'companies'
+                    )
+                    ->cascadeOnDelete();
+
+                $table->foreignId(
+                    'main_nature_id'
+                )
+                    ->constrained(
+                        'asset_code_main_natures'
+                    )
+                    ->cascadeOnUpdate()
+                    ->restrictOnDelete();
+
+                $table->string(
+                    'name',
+                    255
+                );
+
+                $table->string(
+                    'code',
+                    30
+                );
+
+                $table->text(
+                    'description'
+                )
+                    ->nullable();
+
+                $table->boolean(
+                    'is_active'
+                )
+                    ->default(
+                        true
+                    );
+
+                $table->unsignedInteger(
+                    'sort_order'
+                )
+                    ->default(
+                        10
+                    );
+
+                $table->timestamps();
+
+                $table->unique(
+                    [
+                        'company_id',
+                        'main_nature_id',
+                        'code',
+                    ],
+                    'asset_code_sub_natures_parent_code_unique'
+                );
+
+                $table->index(
+                    [
+                        'company_id',
+                        'main_nature_id',
+                        'is_active',
+                    ],
+                    'asset_code_sub_natures_parent_active_idx'
+                );
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Immutable Coding Classification On Asset
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        |
+        | coding_site_id is NOT current_site_id.
+        |
+        | current_site_id can change because the asset moves.
+        | coding_site_id identifies the site used when the permanent
+        | asset code was issued.
+        |
+        */
+
+        Schema::table(
+            'assets',
+            function (Blueprint $table): void {
+
+                $table->foreignId(
+                    'coding_site_id'
+                )
+                    ->nullable()
+                    ->after(
+                        'asset_type_id'
+                    )
+                    ->constrained(
+                        'sites'
+                    )
+                    ->cascadeOnUpdate()
+                    ->nullOnDelete();
+
+                $table->foreignId(
+                    'code_main_nature_id'
+                )
+                    ->nullable()
+                    ->after(
+                        'coding_site_id'
+                    )
+                    ->constrained(
+                        'asset_code_main_natures'
+                    )
+                    ->cascadeOnUpdate()
+                    ->nullOnDelete();
+
+                $table->foreignId(
+                    'code_sub_nature_id'
+                )
+                    ->nullable()
+                    ->after(
+                        'code_main_nature_id'
+                    )
+                    ->constrained(
+                        'asset_code_sub_natures'
+                    )
+                    ->cascadeOnUpdate()
+                    ->nullOnDelete();
+
+                /*
+                 * Snapshots preserve the exact code components
+                 * used at issuance time even if dictionary labels
+                 * or codes are edited later.
+                 */
+
+                $table->string(
+                    'coding_site_code_snapshot',
+                    50
+                )
+                    ->nullable()
+                    ->after(
+                        'code_sub_nature_id'
+                    );
+
+                $table->string(
+                    'main_nature_code_snapshot',
+                    30
+                )
+                    ->nullable()
+                    ->after(
+                        'coding_site_code_snapshot'
+                    );
+
+                $table->string(
+                    'sub_nature_code_snapshot',
+                    30
+                )
+                    ->nullable()
+                    ->after(
+                        'main_nature_code_snapshot'
+                    );
+
+                $table->index(
+                    [
+                        'company_id',
+                        'coding_site_id',
+                    ],
+                    'assets_company_coding_site_idx'
+                );
+
+                $table->index(
+                    [
+                        'company_id',
+                        'code_main_nature_id',
+                        'code_sub_nature_id',
+                    ],
+                    'assets_company_code_natures_idx'
+                );
+            }
+        );
+    }
+
+
+    public function down(): void
+    {
+        Schema::table(
+            'assets',
+            function (Blueprint $table): void {
+
+                $table->dropIndex(
+                    'assets_company_code_natures_idx'
+                );
+
+                $table->dropIndex(
+                    'assets_company_coding_site_idx'
+                );
+
+                $table->dropForeign([
+                    'code_sub_nature_id',
+                ]);
+
+                $table->dropForeign([
+                    'code_main_nature_id',
+                ]);
+
+                $table->dropForeign([
+                    'coding_site_id',
+                ]);
+
+                $table->dropColumn([
+                    'coding_site_id',
+                    'code_main_nature_id',
+                    'code_sub_nature_id',
+                    'coding_site_code_snapshot',
+                    'main_nature_code_snapshot',
+                    'sub_nature_code_snapshot',
+                ]);
+            }
+        );
+
+        Schema::dropIfExists(
+            'asset_code_sub_natures'
+        );
+
+        Schema::dropIfExists(
+            'asset_code_main_natures'
+        );
+    }
+};
+
+---------------- 2026_08_20_220200_use_existing_master_data_for_asset_coding.php ----------------
+
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Existing AssetCategory = coding main nature
+        |--------------------------------------------------------------------------
+        */
+
+        Schema::table(
+            'asset_categories',
+            function (Blueprint $table): void {
+
+                if (
+                    !Schema::hasColumn(
+                        'asset_categories',
+                        'coding_code'
+                    )
+                ) {
+
+                    $table->string(
+                        'coding_code',
+                        30
+                    )
+                        ->nullable()
+                        ->after(
+                            'code'
+                        );
+                }
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Existing AssetType = coding sub nature
+        |--------------------------------------------------------------------------
+        */
+
+        Schema::table(
+            'asset_types',
+            function (Blueprint $table): void {
+
+                if (
+                    !Schema::hasColumn(
+                        'asset_types',
+                        'coding_code'
+                    )
+                ) {
+
+                    $table->string(
+                        'coding_code',
+                        30
+                    )
+                        ->nullable()
+                        ->after(
+                            'code'
+                        );
+                }
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove parallel classification references from Asset
+        |--------------------------------------------------------------------------
+        |
+        | We KEEP:
+        |
+        | coding_site_id
+        | coding_site_code_snapshot
+        | main_nature_code_snapshot
+        | sub_nature_code_snapshot
+        |
+        | But the source of main/sub codes becomes:
+        |
+        | asset_category_id -> asset_categories.coding_code
+        | asset_type_id     -> asset_types.coding_code
+        |
+        */
+
+        Schema::table(
+            'assets',
+            function (Blueprint $table): void {
+
+                if (
+                    Schema::hasColumn(
+                        'assets',
+                        'code_sub_nature_id'
+                    )
+                ) {
+
+                    $table->dropForeign([
+                        'code_sub_nature_id',
+                    ]);
+                }
+
+
+                if (
+                    Schema::hasColumn(
+                        'assets',
+                        'code_main_nature_id'
+                    )
+                ) {
+
+                    $table->dropForeign([
+                        'code_main_nature_id',
+                    ]);
+                }
+
+
+                if (
+                    Schema::hasColumn(
+                        'assets',
+                        'code_sub_nature_id'
+                    )
+                ) {
+
+                    $table->dropColumn(
+                        'code_sub_nature_id'
+                    );
+                }
+
+
+                if (
+                    Schema::hasColumn(
+                        'assets',
+                        'code_main_nature_id'
+                    )
+                ) {
+
+                    $table->dropColumn(
+                        'code_main_nature_id'
+                    );
+                }
+            }
+        );
+
+
+        /*
+         * Parallel dictionary tables are no longer needed.
+         */
+
+        Schema::dropIfExists(
+            'asset_code_sub_natures'
+        );
+
+        Schema::dropIfExists(
+            'asset_code_main_natures'
+        );
+    }
+
+
+    public function down(): void
+    {
+        Schema::table(
+            'asset_types',
+            function (Blueprint $table): void {
+
+                if (
+                    Schema::hasColumn(
+                        'asset_types',
+                        'coding_code'
+                    )
+                ) {
+
+                    $table->dropColumn(
+                        'coding_code'
+                    );
+                }
+            }
+        );
+
+
+        Schema::table(
+            'asset_categories',
+            function (Blueprint $table): void {
+
+                if (
+                    Schema::hasColumn(
+                        'asset_categories',
+                        'coding_code'
+                    )
+                ) {
+
+                    $table->dropColumn(
+                        'coding_code'
+                    );
+                }
+            }
+        );
+    }
+};
+
+
+============================================================
+MIGRATION STATUS
+============================================================
+
+  Migration name .................................................................................... Batch / Status  
+  0001_01_01_000000_create_users_table ..................................................................... [1] Ran  
+  0001_01_01_000001_create_cache_table ..................................................................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ...................................................................... [1] Ran  
+  2026_07_16_152856_create_login_sessions_table ............................................................ [1] Ran  
+  2026_07_16_182700_add_username_and_is_active_to_users_table .............................................. [2] Ran  
+  2026_07_19_190033_create_roles_table ..................................................................... [3] Ran  
+  2026_07_19_190433_add_role_id_to_users_table ............................................................. [4] Ran  
+  2026_07_20_163632_create_permissions_table ............................................................... [5] Ran  
+  2026_07_20_163836_create_role_permissions_table .......................................................... [6] Ran  
+  2026_07_21_160541_create_asset_categories_table .......................................................... [7] Ran  
+  2026_07_21_161018_create_assets_table .................................................................... [8] Ran  
+  2026_07_31_153128_make_asset_code_nullable_in_assets_table ............................................... [9] Ran  
+  2026_08_01_175113_create_asset_transactions_table ....................................................... [10] Ran  
+  2026_08_01_180838_add_status_and_plate_number_to_assets_table ........................................... [11] Ran  
+  2026_08_06_185717_add_company_id_to_users_table ......................................................... [13] Ran  
+  2026_08_06_190000_create_companies_table ................................................................ [12] Ran  
+  2026_08_07_060411_add_company_id_to_asset_transactions_table ............................................ [14] Ran  
+  2026_08_07_060411_add_company_id_to_assets_table ........................................................ [14] Ran  
+  2026_08_07_071021_add_tenant_fields_to_roles_table ...................................................... [15] Ran  
+  2026_08_07_091632_make_asset_plate_number_unique_per_company ............................................ [16] Ran  
+  2026_08_07_095358_make_asset_codes_unique_per_company ................................................... [17] Ran  
+  2026_08_07_122358_create_audit_logs_table ............................................................... [18] Ran  
+  2026_08_08_164439_create_sites_table .................................................................... [19] Ran  
+  2026_08_08_164440_create_departments_table .............................................................. [19] Ran  
+  2026_08_08_164442_create_locations_table ................................................................ [19] Ran  
+  2026_08_08_164445_create_employees_table ................................................................ [19] Ran  
+  2026_08_09_200600_create_workflows_table ................................................................ [20] Ran  
+  2026_08_09_200601_create_workflow_steps_table ........................................................... [20] Ran  
+  2026_08_09_202616_create_workflow_instances_table ....................................................... [21] Ran  
+  2026_08_09_202617_create_workflow_instance_steps_table .................................................. [21] Ran  
+  2026_08_11_141726_create_workflow_step_actions_table .................................................... [22] Ran  
+  2026_08_11_150106_create_inventory_requests_table ....................................................... [23] Ran  
+  2026_08_11_150107_create_inventory_request_items_table .................................................. [23] Ran  
+  2026_08_13_090809_create_asset_category_approval_routes_table ........................................... [24] Ran  
+  2026_08_13_090810_create_workflow_instance_branches_table ............................................... [24] Ran  
+  2026_08_13_090812_create_workflow_instance_branch_items_table ........................................... [24] Ran  
+  2026_08_13_091544_add_asset_category_id_to_inventory_request_items_table ................................ [25] Ran  
+  2026_08_13_092523_create_inventory_request_allocations_table ............................................ [26] Ran  
+  2026_08_13_095751_create_asset_types_table .............................................................. [27] Ran  
+  2026_08_13_095753_add_asset_type_id_to_assets_table ..................................................... [27] Ran  
+  2026_08_13_095755_add_asset_type_id_to_inventory_request_items_table .................................... [27] Ran  
+  2026_08_13_104412_create_asset_photos_table ............................................................. [28] Ran  
+  2026_08_13_111048_create_asset_attribute_definitions_table .............................................. [29] Ran  
+  2026_08_13_111049_create_asset_attribute_options_table .................................................. [29] Ran  
+  2026_08_13_111051_create_asset_attribute_values_table ................................................... [29] Ran  
+  2026_08_14_143500_create_asset_movement_requests_table .................................................. [30] Ran  
+  2026_08_14_151500_add_asset_movement_request_id_to_asset_transactions_table ............................. [31] Ran  
+  2026_08_15_200000_add_primary_location_to_employees_table ............................................... [32] Ran  
+  2026_08_15_200100_add_custody_fields_to_assets_table .................................................... [32] Ran  
+  2026_08_15_200200_add_custody_snapshot_to_asset_transactions_table ...................................... [32] Ran  
+  2026_08_15_200300_add_custody_target_to_asset_movement_requests_table ................................... [32] Ran  
+  2026_08_20_212200_create_asset_code_sequences_table ..................................................... [33] Ran  
+  2026_08_20_212900_create_asset_code_policy_settings_table ............................................... [34] Ran  
+  2026_08_20_220000_create_asset_code_classification_layer ................................................ [35] Ran  
+  2026_08_20_220200_use_existing_master_data_for_asset_coding .............................................. Pending  
+
+
+
+============================================================
+ASSET CODE TEST FILES
+============================================================
+
+FullName                                                                                                 
+--------                                                                                                 
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeBulkImportTest.php          
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeClassificationLayerTest.php 
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeHttpTest.php                
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeImmutabilityTest.php        
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeIntegrationTest.php         
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeMasterDataFoundationTest.php
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodePolicyPanelHttpTest.php     
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodePolicySettingsTest.php      
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeSequenceRegistryTest.php    
+D:\Projects\asset-management-system\backend\tests\Feature\AssetCode\AssetCodeTransactionRollbackTest.php 
+D:\Projects\asset-management-system\backend\tests\Unit\Services\AssetCode\AssetCodePolicyEngineTest.php  
+
+
+
+
+============================================================
+GIT / WORKING TREE IF AVAILABLE
+============================================================
+ M app/Models/User.php
+ M app/Providers/AppServiceProvider.php
+ M bootstrap/app.php
+ M composer.json
+ M composer.lock
+ M package.json
+ M routes/web.php
+?? ../asset-code-policy-step1-result.txt
+?? ASSET-CODE-MASTER-ARCHITECTURE.txt
+?? Modules/
+?? allocation-release-audit.txt
+?? app/Console/
+?? app/Http/Controllers/AssetAttributeController.php
+?? app/Http/Controllers/AssetCodePolicySettingsController.php
+?? app/Http/Controllers/AssetCompletenessQueueController.php
+?? app/Http/Controllers/AssetController.php
+?? app/Http/Controllers/AssetManagerCompletionController.php
+?? app/Http/Controllers/AssetManagerRequestController.php
+?? app/Http/Controllers/AssetMovementRequestController.php
+?? app/Http/Controllers/AssetReferenceController.php
+?? app/Http/Controllers/AssetTransactionController.php
+?? app/Http/Controllers/AssetTypeSettingsController.php
+?? app/Http/Controllers/Auth/
+?? app/Http/Controllers/BulkImportController.php
+?? app/Http/Controllers/CompanyController.php
+?? app/Http/Controllers/DashboardController.php
+?? app/Http/Controllers/DepartmentController.php
+?? app/Http/Controllers/EmployeeController.php
+?? app/Http/Controllers/FinalWarehouseDeliveryController.php
+?? app/Http/Controllers/InventoryRequestController.php
+?? app/Http/Controllers/LocationController.php
+?? app/Http/Controllers/MyApprovalController.php
+?? app/Http/Controllers/OperationalAlertController.php
+?? app/Http/Controllers/OrganizationalAssetController.php
+?? app/Http/Controllers/ReportController.php
+?? app/Http/Controllers/ReportExportController.php
+?? app/Http/Controllers/RoleController.php
+?? app/Http/Controllers/SiteController.php
+?? app/Http/Controllers/SpecialistApprovalController.php
+?? app/Http/Controllers/TaskCenterController.php
+?? app/Http/Controllers/UserController.php
+?? app/Http/Controllers/WarehouseRecoveryController.php
+?? app/Http/Controllers/WorkflowController.php
+?? app/Http/Controllers/WorkflowStepController.php
+?? app/Http/Middleware/
+?? app/Http/Requests/
+?? app/Models/Asset.php
+?? app/Models/AssetAttributeDefinition.php
+?? app/Models/AssetAttributeOption.php
+?? app/Models/AssetAttributeValue.php
+?? app/Models/AssetCategory.php
+?? app/Models/AssetCategoryApprovalRoute.php
+?? app/Models/AssetCodeMainNature.php
+?? app/Models/AssetCodePolicySetting.php
+?? app/Models/AssetCodeSequence.php
+?? app/Models/AssetCodeSubNature.php
+?? app/Models/AssetMovementRequest.php
+?? app/Models/AssetPhoto.php
+?? app/Models/AssetTransaction.php
+?? app/Models/AssetType.php
+?? app/Models/AuditLog.php
+?? app/Models/Company.php
+?? app/Models/Concerns/
+?? app/Models/Department.php
+?? app/Models/Employee.php
+?? app/Models/InventoryRequest.php
+?? app/Models/InventoryRequestAllocation.php
+?? app/Models/InventoryRequestItem.php
+?? app/Models/Location.php
+?? app/Models/Permission.php
+?? app/Models/Role.php
+?? app/Models/Site.php
+?? app/Models/Workflow.php
+?? app/Models/WorkflowInstance.php
+?? app/Models/WorkflowInstanceBranch.php
+?? app/Models/WorkflowInstanceBranchItem.php
+?? app/Models/WorkflowInstanceStep.php
+?? app/Models/WorkflowStep.php
+?? app/Models/WorkflowStepAction.php
+?? app/Services/
+?? app/Support/
+?? approvals-route-restore-check.txt
+?? asset-code-bulk-import-result.txt
+?? asset-code-context.txt
+?? asset-code-db-context.txt
+?? asset-code-existing-master-data-result.txt
+?? asset-code-http-real-auth-result.txt
+?? asset-code-http-test-result.txt
+?? asset-code-immutability-result.txt
+?? asset-code-integration-result.txt
+?? asset-code-integration-retry-result.txt
+?? asset-code-panel-context.txt
+?? asset-code-panel-menu-context.txt
+?? asset-code-panel-route-diagnostic.txt
+?? asset-code-panel-route-fix-result.txt
+?? asset-code-policy-data-context.txt
+?? asset-code-policy-panel-final-result.txt
+?? asset-code-policy-panel-step1-result.txt
+?? asset-code-policy-step1-fixed-result.txt
+?? asset-code-policy-step2-result.txt
+?? asset-code-sequence-registry-result.txt
+?? asset-code-transaction-context.txt
+?? asset-code-transaction-rollback-result.txt
+?? asset-code-write-paths-audit.txt
+?? asset-completeness-queue-discovery.txt
+?? asset-crud-current.txt
+?? asset-delivery-core-audit.txt
+?? asset-dynamic-integration-discovery.txt
+?? asset-http-auth-context.txt
+?? asset-http-domain-session-context.txt
+?? asset-http-middleware-context.txt
+?? asset-import-commit-service-context.txt
+?? asset-lifecycle-context.txt
+?? asset-manager-completion-discovery.txt
+?? asset-manager-final-delivery-audit.txt
+?? asset-manager-flow-audit.txt
+?? asset-manager-gate-repair-check.txt
+?? asset-manager-plate-gate-final-test.txt
+?? asset-manager-plate-gate-test.txt
+?? asset-manager-second-audit.txt
+?? asset-movement-finalizer-e2e-report.txt
+?? asset-movement-finalizer-precheck.txt
+?? asset-movement-finalizer-report.txt
+?? asset-movement-foundation-report.txt
+?? asset-movement-start-e2e-report.txt
+?? asset-movement-start-e2e-v2-report.txt
+?? asset-movement-workflow-audit.txt
+?? asset-movement-workflows-report.txt
+?? asset-selection-discovery.txt
+?? asset-transaction-movement-link-report.txt
+?? backup/
+?? central-navigation-backup-audit.txt
+?? central-navigation-layout-link-report.txt
+?? central-navigation-post-install-audit.txt
+?? central-navigation-safe-install-report.txt
+?? current-navigation-hard-audit.txt
+?? dashboard-company-foreach-audit.txt
+?? database/migrations/2026_07_16_152856_create_login_sessions_table.php
+?? database/migrations/2026_07_16_182700_add_username_and_is_active_to_users_table.php
+?? database/migrations/2026_07_19_190033_create_roles_table.php
+?? database/migrations/2026_07_19_190433_add_role_id_to_users_table.php
+?? database/migrations/2026_07_20_163632_create_permissions_table.php
+?? database/migrations/2026_07_20_163836_create_role_permissions_table.php
+?? database/migrations/2026_07_21_160541_create_asset_categories_table.php
+?? database/migrations/2026_07_21_161018_create_assets_table.php
+?? database/migrations/2026_07_31_153128_make_asset_code_nullable_in_assets_table.php
+?? database/migrations/2026_08_01_175113_create_asset_transactions_table.php
+?? database/migrations/2026_08_01_180838_add_status_and_plate_number_to_assets_table.php
+?? database/migrations/2026_08_06_185717_add_company_id_to_users_table.php
+?? database/migrations/2026_08_06_190000_create_companies_table.php
+?? database/migrations/2026_08_07_060411_add_company_id_to_asset_transactions_table.php
+?? database/migrations/2026_08_07_060411_add_company_id_to_assets_table.php
+?? database/migrations/2026_08_07_071021_add_tenant_fields_to_roles_table.php
+?? database/migrations/2026_08_07_091632_make_asset_plate_number_unique_per_company.php
+?? database/migrations/2026_08_07_095358_make_asset_codes_unique_per_company.php
+?? database/migrations/2026_08_07_122358_create_audit_logs_table.php
+?? database/migrations/2026_08_08_164439_create_sites_table.php
+?? database/migrations/2026_08_08_164440_create_departments_table.php
+?? database/migrations/2026_08_08_164442_create_locations_table.php
+?? database/migrations/2026_08_08_164445_create_employees_table.php
+?? database/migrations/2026_08_09_200600_create_workflows_table.php
+?? database/migrations/2026_08_09_200601_create_workflow_steps_table.php
+?? database/migrations/2026_08_09_202616_create_workflow_instances_table.php
+?? database/migrations/2026_08_09_202617_create_workflow_instance_steps_table.php
+?? database/migrations/2026_08_11_141726_create_workflow_step_actions_table.php
+?? database/migrations/2026_08_11_150106_create_inventory_requests_table.php
+?? database/migrations/2026_08_11_150107_create_inventory_request_items_table.php
+?? database/migrations/2026_08_13_090809_create_asset_category_approval_routes_table.php
+?? database/migrations/2026_08_13_090810_create_workflow_instance_branches_table.php
+?? database/migrations/2026_08_13_090812_create_workflow_instance_branch_items_table.php
+?? database/migrations/2026_08_13_091544_add_asset_category_id_to_inventory_request_items_table.php
+?? database/migrations/2026_08_13_092523_create_inventory_request_allocations_table.php
+?? database/migrations/2026_08_13_095751_create_asset_types_table.php
+?? database/migrations/2026_08_13_095753_add_asset_type_id_to_assets_table.php
+?? database/migrations/2026_08_13_095755_add_asset_type_id_to_inventory_request_items_table.php
+?? database/migrations/2026_08_13_104412_create_asset_photos_table.php
+?? database/migrations/2026_08_13_111048_create_asset_attribute_definitions_table.php
+?? database/migrations/2026_08_13_111049_create_asset_attribute_options_table.php
+?? database/migrations/2026_08_13_111051_create_asset_attribute_values_table.php
+?? database/migrations/2026_08_14_143500_create_asset_movement_requests_table.php
+?? database/migrations/2026_08_14_151500_add_asset_movement_request_id_to_asset_transactions_table.php
+?? database/migrations/2026_08_15_200000_add_primary_location_to_employees_table.php
+?? database/migrations/2026_08_15_200100_add_custody_fields_to_assets_table.php
+?? database/migrations/2026_08_15_200200_add_custody_snapshot_to_asset_transactions_table.php
+?? database/migrations/2026_08_15_200300_add_custody_target_to_asset_movement_requests_table.php
+?? database/migrations/2026_08_20_212200_create_asset_code_sequences_table.php
+?? database/migrations/2026_08_20_212900_create_asset_code_policy_settings_table.php
+?? database/migrations/2026_08_20_220000_create_asset_code_classification_layer.php
+?? database/migrations/2026_08_20_220200_use_existing_master_data_for_asset_coding.php
+?? database/seeders/AssetCategorySeeder.php
+?? database/seeders/AssetMovementWorkflowSeeder.php
+?? database/seeders/CommercialCoreSeeder.php
+?? database/seeders/PermissionSeeder.php
+?? direct-manager-resolution-audit.txt
+?? final-delivery-end-to-end-test.txt
+?? final-delivery-route-repair.txt
+?? final-delivery-route-safe-patch.txt
+?? final-warehouse-delivery-audit.txt
+?? layout-emergency-restore-report.txt
+?? layout-foreach-fix-report.txt
+?? layout-full-rebuild-report.txt
+?? layout-navigation-safe-audit.txt
+?? layout-recovery-search-report.txt
+?? movement-finalizer-hook-repair-report.txt
+?? movement-finalizer-hook-report.txt
+?? movement-ui-sidebar-audit.txt
+?? operational-core-audit.txt
+?? package-lock.json
+?? pre-sequence-registry-full-test.txt
+?? project-full-source-20260820-221046/
+?? project-review-export-20260820-220629.zip
+?? project-review-export-20260820-220629/
+?? project-review-source-20260820-220859/
+?? public/assets/
+?? request-workflow-master-audit.txt
+?? resources/views/approvals/
+?? resources/views/asset_completeness/
+?? resources/views/asset_manager_requests/
+?? resources/views/asset_movement_requests/
+?? resources/views/asset_reference/
+?? resources/views/asset_settings/
+?? resources/views/asset_transactions/
+?? resources/views/assets/
+?? resources/views/auth/
+?? resources/views/bulk_import/
+?? resources/views/companies/
+?? resources/views/components/
+?? resources/views/dashboard/
+?? resources/views/departments/
+?? resources/views/employees/
+?? resources/views/final_warehouse_deliveries/
+?? resources/views/inventory_requests/
+?? resources/views/layouts/
+?? resources/views/locations/
+?? resources/views/operational_alerts/
+?? resources/views/organizational_assets/
+?? resources/views/partials/
+?? resources/views/reports/
+?? resources/views/roles/
+?? resources/views/sites/
+?? resources/views/specialist_approvals/
+?? resources/views/task_center/
+?? resources/views/users/
+?? resources/views/warehouse_recoveries/
+?? resources/views/workflows/
+?? role-menu-dashboard-audit.txt
+?? routes.json
+?? segment-asset-code-engine-context.txt
+?? segment-code-foundation-result.txt
+?? specialist-approval-discovery.txt
+?? specialist-branch-access-action-test.txt
+?? specialist-recovery-final-test.txt
+?? specialist-rejection-recovery-audit.txt
+?? tests/Feature/AssetCode/
+?? tests/Unit/Services/
+?? warehouse-parallel-gate-safety-test.txt
+?? workflow-finalization-path-audit.txt
+?? workflow-finalizer-hook-diagnostic.txt
+?? workflow-runtime-completion-source.txt
+?? ../scripts/
+
+
+============================================================
+END
+============================================================

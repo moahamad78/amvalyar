@@ -1,0 +1,116 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+/backup/
+/project-audit-*/
+/project-audit-*.txt
+/project-hardening-result-*.txt
+/asset-*-result.txt
+# ============================================================
+# Local development / generated audit artifacts
+# ============================================================
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies / build output
+/vendor/
+/node_modules/
+/public/build/
+/public/hot
+
+# Laravel runtime
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+!/storage/framework/cache/.gitignore
+!/storage/framework/sessions/.gitignore
+!/storage/framework/testing/.gitignore
+!/storage/framework/views/.gitignore
+!/storage/logs/.gitignore
+
+# PHPUnit / tooling caches
+.phpunit.result.cache
+.phpunit.cache/
+.php-cs-fixer.cache
+/.phpunit.cache/
+/.phpunit.result.cache
+
+# IDE / OS
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local database files
+/database/*.sqlite
+/database/*.sqlite3
+/database/*.db
+!/database/.gitignore
+
+# Project-local backup folder
+/backup/
+
+# Generated project review/export folders
+/project-full-source-*/
+/project-review-export-*/
+/project-review-source-*/
+
+# Generated archives and exports
+/project-audit-*.zip
+/project-review-export-*.zip
+/project_export.txt
+
+# Generated audit / diagnostic / context / result reports in project root
+/*-audit.txt
+/*-context.txt
+/*-diagnostic.txt
+/*-discovery.txt
+/*-report.txt
+/*-result-*.txt
+/*-test.txt
+/*-check.txt
+/*-precheck.txt
+/*-restore-check.txt
+/*-source.txt
+
+# Specific generated route/export artifacts
+/routes.json
+
+# Temporary patch/install artifacts
+/*.tmp
+/*.bak
+/*.orig
+/*.rej
+
+# One-off development notes and generated source snapshots
+/asset-crud-current.txt
+/final-delivery-route-repair.txt
+/final-delivery-route-safe-patch.txt
+/segment-code-foundation-result.txt
