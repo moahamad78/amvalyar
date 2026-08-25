@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\InventoryRequest as InventoryRequestModel;
 use App\Models\InventoryRequestItem;
+use App\Models\Location;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\InventoryRequestGuard;
@@ -80,6 +81,7 @@ final class InventoryRequestController extends Controller
             $departments,
             $employee,
             $categories,
+            $locations,
         ] =
             $this->formData(
                 $request->user()
@@ -92,7 +94,8 @@ final class InventoryRequestController extends Controller
                 'sites',
                 'departments',
                 'employee',
-                'categories'
+                'categories',
+                'locations'
             )
         );
     }
@@ -204,6 +207,24 @@ final class InventoryRequestController extends Controller
                                 'department_id' =>
                                     $department?->id,
 
+                                'delivery_target_type' =>
+                                    $validated['delivery_target_type'],
+
+                                'target_site_id' =>
+                                    $validated['delivery_target_type'] === 'organization'
+                                        ? ($validated['target_site_id'] ?? null)
+                                        : null,
+
+                                'target_department_id' =>
+                                    $validated['delivery_target_type'] === 'organization'
+                                        ? ($validated['target_department_id'] ?? null)
+                                        : null,
+
+                                'target_location_id' =>
+                                    $validated['delivery_target_type'] === 'organization'
+                                        ? ($validated['target_location_id'] ?? null)
+                                        : null,
+
                                 'status' =>
                                     'draft',
 
@@ -269,6 +290,7 @@ final class InventoryRequestController extends Controller
             $departments,
             $employee,
             $categories,
+            $locations,
         ] =
             $this->formData(
                 $request->user()
@@ -283,7 +305,7 @@ final class InventoryRequestController extends Controller
                 'departments',
                 'employee',
                 'categories',
-                'categories'
+                'locations'
             )
         );
     }
@@ -385,6 +407,24 @@ final class InventoryRequestController extends Controller
 
                     'department_id' =>
                         $department?->id,
+
+                    'delivery_target_type' =>
+                        $validated['delivery_target_type'],
+
+                    'target_site_id' =>
+                        $validated['delivery_target_type'] === 'organization'
+                            ? ($validated['target_site_id'] ?? null)
+                            : null,
+
+                    'target_department_id' =>
+                        $validated['delivery_target_type'] === 'organization'
+                            ? ($validated['target_department_id'] ?? null)
+                            : null,
+
+                    'target_location_id' =>
+                        $validated['delivery_target_type'] === 'organization'
+                            ? ($validated['target_location_id'] ?? null)
+                            : null,
 
                     'priority' =>
                         $validated['priority'],
@@ -587,6 +627,22 @@ final class InventoryRequestController extends Controller
                 ->first();
 
 
+        $locations =
+            Location::withoutGlobalScopes()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy('site_id')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+
+
         $categories =
             AssetCategory::query()
                 ->where(
@@ -603,6 +659,7 @@ final class InventoryRequestController extends Controller
             $departments,
             $employee,
             $categories,
+            $locations,
         ];
     }
 

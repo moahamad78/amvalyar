@@ -6,7 +6,10 @@ namespace App\Services;
 
 use App\Models\Asset;
 use App\Models\AssetTransaction;
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Location;
+use App\Models\Site;
 use App\Models\InventoryRequest;
 use App\Models\InventoryRequestAllocation;
 use App\Models\User;
@@ -87,47 +90,133 @@ final class FinalWarehouseDeliveryService
                 );
 
 
-        if (
-            $inventoryRequest->requester_user_id
-            ===
-            null
-        ) {
+        $deliveryTargetType =
+            $inventoryRequest->delivery_target_type
+            ?: 'employee';
 
+        if (
+            !in_array(
+                $deliveryTargetType,
+                [
+                    'employee',
+                    'organization',
+                ],
+                true
+            )
+        ) {
             throw ValidationException::withMessages([
-                'requester' =>
-                    'کاربر درخواست‌کننده برای تحویل نهایی قابل تشخیص نیست.',
+                'delivery_target_type' =>
+                    'نوع مقصد تحویل درخواست معتبر نیست.',
             ]);
         }
 
+        $recipient = null;
+        $recipientEmployee = null;
+        $targetDepartment = null;
+        $targetLocation = null;
+        $targetSite = null;
 
-        $recipient =
-            User::withoutGlobalScopes()
-                ->findOrFail(
-                    $inventoryRequest->requester_user_id
-                );
-        $recipientEmployee =
-            $inventoryRequest->requester_employee_id !== null
-                ? Employee::withoutGlobalScopes()
-                    ->where('company_id', $inventoryRequest->company_id)
-                    ->find($inventoryRequest->requester_employee_id)
-                : Employee::withoutGlobalScopes()
-                    ->where('company_id', $inventoryRequest->company_id)
-                    ->where('user_id', $recipient->id)
-                    ->first();
+        if ($deliveryTargetType === 'employee') {
+            if (
+                $inventoryRequest->requester_user_id
+                ===
+                null
+            ) {
+                throw ValidationException::withMessages([
+                    'requester' =>
+                        'کاربر درخواست‌کننده برای تحویل نهایی قابل تشخیص نیست.',
+                ]);
+            }
 
+            $recipient =
+                User::withoutGlobalScopes()
+                    ->findOrFail(
+                        $inventoryRequest->requester_user_id
+                    );
 
-        if (
-            !$recipient->isSuperAdmin()
-            &&
-            (int) $recipient->company_id
-            !==
-            (int) $inventoryRequest->company_id
-        ) {
+            $recipientEmployee =
+                $inventoryRequest->requester_employee_id !== null
+                    ? Employee::withoutGlobalScopes()
+                        ->where(
+                            'company_id',
+                            $inventoryRequest->company_id
+                        )
+                        ->find(
+                            $inventoryRequest->requester_employee_id
+                        )
+                    : Employee::withoutGlobalScopes()
+                        ->where(
+                            'company_id',
+                            $inventoryRequest->company_id
+                        )
+                        ->where(
+                            'user_id',
+                            $recipient->id
+                        )
+                        ->first();
 
-            throw ValidationException::withMessages([
-                'requester' =>
-                    'درخواست‌کننده متعلق به شرکت این درخواست نیست.',
-            ]);
+            if (
+                !$recipient->isSuperAdmin()
+                &&
+                (int) $recipient->company_id
+                !==
+                (int) $inventoryRequest->company_id
+            ) {
+                throw ValidationException::withMessages([
+                    'requester' =>
+                        'درخواست‌کننده متعلق به شرکت این درخواست نیست.',
+                ]);
+            }
+        }
+        else {
+            $targetDepartment =
+                $inventoryRequest->target_department_id !== null
+                    ? Department::withoutGlobalScopes()
+                        ->where(
+                            'company_id',
+                            $inventoryRequest->company_id
+                        )
+                        ->find(
+                            $inventoryRequest->target_department_id
+                        )
+                    : null;
+
+            $targetLocation =
+                $inventoryRequest->target_location_id !== null
+                    ? Location::withoutGlobalScopes()
+                        ->where(
+                            'company_id',
+                            $inventoryRequest->company_id
+                        )
+                        ->find(
+                            $inventoryRequest->target_location_id
+                        )
+                    : null;
+
+            $targetSite =
+                $inventoryRequest->target_site_id !== null
+                    ? Site::withoutGlobalScopes()
+                        ->where(
+                            'company_id',
+                            $inventoryRequest->company_id
+                        )
+                        ->find(
+                            $inventoryRequest->target_site_id
+                        )
+                    : null;
+
+            if (
+                $targetDepartment === null
+                &&
+                $targetLocation === null
+                &&
+                $targetSite === null
+            ) {
+                throw ValidationException::withMessages([
+                    'delivery_target' =>
+                        'مقصد سازمانی درخواست برای تحویل نهایی قابل تشخیص نیست.',
+                ]);
+            }
         }
 
 
@@ -366,15 +455,29 @@ final class FinalWarehouseDeliveryService
                 $lockedAssets[
                     $allocation->id
                 ];
-            $this->custodyService->assignToEmployee(
-                asset: $asset,
-                employee: $recipientEmployee,
-                user: $recipient,
-                actorUser: $actorUser,
-                description:
-                    'تحویل نهایی بابت درخواست '
-                    . $inventoryRequest->request_number
-            );
+            if ($deliveryTargetType === 'organization') {
+                $this->custodyService->assignToOrganization(
+                    asset: $asset,
+                    department: $targetDepartment,
+                    location: $targetLocation,
+                    site: $targetSite,
+                    actorUser: $actorUser,
+                    description:
+                        'استقرار سازمانی بابت درخواست '
+                        . $inventoryRequest->request_number
+                );
+            }
+            else {
+                $this->custodyService->assignToEmployee(
+                    asset: $asset,
+                    employee: $recipientEmployee,
+                    user: $recipient,
+                    actorUser: $actorUser,
+                    description:
+                        'تحویل نهایی بابت درخواست '
+                        . $inventoryRequest->request_number
+                );
+            }
 
 
             $allocation->update([

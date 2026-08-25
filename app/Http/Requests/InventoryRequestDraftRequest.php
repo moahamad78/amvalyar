@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\Department;
+use App\Models\Location;
 use App\Models\Site;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,6 +29,29 @@ final class InventoryRequestDraftRequest extends FormRequest
             ],
 
             'department_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'delivery_target_type' => [
+                'required',
+                Rule::in([
+                    'employee',
+                    'organization',
+                ]),
+            ],
+
+            'target_site_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'target_department_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'target_location_id' => [
                 'nullable',
                 'integer',
             ],
@@ -163,6 +187,92 @@ final class InventoryRequestDraftRequest extends FormRequest
 
 
                 if (
+                    $this->input('delivery_target_type')
+                    ===
+                    'organization'
+                ) {
+                    if (
+                        !$this->filled('target_site_id')
+                        &&
+                        !$this->filled('target_department_id')
+                        &&
+                        !$this->filled('target_location_id')
+                    ) {
+                        $validator->errors()->add(
+                            'delivery_target_type',
+                            'برای درخواست سازمانی حداقل یک مقصد شامل سایت، واحد یا محل باید مشخص شود.'
+                        );
+                    }
+
+                    if ($this->filled('target_site_id')) {
+                        $validTargetSite =
+                            Site::withoutGlobalScopes()
+                                ->where('company_id', $companyId)
+                                ->whereKey(
+                                    (int) $this->input('target_site_id')
+                                )
+                                ->where('is_active', true)
+                                ->exists();
+
+                        if (!$validTargetSite) {
+                            $validator->errors()->add(
+                                'target_site_id',
+                                'سایت مقصد معتبر، فعال یا متعلق به شرکت شما نیست.'
+                            );
+                        }
+                    }
+
+                    if ($this->filled('target_department_id')) {
+                        $validTargetDepartment =
+                            Department::withoutGlobalScopes()
+                                ->where('company_id', $companyId)
+                                ->whereKey(
+                                    (int) $this->input('target_department_id')
+                                )
+                                ->where('is_active', true)
+                                ->exists();
+
+                        if (!$validTargetDepartment) {
+                            $validator->errors()->add(
+                                'target_department_id',
+                                'واحد مقصد معتبر، فعال یا متعلق به شرکت شما نیست.'
+                            );
+                        }
+                    }
+
+                    if ($this->filled('target_location_id')) {
+                        $targetLocation =
+                            Location::withoutGlobalScopes()
+                                ->where('company_id', $companyId)
+                                ->whereKey(
+                                    (int) $this->input('target_location_id')
+                                )
+                                ->where('is_active', true)
+                                ->first();
+
+                        if ($targetLocation === null) {
+                            $validator->errors()->add(
+                                'target_location_id',
+                                'محل مقصد معتبر، فعال یا متعلق به شرکت شما نیست.'
+                            );
+                        }
+                        elseif (
+                            $this->filled('target_site_id')
+                            &&
+                            $targetLocation->site_id !== null
+                            &&
+                            (int) $targetLocation->site_id
+                                !== (int) $this->input('target_site_id')
+                        ) {
+                            $validator->errors()->add(
+                                'target_location_id',
+                                'محل مقصد متعلق به سایت مقصد انتخاب‌شده نیست.'
+                            );
+                        }
+                    }
+                }
+
+                if (
                     $this->filled('department_id')
                 ) {
 
@@ -198,6 +308,12 @@ final class InventoryRequestDraftRequest extends FormRequest
     public function messages(): array
     {
         return [
+
+            'delivery_target_type.required' =>
+                'نوع مقصد درخواست مشخص نشده است.',
+
+            'delivery_target_type.in' =>
+                'نوع مقصد درخواست معتبر نیست.',
 
             'priority.required' =>
                 'اولویت درخواست مشخص نشده است.',

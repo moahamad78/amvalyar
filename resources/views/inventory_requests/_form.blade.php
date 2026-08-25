@@ -71,6 +71,174 @@ $existingItems =
 
         <div class="row g-3">
 
+            @php
+                $deliveryTargetType =
+                    old(
+                        'delivery_target_type',
+                        $inventoryRequest->delivery_target_type
+                            ?? 'employee'
+                    );
+            @endphp
+
+            <div class="col-12">
+                <label class="form-label">
+                    مقصد تحویل *
+                </label>
+
+                <div class="d-flex flex-wrap gap-4">
+                    <label class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="radio"
+                            name="delivery_target_type"
+                            value="employee"
+                            @checked($deliveryTargetType === 'employee')
+                        >
+                        <span class="form-check-label">
+                            تحویل به شخص درخواست‌کننده
+                        </span>
+                    </label>
+
+                    <label class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="radio"
+                            name="delivery_target_type"
+                            value="organization"
+                            @checked($deliveryTargetType === 'organization')
+                        >
+                        <span class="form-check-label">
+                            استقرار به‌عنوان مال سازمانی
+                        </span>
+                    </label>
+                </div>
+
+                <div class="form-text">
+                    در حالت سازمانی، کالا پس از همه تأییدها و تأیید جمعدار اموال به انباردار برمی‌گردد؛ پلاک چاپ و دارایی مستقیماً در مقصد سازمانی ثبت می‌شود.
+                </div>
+            </div>
+
+            <div
+                class="col-12"
+                id="organization-delivery-target"
+            >
+                <div class="border rounded p-3 bg-light">
+                    <strong class="d-block mb-3">
+                        مقصد استقرار سازمانی
+                    </strong>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                سایت مقصد
+                            </label>
+
+                            <select
+                                name="target_site_id"
+                                id="target_site_id"
+                                class="form-select"
+                            >
+                                <option value="">
+                                    بدون انتخاب
+                                </option>
+
+                                @foreach($sites as $site)
+                                    <option
+                                        value="{{ $site->id }}"
+                                        @selected(
+                                            (string) old(
+                                                'target_site_id',
+                                                $inventoryRequest->target_site_id ?? ''
+                                            )
+                                            ===
+                                            (string) $site->id
+                                        )
+                                    >
+                                        {{ $site->name }}
+                                        -
+                                        {{ $site->code }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                واحد مقصد
+                            </label>
+
+                            <select
+                                name="target_department_id"
+                                id="target_department_id"
+                                class="form-select"
+                            >
+                                <option value="">
+                                    بدون انتخاب
+                                </option>
+
+                                @foreach($departments as $department)
+                                    <option
+                                        value="{{ $department->id }}"
+                                        @selected(
+                                            (string) old(
+                                                'target_department_id',
+                                                $inventoryRequest->target_department_id ?? ''
+                                            )
+                                            ===
+                                            (string) $department->id
+                                        )
+                                    >
+                                        {{ $department->name }}
+                                        -
+                                        {{ $department->code }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                محل مقصد
+                            </label>
+
+                            <select
+                                name="target_location_id"
+                                id="target_location_id"
+                                class="form-select"
+                            >
+                                <option value="">
+                                    بدون انتخاب
+                                </option>
+
+                                @foreach($locations as $location)
+                                    <option
+                                        value="{{ $location->id }}"
+                                        data-site="{{ $location->site_id }}"
+                                        @selected(
+                                            (string) old(
+                                                'target_location_id',
+                                                $inventoryRequest->target_location_id ?? ''
+                                            )
+                                            ===
+                                            (string) $location->id
+                                        )
+                                    >
+                                        {{ $location->name }}
+                                        @if($location->code)
+                                            - {{ $location->code }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-text mt-2">
+                        برای درخواست سازمانی حداقل یکی از سایت، واحد یا محل مقصد را مشخص کنید.
+                    </div>
+                </div>
+            </div>
+
             <div class="col-md-4">
 
                 <label class="form-label">
@@ -631,7 +799,113 @@ document.addEventListener(
         );
 
 
+        const targetTypeInputs =
+            document.querySelectorAll(
+                'input[name="delivery_target_type"]'
+            );
+
+        const organizationTarget =
+            document.getElementById(
+                'organization-delivery-target'
+            );
+
+        const targetSite =
+            document.getElementById(
+                'target_site_id'
+            );
+
+        const targetLocation =
+            document.getElementById(
+                'target_location_id'
+            );
+
+        function refreshDeliveryTarget() {
+            const selected =
+                document.querySelector(
+                    'input[name="delivery_target_type"]:checked'
+                );
+
+            const isOrganization =
+                selected
+                &&
+                selected.value === 'organization';
+
+            organizationTarget.style.display =
+                isOrganization
+                    ? ''
+                    : 'none';
+
+            if (!isOrganization) {
+                document.getElementById(
+                    'target_site_id'
+                ).value = '';
+
+                document.getElementById(
+                    'target_department_id'
+                ).value = '';
+
+                document.getElementById(
+                    'target_location_id'
+                ).value = '';
+            }
+        }
+
+        function refreshTargetLocations() {
+            if (!targetSite || !targetLocation) {
+                return;
+            }
+
+            const siteId = targetSite.value;
+
+            Array.from(
+                targetLocation.options
+            ).forEach(
+                function (option) {
+                    if (!option.value) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    const optionSite =
+                        option.dataset.site || '';
+
+                    const visible =
+                        !siteId
+                        ||
+                        !optionSite
+                        ||
+                        optionSite === siteId;
+
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+
+                    if (!visible && option.selected) {
+                        targetLocation.value = '';
+                    }
+                }
+            );
+        }
+
+        targetTypeInputs.forEach(
+            function (input) {
+                input.addEventListener(
+                    'change',
+                    refreshDeliveryTarget
+                );
+            }
+        );
+
+        if (targetSite) {
+            targetSite.addEventListener(
+                'change',
+                refreshTargetLocations
+            );
+        }
+
         renumber();
+        refreshDeliveryTarget();
+        refreshTargetLocations();
     }
 );
 

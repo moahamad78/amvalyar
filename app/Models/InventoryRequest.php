@@ -26,6 +26,11 @@ final class InventoryRequest extends Model
         'site_id',
         'department_id',
 
+        'delivery_target_type',
+        'target_site_id',
+        'target_department_id',
+        'target_location_id',
+
         'workflow_instance_id',
 
         'status',
@@ -98,6 +103,30 @@ final class InventoryRequest extends Model
         );
     }
 
+
+    public function targetSite(): BelongsTo
+    {
+        return $this->belongsTo(
+            Site::class,
+            'target_site_id'
+        );
+    }
+
+    public function targetDepartment(): BelongsTo
+    {
+        return $this->belongsTo(
+            Department::class,
+            'target_department_id'
+        );
+    }
+
+    public function targetLocation(): BelongsTo
+    {
+        return $this->belongsTo(
+            Location::class,
+            'target_location_id'
+        );
+    }
 
     public function workflowInstance(): BelongsTo
     {
