@@ -19,5 +19,5 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-php artisan test --filter=$Filter
+& "$PSScriptRoot\run-tests-isolated.ps1" "--filter=$Filter"
 exit $LASTEXITCODE

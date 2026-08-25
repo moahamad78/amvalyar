@@ -19,5 +19,5 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-php artisan test
+& "$PSScriptRoot\run-tests-isolated.ps1"
 exit $LASTEXITCODE
