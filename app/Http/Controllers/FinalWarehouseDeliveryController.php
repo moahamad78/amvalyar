@@ -108,6 +108,9 @@ final class FinalWarehouseDeliveryController extends Controller
                                 'requesterUser',
                                 'site',
                                 'department',
+                                'targetSite',
+                                'targetDepartment',
+                                'targetLocation',
                             ])
                             ->findOrFail(
                                 $instance->subject_id
@@ -202,6 +205,9 @@ final class FinalWarehouseDeliveryController extends Controller
                     'requesterUser',
                     'site',
                     'department',
+                    'targetSite',
+                    'targetDepartment',
+                    'targetLocation',
                 ])
                 ->findOrFail(
                     $instance->subject_id

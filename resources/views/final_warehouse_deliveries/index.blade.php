@@ -6,25 +6,16 @@
 
 <div class="container py-4">
 
-    <div class="d-flex
-                justify-content-between
-                align-items-center
-                flex-wrap
-                gap-3
-                mb-4">
-
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
-
             <h2 class="mb-1">
                 تحویل نهایی انبار
             </h2>
 
             <div class="text-muted">
-                درخواست‌های آماده تحویل فیزیکی به درخواست‌کننده
+                درخواست‌هایی که پس از تأییدهای لازم و تأیید جمعدار اموال برای چاپ پلاک و تحویل نهایی به انبار برگشته‌اند
             </div>
-
         </div>
-
 
         <a
             href="{{ route('approvals.index') }}"
@@ -32,119 +23,97 @@
         >
             بازگشت
         </a>
-
     </div>
 
-
     @if(session('success'))
-
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
-
     @endif
 
-
     <div class="card border-0 shadow-sm">
-
         <div class="table-responsive">
-
             <table class="table table-hover align-middle mb-0">
 
                 <thead class="table-light">
-
                     <tr>
-
-                        <th>
-                            شماره درخواست
-                        </th>
-
-                        <th>
-                            درخواست‌کننده
-                        </th>
-
-                        <th>
-                            محل
-                        </th>
-
-                        <th>
-                            تعداد اموال
-                        </th>
-
-                        <th>
-                            وضعیت
-                        </th>
-
-                        <th>
-                            عملیات
-                        </th>
-
+                        <th>شماره درخواست</th>
+                        <th>درخواست‌کننده</th>
+                        <th>نوع مقصد</th>
+                        <th>مقصد نهایی</th>
+                        <th>تعداد اموال</th>
+                        <th>وضعیت</th>
+                        <th>عملیات</th>
                     </tr>
-
                 </thead>
 
-
                 <tbody>
-
                 @forelse($rows as $row)
+                    @php
+                        $requestRow = $row['request'];
+
+                        $isOrganization =
+                            ($requestRow->delivery_target_type ?? 'employee')
+                            ===
+                            'organization';
+
+                        $targetParts = $isOrganization
+                            ? collect([
+                                $requestRow->targetSite?->name,
+                                $requestRow->targetDepartment?->name,
+                                $requestRow->targetLocation?->name,
+                            ])->filter()->values()
+                            : collect([
+                                $requestRow->requesterEmployee?->display_name
+                                    ?? $requestRow->requesterUser?->name
+                            ])->filter()->values();
+                    @endphp
 
                     <tr>
-
                         <td>
-
                             <strong dir="ltr">
-                                {{ $row['request']->request_number }}
+                                {{ $requestRow->request_number }}
                             </strong>
-
                         </td>
 
-
                         <td>
-
-                            {{ $row['request']->requesterEmployee?->display_name
-                                ?? $row['request']->requesterUser?->name
+                            {{ $requestRow->requesterEmployee?->display_name
+                                ?? $requestRow->requesterUser?->name
                                 ?? '-' }}
-
                         </td>
 
-
                         <td>
-
-                            {{ $row['request']->site?->name ?? '-' }}
-
-                            @if($row['request']->department)
-
-                                /
-                                {{ $row['request']->department->name }}
-
+                            @if($isOrganization)
+                                <span class="badge bg-info text-dark">
+                                    مال سازمانی
+                                </span>
+                            @else
+                                <span class="badge bg-primary">
+                                    تحویل به شخص
+                                </span>
                             @endif
-
                         </td>
 
+                        <td>
+                            {{ $targetParts->isNotEmpty()
+                                ? $targetParts->implode(' / ')
+                                : '-' }}
+                        </td>
 
                         <td>
-
                             <span class="badge bg-primary">
-
                                 {{ $row['asset_count'] }}
                                 قلم
-
                             </span>
-
                         </td>
 
-
                         <td>
-
                             <span class="badge bg-warning text-dark">
-                                آماده تحویل
+                                آماده چاپ و تحویل
                             </span>
-
                         </td>
 
-
                         <td>
-
                             <a
                                 href="{{ route(
                                     'final-warehouse-deliveries.show',
@@ -152,36 +121,25 @@
                                 ) }}"
                                 class="btn btn-sm btn-primary"
                             >
-                                مشاهده و تحویل
+                                مشاهده، چاپ پلاک و تحویل
                             </a>
-
                         </td>
-
                     </tr>
 
                 @empty
-
                     <tr>
-
                         <td
-                            colspan="6"
+                            colspan="7"
                             class="text-center text-muted py-5"
                         >
-
                             هیچ درخواستی در انتظار تحویل نهایی نیست.
-
                         </td>
-
                     </tr>
-
                 @endforelse
-
                 </tbody>
 
             </table>
-
         </div>
-
     </div>
 
 </div>
