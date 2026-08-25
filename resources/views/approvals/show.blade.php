@@ -787,29 +787,58 @@ $actionLabels = [
 
                         @else
 
-                            <div class="d-flex gap-2">
+                            @if($step->code === 'REQUESTER-RECEIPT')
+
+                                <div class="alert alert-info mb-3">
+                                    <strong>تأیید دریافت نهایی</strong>
+                                    <div class="small mt-1">
+                                        با تأیید این مرحله، دریافت فیزیکی کالا یا استقرار سازمانی آن را تأیید می‌کنید
+                                        و درخواست به‌صورت کامل بسته می‌شود.
+                                    </div>
+                                </div>
 
                                 <button
                                     type="submit"
                                     name="action"
                                     value="approve"
                                     class="btn btn-success"
+                                    onclick="return confirm('دریافت کالا / استقرار سازمانی را تأیید می‌کنید؟');"
                                 >
-                                    تأیید و ارسال به مرحله بعد
+                                    تأیید دریافت و پایان درخواست
                                 </button>
 
+                                <div class="text-muted small mt-2">
+                                    اعلام مغایرت تحویل از مسیر تخصصی برگشت به انبار انجام خواهد شد
+                                    و عمداً از دکمه رد عمومی این مرحله جدا شده است.
+                                </div>
 
-                                <button
-                                    type="submit"
-                                    name="action"
-                                    value="reject"
-                                    class="btn btn-danger"
-                                    onclick="return confirm('از رد این مرحله مطمئن هستید؟');"
-                                >
-                                    رد درخواست
-                                </button>
+                            @else
 
-                            </div>
+                                <div class="d-flex gap-2">
+
+                                    <button
+                                        type="submit"
+                                        name="action"
+                                        value="approve"
+                                        class="btn btn-success"
+                                    >
+                                        تأیید و ارسال به مرحله بعد
+                                    </button>
+
+
+                                    <button
+                                        type="submit"
+                                        name="action"
+                                        value="reject"
+                                        class="btn btn-danger"
+                                        onclick="return confirm('از رد این مرحله مطمئن هستید؟');"
+                                    >
+                                        رد درخواست
+                                    </button>
+
+                                </div>
+
+                            @endif
 
                         @endif
 

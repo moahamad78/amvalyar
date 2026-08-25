@@ -558,17 +558,41 @@ final class FinalWarehouseDeliveryService
 
         /*
         |--------------------------------------------------------------------------
-        | Request fulfilled
+        | Request delivery state
         |--------------------------------------------------------------------------
+        |
+        | New workflow instances may contain REQUESTER-RECEIPT after the
+        | warehouse physically delivers the assets. In that case the assets
+        | and allocations are already delivered, but the request itself is
+        | not considered fully closed until the requester confirms receipt.
+        |
+        | Backward compatibility:
+        | old workflow instances that do not contain REQUESTER-RECEIPT retain
+        | the previous behavior and become fulfilled immediately.
         */
 
-        $inventoryRequest->update([
+        $requiresRequesterReceipt =
+            WorkflowInstanceStep::query()
+                ->where(
+                    'workflow_instance_id',
+                    $instance->id
+                )
+                ->where(
+                    'code',
+                    'REQUESTER-RECEIPT'
+                )
+                ->exists();
 
+        $inventoryRequest->update([
             'status' =>
-                'fulfilled',
+                $requiresRequesterReceipt
+                    ? 'awaiting_receipt'
+                    : 'fulfilled',
 
             'fulfilled_at' =>
-                now(),
+                $requiresRequesterReceipt
+                    ? null
+                    : now(),
         ]);
     }
 

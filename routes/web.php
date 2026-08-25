@@ -834,6 +834,7 @@ Route::post('/approvals/{step}/act', [
         'permission:approvals.act',
         \App\Http\Middleware\EnsureAssetManagerReadyForApproval::class,
         \App\Http\Middleware\FinalizeWarehouseDeliveryOnApproval::class,
+        \App\Http\Middleware\FinalizeRequesterReceiptOnApproval::class,
     ])
     ->name('approvals.act');
 
