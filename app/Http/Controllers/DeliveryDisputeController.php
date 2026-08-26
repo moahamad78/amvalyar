@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\DeliveryDisputeRequest;
+use App\Http\Requests\DeliveryDisputeWarehouseReceiptRequest;
 use App\Models\DeliveryDispute;
 use App\Models\DeliveryDisputeItem;
 use App\Models\Employee;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Services\AssetCustodyService;
 use Illuminate\View\View;
 
 final class DeliveryDisputeController extends Controller
@@ -420,6 +422,182 @@ final class DeliveryDisputeController extends Controller
                     );
             }
         );
+    }
+
+    public function warehouseReceive(
+        DeliveryDisputeWarehouseReceiptRequest $request,
+        DeliveryDispute $deliveryDispute,
+        AssetCustodyService $custodyService
+    ): RedirectResponse {
+        $user = $request->user();
+        $employee = $this->resolveEmployee($user);
+
+        return DB::transaction(function () use (
+            $request,
+            $deliveryDispute,
+            $custodyService,
+            $user,
+            $employee
+        ): RedirectResponse {
+            $dispute = DeliveryDispute::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->findOrFail($deliveryDispute->id);
+
+            $this->ensureVisible($user, $dispute);
+            $this->ensureWarehouseActor($user, $employee, $dispute);
+
+            if ($dispute->status !== 'warehouse_pending') {
+                throw ValidationException::withMessages([
+                    'dispute' => 'این مغایرت دیگر در انتظار دریافت فیزیکی انبار نیست.',
+                ]);
+            }
+
+            $inventoryRequest = InventoryRequest::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->findOrFail($dispute->inventory_request_id);
+
+            $selected = collect($request->validated('received_items'))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+
+            $items = DeliveryDisputeItem::withoutGlobalScopes()
+                ->with(['asset', 'allocation'])
+                ->where('delivery_dispute_id', $dispute->id)
+                ->where('status', 'reported')
+                ->whereIn('id', $selected->all())
+                ->lockForUpdate()
+                ->get();
+
+            if ($items->count() !== $selected->count()) {
+                throw ValidationException::withMessages([
+                    'received_items' => 'یکی از اقلام انتخاب‌شده معتبر نیست یا قبلاً دریافت شده است.',
+                ]);
+            }
+
+            $note = $request->filled('warehouse_note')
+                ? $request->string('warehouse_note')->toString()
+                : null;
+
+            foreach ($items as $item) {
+                $asset = $item->asset;
+                $allocation = $item->allocation;
+
+                if ($asset === null || $allocation === null) {
+                    throw ValidationException::withMessages([
+                        'received_items' => 'اطلاعات دارایی یا تخصیص ناقص است.',
+                    ]);
+                }
+
+                if (
+                    (int) $asset->company_id !== (int) $dispute->company_id
+                    ||
+                    (int) $allocation->company_id !== (int) $dispute->company_id
+                    ||
+                    (int) $allocation->inventory_request_id !== (int) $inventoryRequest->id
+                    ||
+                    (int) $allocation->asset_id !== (int) $asset->id
+                ) {
+                    abort(404);
+                }
+
+                if ($allocation->status !== 'delivered') {
+                    throw ValidationException::withMessages([
+                        'received_items' => 'تخصیص دارایی در وضعیت تحویل‌شده نیست.',
+                    ]);
+                }
+
+                $custodyService->returnDeliveredAssetToWarehouse(
+                    asset: $asset,
+                    actorUser: $user,
+                    description:
+                        'برگشت فیزیکی بابت مغایرت تحویل درخواست '
+                        . $inventoryRequest->request_number
+                        . ($note ? ' - ' . $note : '')
+                );
+
+                $allocation->update([
+                    'status' => 'returned',
+                    'note' => trim(
+                        ($allocation->note ? $allocation->note . PHP_EOL : '')
+                        . 'برگشت به انبار بابت مغایرت تحویل'
+                        . ($note ? ': ' . $note : '')
+                    ),
+                ]);
+
+                $item->update([
+                    'status' => 'warehouse_received',
+                ]);
+            }
+
+            $remaining = DeliveryDisputeItem::withoutGlobalScopes()
+                ->where('delivery_dispute_id', $dispute->id)
+                ->where('status', 'reported')
+                ->count();
+
+            if ($remaining === 0) {
+                $dispute->update([
+                    'status' => 'warehouse_received',
+                    'warehouse_received_at' => now(),
+                ]);
+
+                $inventoryRequest->update([
+                    'status' => 'replacement_pending',
+                    'fulfilled_at' => null,
+                ]);
+            }
+
+            return redirect()
+                ->route('delivery-disputes.show', $dispute)
+                ->with(
+                    'success',
+                    $remaining === 0
+                        ? 'تمام اقلام در انبار دریافت شدند و درخواست آماده تخصیص کالای جایگزین است.'
+                        : 'اقلام انتخاب‌شده دریافت شدند؛ مغایرت تا دریافت سایر اقلام باز می‌ماند.'
+                );
+        });
+    }
+
+    private function ensureWarehouseActor(
+        User $user,
+        ?Employee $employee,
+        DeliveryDispute $dispute
+    ): void {
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        if ((int) $user->company_id !== (int) $dispute->company_id) {
+            abort(404);
+        }
+
+        if ($dispute->workflow_instance_id === null) {
+            abort(403);
+        }
+
+        $allowed = WorkflowInstanceStep::query()
+            ->where('workflow_instance_id', $dispute->workflow_instance_id)
+            ->whereIn('code', ['WAREHOUSE', 'FINAL-WAREHOUSE-DELIVERY'])
+            ->get()
+            ->contains(function (WorkflowInstanceStep $step) use ($user, $employee): bool {
+                $userMatches =
+                    $step->resolved_user_id !== null
+                    &&
+                    (int) $step->resolved_user_id === (int) $user->id;
+
+                $employeeMatches =
+                    $employee !== null
+                    &&
+                    $step->resolved_employee_id !== null
+                    &&
+                    (int) $step->resolved_employee_id === (int) $employee->id;
+
+                return $userMatches || $employeeMatches;
+            });
+
+        if (!$allowed) {
+            abort(403);
+        }
     }
 
     private function ensureRequester(

@@ -160,4 +160,63 @@
 
 </div>
 
+@if($deliveryDispute->status === 'warehouse_pending')
+    <div class="card shadow-sm mt-4 border-primary">
+        <div class="card-header">دریافت فیزیکی توسط انبار</div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                فقط اقلامی را انتخاب کنید که واقعاً تحویل انبار شده‌اند.
+                با ثبت این عملیات، تراکنش Return ایجاد و Custody واقعی دارایی به انبار منتقل می‌شود.
+            </div>
+
+            <form method="POST" action="{{ route('delivery-disputes.warehouse-receive', $deliveryDispute) }}">
+                @csrf
+
+                @foreach($deliveryDispute->items as $item)
+                    @if($item->status === 'reported')
+                        <div class="border rounded p-3 mb-2">
+                            <div class="form-check">
+                                <input
+                                    type="checkbox"
+                                    name="received_items[]"
+                                    value="{{ $item->id }}"
+                                    class="form-check-input"
+                                    id="warehouse_receive_{{ $item->id }}"
+                                >
+                                <label class="form-check-label" for="warehouse_receive_{{ $item->id }}">
+                                    <strong>{{ $item->asset?->title ?? 'دارایی' }}</strong>
+                                    <span class="text-muted ms-2" dir="ltr">
+                                        {{ $item->asset?->asset_code ?? '-' }}
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
+
+                <div class="mt-3">
+                    <label class="form-label">توضیح انباردار</label>
+                    <textarea
+                        name="warehouse_note"
+                        class="form-control"
+                        rows="3"
+                        maxlength="4000"
+                    ></textarea>
+                </div>
+
+                <button
+                    type="submit"
+                    class="btn btn-primary mt-3"
+                    onclick="return confirm('دریافت فیزیکی اقلام انتخاب‌شده ثبت شود؟');"
+                >
+                    تأیید دریافت فیزیکی در انبار
+                </button>
+            </form>
+        </div>
+    </div>
+@elseif($deliveryDispute->status === 'warehouse_received')
+    <div class="alert alert-success mt-4">
+        تمام دارایی‌های مغایرت در انبار دریافت شده‌اند و درخواست آماده تخصیص کالای جایگزین است.
+    </div>
+@endif
 @endsection

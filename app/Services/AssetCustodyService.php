@@ -519,6 +519,53 @@ final class AssetCustodyService
         ]);
     }
 
+    public function returnDeliveredAssetToWarehouse(
+        \App\Models\Asset $asset,
+        ?\App\Models\User $actorUser = null,
+        ?string $description = null
+    ): \App\Models\AssetTransaction {
+        if (
+            $asset->status !== 'assigned'
+            ||
+            !in_array(
+                $asset->custody_type,
+                [self::TYPE_EMPLOYEE, self::TYPE_USER, self::TYPE_ORGANIZATION],
+                true
+            )
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'asset' => 'فقط دارایی تحویل‌شده به شخص یا سازمان قابل برگشت فیزیکی به انبار است.',
+            ]);
+        }
+
+        $before = $this->snapshot($asset);
+        $fromUserId = $asset->custody_user_id;
+
+        $this->applyWarehouse($asset);
+        $asset->refresh();
+
+        return \App\Models\AssetTransaction::withoutGlobalScopes()->create([
+            'company_id' => $asset->company_id,
+            'asset_id' => $asset->id,
+            'from_user_id' => $fromUserId,
+            'to_user_id' => null,
+            'type' => 'return',
+            'plate_number' => $asset->asset_code,
+            'description' => $description,
+            'created_by' => $actorUser?->id,
+            'from_custody_type' => $before['custody_type'],
+            'to_custody_type' => self::TYPE_WAREHOUSE,
+            'from_employee_id' => $before['custody_employee_id'] ?? null,
+            'to_employee_id' => null,
+            'from_department_id' => $before['custody_department_id'] ?? null,
+            'to_department_id' => null,
+            'from_site_id' => $before['site_id'] ?? null,
+            'to_site_id' => null,
+            'from_location_id' => $before['location_id'] ?? null,
+            'to_location_id' => null,
+        ]);
+    }
+
     public function returnOrganizationToWarehouse(
         \App\Models\Asset $asset,
         ?\App\Models\User $actorUser = null,
