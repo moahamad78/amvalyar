@@ -363,5 +363,9 @@
     <div class="alert alert-info mt-4">
         دارایی‌های جایگزین تخصیص یافته‌اند و درخواست در انتظار بررسی تخصصی مجدد است.
         سابقه دارایی‌های قبلی و تخصیص‌های برگشتی بدون حذف حفظ شده است.
+    </div>
+@elseif($deliveryDispute->status === 'replacement_review_approved')
+    <div class="alert alert-success mt-4">
+        همه تأییدهای تخصصی الزامی کالاهای جایگزین تکمیل شده‌اند و درخواست آماده تحویل مجدد است.
     </div>@endif
 @endsection

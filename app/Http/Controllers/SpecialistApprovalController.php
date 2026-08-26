@@ -14,6 +14,7 @@ use App\Models\WorkflowInstanceBranch;
 use App\Models\WorkflowInstanceBranchItem;
 use App\Models\WorkflowInstanceStep;
 use App\Services\SpecialistRejectionRecoveryService;
+use App\Services\DeliveryDisputeReplacementReviewService;
 use App\Services\WarehouseSpecialistGateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -271,7 +272,8 @@ final class SpecialistApprovalController extends Controller
         Request $request,
         WorkflowInstanceBranch $branch,
         WarehouseSpecialistGateService $gateService,
-        SpecialistRejectionRecoveryService $recoveryService
+        SpecialistRejectionRecoveryService $recoveryService,
+        DeliveryDisputeReplacementReviewService $replacementReviewService
     ): RedirectResponse {
 
         $user =
@@ -323,6 +325,49 @@ final class SpecialistApprovalController extends Controller
                 )
                 : null;
 
+
+        if (
+            $replacementReviewService
+                ->isReplacementBranch($branch)
+        ) {
+            if ($action === 'reject') {
+                if ($comment === null || $comment === '') {
+                    throw ValidationException::withMessages([
+                        'comment' => 'برای رد کالای جایگزین، ثبت توضیح الزامی است.',
+                    ]);
+                }
+
+                $replacementReviewService->reject(
+                    branch: $branch,
+                    actorEmployee: $employee,
+                    actorUser: $user,
+                    comment: $comment,
+                );
+
+                return redirect()
+                    ->route('specialist-approvals.index')
+                    ->with(
+                        'success',
+                        'کالای جایگزین رد شد. رزروهای جایگزین آزاد و درخواست برای انتخاب مجدد به انبار برگشت.'
+                    );
+            }
+
+            $readyForRedelivery = $replacementReviewService->approve(
+                branch: $branch,
+                actorEmployee: $employee,
+                actorUser: $user,
+                comment: $comment,
+            );
+
+            return redirect()
+                ->route('specialist-approvals.index')
+                ->with(
+                    'success',
+                    $readyForRedelivery
+                        ? 'همه تأییدهای تخصصی جایگزین تکمیل شدند و کالا آماده تحویل مجدد است.'
+                        : 'تأیید تخصصی جایگزین ثبت شد؛ سایر تأییدهای الزامی هنوز باقی مانده‌اند.'
+                );
+        }
 
         if (
             $action

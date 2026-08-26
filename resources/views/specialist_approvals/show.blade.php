@@ -67,7 +67,22 @@
 
     @if($inventoryRequest)
 
-        <div class="card shadow-sm mb-4">
+        @php
+        $branchSettings = is_array($branch->settings) ? $branch->settings : [];
+        $isReplacementReview =
+            ($branchSettings['context'] ?? null) === 'delivery_dispute_replacement';
+    @endphp
+
+    @if($isReplacementReview)
+        <div class="alert alert-info">
+            <strong>بازبینی تخصصی کالای جایگزین</strong>
+            <div class="small mt-1">
+                این تصمیم فقط مربوط به مجموعه جایگزین فعلی است.
+                تأییدهای تخصصی قبلی دست‌نخورده در تاریخچه باقی می‌مانند.
+            </div>
+        </div>
+    @endif
+    <div class="card shadow-sm mb-4">
 
             <div class="card-header">
 

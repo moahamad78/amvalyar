@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Services\AssetCustodyService;
 use App\Services\InventoryAssetAllocationService;
+use App\Services\DeliveryDisputeReplacementReviewService;
 use Illuminate\View\View;
 
 final class DeliveryDisputeController extends Controller
@@ -460,7 +461,8 @@ final class DeliveryDisputeController extends Controller
     public function allocateReplacements(
         DeliveryDisputeReplacementAllocationRequest $request,
         DeliveryDispute $deliveryDispute,
-        InventoryAssetAllocationService $allocationService
+        InventoryAssetAllocationService $allocationService,
+        DeliveryDisputeReplacementReviewService $reviewService
     ): RedirectResponse {
         $user = $request->user();
         $employee = $this->resolveEmployee($user);
@@ -469,6 +471,7 @@ final class DeliveryDisputeController extends Controller
             $request,
             $deliveryDispute,
             $allocationService,
+            $reviewService,
             $user,
             $employee
         ): RedirectResponse {
@@ -639,33 +642,30 @@ final class DeliveryDisputeController extends Controller
                 $newAllocationIds[] = $allocation->id;
             }
 
-            /*
-             * We intentionally DO NOT reactivate old specialist branches here.
-             * Old branches belong to the first physical asset set and are part
-             * of immutable history. The next phase creates a dedicated
-             * specialist recheck for replacement assets before re-delivery.
-             */
             $dispute->update([
-                'status' =>
-                    'replacement_allocated',
+                'status' => 'replacement_allocated',
             ]);
 
             $inventoryRequest->update([
-                'status' =>
-                    'replacement_review_pending',
-
-                'fulfilled_at' =>
-                    null,
+                'status' => 'replacement_review_pending',
+                'fulfilled_at' => null,
             ]);
 
+            $reviewResult = $reviewService->startReview(
+                deliveryDispute: $dispute->fresh(),
+                inventoryRequest: $inventoryRequest->fresh(),
+                actorUser: $user,
+            );
+
             return redirect()
-                ->route(
-                    'delivery-disputes.show',
-                    $dispute
-                )
+                ->route('delivery-disputes.show', $dispute)
                 ->with(
                     'success',
-                    'کالاهای جایگزین تخصیص یافتند و درخواست برای بررسی تخصصی مجدد آماده شد.'
+                    $reviewResult['ready_for_redelivery']
+                        ? 'کالاهای جایگزین تخصیص یافتند و بدون تأیید تخصصی الزامی، آماده تحویل مجدد هستند.'
+                        : 'کالاهای جایگزین تخصیص یافتند و '
+                            . $reviewResult['required_branch_count']
+                            . ' مسیر تأیید تخصصی الزامی برای بازبینی مجدد فعال شد.'
                 );
         });
     }
