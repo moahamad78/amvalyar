@@ -21,12 +21,21 @@
         </div>
 
 
-        <a
-            href="{{ route('specialist-approvals.index') }}"
-            class="btn btn-outline-primary"
-        >
-            تأییدهای تخصصی من
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a
+                href="{{ route('delivery-disputes.index') }}"
+                class="btn btn-outline-danger"
+            >
+                مغایرت‌های تحویل
+            </a>
+
+            <a
+                href="{{ route('specialist-approvals.index') }}"
+                class="btn btn-outline-primary"
+            >
+                تأییدهای تخصصی من
+            </a>
+        </div>
 
     </div>
 

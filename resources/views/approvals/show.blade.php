@@ -808,9 +808,149 @@ $actionLabels = [
                                 </button>
 
                                 <div class="text-muted small mt-2">
-                                    اعلام مغایرت تحویل از مسیر تخصصی برگشت به انبار انجام خواهد شد
-                                    و عمداً از دکمه رد عمومی این مرحله جدا شده است.
+                                    در صورت مغایرت، آن را ثبت کنید. ثبت مغایرت به‌تنهایی مالکیت یا استقرار دارایی را تغییر نمی‌دهد؛
+                                    برگشت به انبار فقط پس از دریافت فیزیکی توسط انبار ثبت خواهد شد.
                                 </div>
+
+                                @if(($requesterReceiptAllocations ?? collect())->isNotEmpty())
+
+                                    <div class="card border-danger mt-4">
+                                        <div class="card-header text-danger">
+                                            اعلام مغایرت تحویل
+                                        </div>
+
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">
+                                                    علت اصلی مغایرت
+                                                </label>
+
+                                                <select
+                                                    name="reason_code"
+                                                    class="form-select"
+                                                >
+                                                    <option value="">
+                                                        انتخاب کنید
+                                                    </option>
+                                                    <option value="damaged">
+                                                        خرابی / آسیب‌دیدگی
+                                                    </option>
+                                                    <option value="wrong_item">
+                                                        کالای اشتباه
+                                                    </option>
+                                                    <option value="missing_parts">
+                                                        کسری قطعات یا متعلقات
+                                                    </option>
+                                                    <option value="quantity_mismatch">
+                                                        مغایرت تعداد
+                                                    </option>
+                                                    <option value="wrong_organizational_destination">
+                                                        مغایرت محل استقرار سازمانی
+                                                    </option>
+                                                    <option value="other">
+                                                        سایر
+                                                    </option>
+                                                </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">
+                                                    دارایی‌های دارای مغایرت
+                                                </label>
+
+                                                @foreach($requesterReceiptAllocations as $allocation)
+                                                    @php
+                                                        $asset = $allocation->asset;
+                                                    @endphp
+
+                                                    <div class="border rounded p-3 mb-2">
+                                                        <div class="form-check">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="dispute_allocations[]"
+                                                                value="{{ $allocation->id }}"
+                                                                class="form-check-input"
+                                                                id="dispute_allocation_{{ $allocation->id }}"
+                                                            >
+
+                                                            <label
+                                                                class="form-check-label"
+                                                                for="dispute_allocation_{{ $allocation->id }}"
+                                                            >
+                                                                <strong>
+                                                                    {{ $asset?->title ?? 'دارایی' }}
+                                                                </strong>
+
+                                                                @if($asset?->asset_code)
+                                                                    <span
+                                                                        class="text-muted ms-2"
+                                                                        dir="ltr"
+                                                                    >
+                                                                        {{ $asset->asset_code }}
+                                                                    </span>
+                                                                @endif
+                                                            </label>
+                                                        </div>
+
+                                                        <div class="row g-2 mt-2">
+                                                            <div class="col-md-4">
+                                                                <select
+                                                                    name="item_issue_type[{{ $allocation->id }}]"
+                                                                    class="form-select form-select-sm"
+                                                                >
+                                                                    <option value="">
+                                                                        همان علت اصلی
+                                                                    </option>
+                                                                    <option value="damaged">خرابی</option>
+                                                                    <option value="wrong_item">کالای اشتباه</option>
+                                                                    <option value="missing_parts">کسری متعلقات</option>
+                                                                    <option value="quantity_mismatch">مغایرت تعداد</option>
+                                                                    <option value="wrong_organizational_destination">محل استقرار اشتباه</option>
+                                                                    <option value="other">سایر</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="col-md-8">
+                                                                <input
+                                                                    type="text"
+                                                                    name="item_description[{{ $allocation->id }}]"
+                                                                    class="form-control form-control-sm"
+                                                                    maxlength="2000"
+                                                                    placeholder="توضیح اختصاصی این دارایی (اختیاری)"
+                                                                >
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">
+                                                    توضیحات کلی
+                                                </label>
+
+                                                <textarea
+                                                    name="description"
+                                                    class="form-control"
+                                                    rows="3"
+                                                    maxlength="4000"
+                                                    placeholder="شرح مغایرت، خرابی یا مورد مشاهده‌شده"
+                                                ></textarea>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                class="btn btn-outline-danger"
+                                                formaction="{{ route('delivery-disputes.store', $step) }}"
+                                                formmethod="POST"
+                                                onclick="return confirm('مغایرت تحویل ثبت و برای بررسی انبار ارسال شود؟');"
+                                            >
+                                                ثبت مغایرت و ارجاع به انبار
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                @endif
 
                             @else
 

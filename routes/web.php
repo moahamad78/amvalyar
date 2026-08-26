@@ -29,6 +29,7 @@ use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\WorkflowStepController;
 use App\Http\Controllers\AssetCategoryApprovalRouteController;
 use App\Http\Controllers\MyApprovalController;
+use App\Http\Controllers\DeliveryDisputeController;
 use App\Http\Controllers\InventoryRequestController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\EnsureActiveLoginSession;
@@ -849,6 +850,42 @@ Route::delete('/asset-settings/specialist-approval-routes/{approvalRoute}', [
         'permission:workflows.edit',
     ])
     ->name('asset-settings.specialist-approval-routes.destroy');
+
+/*
+|--------------------------------------------------------------------------
+| Delivery Disputes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/delivery-disputes', [
+    DeliveryDisputeController::class,
+    'index',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:approvals.act',
+    ])
+    ->name('delivery-disputes.index');
+
+Route::get('/delivery-disputes/{deliveryDispute}', [
+    DeliveryDisputeController::class,
+    'show',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:approvals.act',
+    ])
+    ->name('delivery-disputes.show');
+
+Route::post('/approvals/{step}/delivery-dispute', [
+    DeliveryDisputeController::class,
+    'store',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:approvals.act',
+    ])
+    ->name('delivery-disputes.store');
 
 Route::get('/approvals', [
     MyApprovalController::class,

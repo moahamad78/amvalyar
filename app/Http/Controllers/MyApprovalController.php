@@ -274,6 +274,41 @@ final class MyApprovalController extends Controller
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Requester Receipt / Delivery Dispute
+        |--------------------------------------------------------------------------
+        */
+
+        $requesterReceiptAllocations =
+            collect();
+
+        if (
+            $inventoryRequest !== null
+            &&
+            $step->code === 'REQUESTER-RECEIPT'
+            &&
+            $step->status === 'pending'
+        ) {
+            $requesterReceiptAllocations =
+                InventoryRequestAllocation::query()
+                    ->with([
+                        'asset.category',
+                        'requestItem',
+                    ])
+                    ->where(
+                        'inventory_request_id',
+                        $inventoryRequest->id
+                    )
+                    ->where(
+                        'status',
+                        'delivered'
+                    )
+                    ->orderBy('id')
+                    ->get();
+        }
+
+
         return view(
             'approvals.show',
             compact(
@@ -283,7 +318,8 @@ final class MyApprovalController extends Controller
                 'canEditItemDecision',
                 'warehouseAllocationMode',
                 'warehouseAvailableAssets',
-                'warehouseAllocations'
+                'warehouseAllocations',
+                'requesterReceiptAllocations'
             )
         );
     }

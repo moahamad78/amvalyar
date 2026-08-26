@@ -12,6 +12,7 @@ $statusLabels = [
     'in_approval' => 'در حال تأیید',
     'approved' => 'تأییدشده',
     'awaiting_receipt' => 'در انتظار تأیید دریافت',
+    'delivery_dispute' => 'مغایرت تحویل',
     'rejected' => 'ردشده',
     'cancelled' => 'لغوشده',
     'fulfilled' => 'تحویل کامل',
