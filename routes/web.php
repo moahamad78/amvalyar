@@ -895,6 +895,15 @@ Route::post('/delivery-disputes/{deliveryDispute}/warehouse-receive', [
         'permission:approvals.act',
     ])
     ->name('delivery-disputes.warehouse-receive');
+Route::post('/delivery-disputes/{deliveryDispute}/allocate-replacements', [
+    DeliveryDisputeController::class,
+    'allocateReplacements',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:approvals.act',
+    ])
+    ->name('delivery-disputes.allocate-replacements');
 
 Route::get('/approvals', [
     MyApprovalController::class,

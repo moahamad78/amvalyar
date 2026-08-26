@@ -14,6 +14,7 @@ $statusLabels = [
     'awaiting_receipt' => 'در انتظار تأیید دریافت',
     'delivery_dispute' => 'مغایرت تحویل',
     'replacement_pending' => 'در انتظار کالای جایگزین',
+    'replacement_review_pending' => 'در انتظار بررسی مجدد جایگزین',
     'rejected' => 'ردشده',
     'cancelled' => 'لغوشده',
     'fulfilled' => 'تحویل کامل',

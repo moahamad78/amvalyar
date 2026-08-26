@@ -133,6 +133,25 @@
                             </td>
 
                             <td>
+                                @if($item->replacementAsset)
+                                    <div class="mb-2">
+                                        <span class="badge bg-success">
+                                            جایگزین انتخاب‌شده
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        {{ $item->replacementAsset->title }}
+                                    </div>
+
+                                    <div
+                                        class="small text-muted"
+                                        dir="ltr"
+                                    >
+                                        {{ $item->replacementAsset->asset_code ?? '-' }}
+                                    </div>
+                                @endif
+
                                 @php
                                     $snapshot = $item->custody_snapshot ?? [];
                                 @endphp
@@ -215,8 +234,134 @@
         </div>
     </div>
 @elseif($deliveryDispute->status === 'warehouse_received')
-    <div class="alert alert-success mt-4">
-        تمام دارایی‌های مغایرت در انبار دریافت شده‌اند و درخواست آماده تخصیص کالای جایگزین است.
+    <div class="card shadow-sm mt-4 border-success">
+        <div class="card-header">
+            تخصیص کالای جایگزین
+        </div>
+
+        <div class="card-body">
+            <div class="alert alert-success">
+                برگشت فیزیکی کامل شده است.
+                برای هر قلم برگشتی، یک دارایی موجود در انبار انتخاب کنید.
+                دارایی جایگزین باید با گروه کالایی و در صورت تعیین، با نوع دارایی قلم درخواست مطابقت داشته باشد.
+            </div>
+
+            <form
+                method="POST"
+                action="{{ route('delivery-disputes.allocate-replacements', $deliveryDispute) }}"
+            >
+                @csrf
+
+                @foreach($deliveryDispute->items as $item)
+                    @if($item->status === 'warehouse_received')
+                        @php
+                            $requestItem = $item->requestItem;
+
+                            $eligibleAssets = ($replacementAvailableAssets ?? collect())
+                                ->filter(function ($asset) use ($item, $requestItem) {
+                                    if (
+                                        (int) $asset->asset_category_id
+                                        !==
+                                        (int) $requestItem?->asset_category_id
+                                    ) {
+                                        return false;
+                                    }
+
+                                    if (
+                                        $requestItem?->asset_type_id !== null
+                                        &&
+                                        (int) $asset->asset_type_id
+                                        !==
+                                        (int) $requestItem->asset_type_id
+                                    ) {
+                                        return false;
+                                    }
+
+                                    return
+                                        (int) $asset->id
+                                        !==
+                                        (int) $item->asset_id;
+                                })
+                                ->values();
+                        @endphp
+
+                        <div class="border rounded p-3 mb-3">
+                            <div class="mb-2">
+                                <strong>
+                                    قلم برگشتی:
+                                    {{ $item->asset?->title ?? '-' }}
+                                </strong>
+
+                                <span
+                                    class="text-muted ms-2"
+                                    dir="ltr"
+                                >
+                                    {{ $item->asset?->asset_code ?? '-' }}
+                                </span>
+                            </div>
+
+                            <div class="small text-muted mb-2">
+                                قلم درخواست:
+                                {{ $requestItem?->item_name ?? '-' }}
+                            </div>
+
+                            <select
+                                name="replacements[{{ $item->id }}]"
+                                class="form-select"
+                                required
+                            >
+                                <option value="">
+                                    انتخاب دارایی جایگزین
+                                </option>
+
+                                @foreach($eligibleAssets as $asset)
+                                    <option value="{{ $asset->id }}">
+                                        {{ $asset->title }}
+                                        —
+                                        {{ $asset->asset_code ?: 'بدون کد صادرشده' }}
+                                        @if($asset->assetType)
+                                            —
+                                            {{ $asset->assetType->name }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @if($eligibleAssets->isEmpty())
+                                <div class="text-danger small mt-2">
+                                    در حال حاضر دارایی جایگزین منطبق و آزاد در انبار وجود ندارد.
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                @endforeach
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        توضیح تخصیص جایگزین
+                    </label>
+
+                    <textarea
+                        name="replacement_note"
+                        class="form-control"
+                        rows="3"
+                        maxlength="4000"
+                    ></textarea>
+                </div>
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                    onclick="return confirm('دارایی‌های جایگزین انتخاب و برای بررسی مجدد آماده شوند؟');"
+                >
+                    ثبت تخصیص جایگزین
+                </button>
+            </form>
+        </div>
     </div>
-@endif
+@elseif($deliveryDispute->status === 'replacement_allocated')
+    <div class="alert alert-info mt-4">
+        دارایی‌های جایگزین تخصیص یافته‌اند و درخواست در انتظار بررسی تخصصی مجدد است.
+        سابقه دارایی‌های قبلی و تخصیص‌های برگشتی بدون حذف حفظ شده است.
+    </div>@endif
 @endsection

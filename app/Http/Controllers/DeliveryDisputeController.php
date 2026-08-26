@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DeliveryDisputeRequest;
 use App\Http\Requests\DeliveryDisputeWarehouseReceiptRequest;
+use App\Http\Requests\DeliveryDisputeReplacementAllocationRequest;
 use App\Models\DeliveryDispute;
 use App\Models\DeliveryDisputeItem;
 use App\Models\Employee;
@@ -20,6 +21,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Services\AssetCustodyService;
+use App\Services\InventoryAssetAllocationService;
 use Illuminate\View\View;
 
 final class DeliveryDisputeController extends Controller
@@ -78,14 +80,45 @@ final class DeliveryDisputeController extends Controller
             'reportedByUser',
             'reportedByEmployee',
             'items.asset.category',
+            'items.replacementAsset.category',
+            'items.replacementAllocation',
             'items.requestItem',
             'items.allocation',
             'requesterReceiptStep',
         ]);
 
+        $replacementAvailableAssets =
+            collect();
+
+        if (
+            $deliveryDispute->status
+            ===
+            'warehouse_received'
+        ) {
+            $allocationService =
+                app(
+                    InventoryAssetAllocationService::class
+                );
+
+            $replacementAvailableAssets =
+                $allocationService
+                    ->availableAssets(
+                        (int) $deliveryDispute->company_id
+                    )
+                    ->with([
+                        'category',
+                        'assetType',
+                    ])
+                    ->orderBy('title')
+                    ->get();
+        }
+
         return view(
             'delivery_disputes.show',
-            compact('deliveryDispute')
+            compact(
+                'deliveryDispute',
+                'replacementAvailableAssets'
+            )
         );
     }
 
@@ -422,6 +455,219 @@ final class DeliveryDisputeController extends Controller
                     );
             }
         );
+    }
+
+    public function allocateReplacements(
+        DeliveryDisputeReplacementAllocationRequest $request,
+        DeliveryDispute $deliveryDispute,
+        InventoryAssetAllocationService $allocationService
+    ): RedirectResponse {
+        $user = $request->user();
+        $employee = $this->resolveEmployee($user);
+
+        return DB::transaction(function () use (
+            $request,
+            $deliveryDispute,
+            $allocationService,
+            $user,
+            $employee
+        ): RedirectResponse {
+            $dispute = DeliveryDispute::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->findOrFail($deliveryDispute->id);
+
+            $this->ensureVisible($user, $dispute);
+            $this->ensureWarehouseActor($user, $employee, $dispute);
+
+            if ($dispute->status !== 'warehouse_received') {
+                throw ValidationException::withMessages([
+                    'dispute' =>
+                        'تخصیص جایگزین فقط پس از دریافت فیزیکی کامل مغایرت در انبار امکان‌پذیر است.',
+                ]);
+            }
+
+            $inventoryRequest = InventoryRequest::withoutGlobalScopes()
+                ->with('items')
+                ->lockForUpdate()
+                ->findOrFail($dispute->inventory_request_id);
+
+            if ($inventoryRequest->status !== 'replacement_pending') {
+                throw ValidationException::withMessages([
+                    'request' =>
+                        'درخواست در وضعیت انتظار کالای جایگزین نیست.',
+                ]);
+            }
+
+            $items = DeliveryDisputeItem::withoutGlobalScopes()
+                ->with([
+                    'requestItem',
+                    'asset',
+                ])
+                ->where('delivery_dispute_id', $dispute->id)
+                ->where('status', 'warehouse_received')
+                ->lockForUpdate()
+                ->get();
+
+            if ($items->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'replacements' =>
+                        'هیچ قلم دریافت‌شده‌ای برای تخصیص جایگزین وجود ندارد.',
+                ]);
+            }
+
+            $submitted = collect(
+                $request->validated('replacements')
+            )
+                ->mapWithKeys(
+                    fn ($assetId, $itemId): array => [
+                        (int) $itemId => (int) $assetId,
+                    ]
+                );
+
+            $expectedIds = $items
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->sort()
+                ->values();
+
+            $submittedIds = $submitted
+                ->keys()
+                ->map(fn ($id): int => (int) $id)
+                ->sort()
+                ->values();
+
+            if ($expectedIds->all() !== $submittedIds->all()) {
+                throw ValidationException::withMessages([
+                    'replacements' =>
+                        'برای تمام اقلام برگشتی باید دقیقاً یک دارایی جایگزین انتخاب شود.',
+                ]);
+            }
+
+            $note = $request->filled('replacement_note')
+                ? $request->string('replacement_note')->toString()
+                : null;
+
+            $newAllocationIds = [];
+
+            foreach ($items as $item) {
+                $requestItem = $item->requestItem;
+
+                if ($requestItem === null) {
+                    throw ValidationException::withMessages([
+                        'replacements.' . $item->id =>
+                            'قلم درخواست مرتبط با مغایرت قابل تشخیص نیست.',
+                    ]);
+                }
+
+                $replacementAssetId =
+                    (int) $submitted->get($item->id);
+
+                if (
+                    $item->asset_id !== null
+                    &&
+                    (int) $item->asset_id === $replacementAssetId
+                ) {
+                    throw ValidationException::withMessages([
+                        'replacements.' . $item->id =>
+                            'همان دارایی برگشتی نمی‌تواند به‌عنوان جایگزین انتخاب شود.',
+                    ]);
+                }
+
+                $replacementAsset = $allocationService
+                    ->availableAssets(
+                        (int) $dispute->company_id
+                    )
+                    ->whereKey($replacementAssetId)
+                    ->where(
+                        'asset_category_id',
+                        $requestItem->asset_category_id
+                    )
+                    ->when(
+                        $requestItem->asset_type_id !== null,
+                        fn ($query) =>
+                            $query->where(
+                                'asset_type_id',
+                                $requestItem->asset_type_id
+                            )
+                    )
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($replacementAsset === null) {
+                    throw ValidationException::withMessages([
+                        'replacements.' . $item->id =>
+                            'دارایی جایگزین باید فعال، موجود در انبار و منطبق با گروه/نوع قلم درخواست باشد.',
+                    ]);
+                }
+
+                $allocation = $allocationService->reserve(
+                    $inventoryRequest,
+                    $requestItem,
+                    $replacementAsset,
+                    $user
+                );
+
+                /*
+                 * Replacement has already passed manager quantity approval.
+                 * It now enters specialist recheck, so allocation is moved to
+                 * approved (same state used before specialist review).
+                 */
+                $allocation->status = 'approved';
+                $allocation->approved_at = now();
+
+                $allocation->note = trim(
+                    'تخصیص جایگزین بابت مغایرت تحویل'
+                    . ($note ? ': ' . $note : '')
+                );
+
+                $allocation->save();
+
+                $item->update([
+                    'replacement_asset_id' =>
+                        $replacementAsset->id,
+
+                    'replacement_allocation_id' =>
+                        $allocation->id,
+
+                    'replacement_selected_at' =>
+                        now(),
+
+                    'status' =>
+                        'replacement_allocated',
+                ]);
+
+                $newAllocationIds[] = $allocation->id;
+            }
+
+            /*
+             * We intentionally DO NOT reactivate old specialist branches here.
+             * Old branches belong to the first physical asset set and are part
+             * of immutable history. The next phase creates a dedicated
+             * specialist recheck for replacement assets before re-delivery.
+             */
+            $dispute->update([
+                'status' =>
+                    'replacement_allocated',
+            ]);
+
+            $inventoryRequest->update([
+                'status' =>
+                    'replacement_review_pending',
+
+                'fulfilled_at' =>
+                    null,
+            ]);
+
+            return redirect()
+                ->route(
+                    'delivery-disputes.show',
+                    $dispute
+                )
+                ->with(
+                    'success',
+                    'کالاهای جایگزین تخصیص یافتند و درخواست برای بررسی تخصصی مجدد آماده شد.'
+                );
+        });
     }
 
     public function warehouseReceive(
