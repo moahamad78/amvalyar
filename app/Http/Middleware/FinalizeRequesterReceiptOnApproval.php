@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\DeliveryDispute;
+use App\Models\DeliveryDisputeItem;
 use App\Models\InventoryRequest;
 use App\Models\WorkflowInstance;
 use App\Models\WorkflowInstanceStep;
@@ -19,36 +21,58 @@ final class FinalizeRequesterReceiptOnApproval
         Request $request,
         Closure $next
     ): Response {
-        $routeStep = $request->route('step');
+        $routeStep =
+            $request->route(
+                'step'
+            );
 
-        if (!$routeStep instanceof WorkflowInstanceStep) {
-            return $next($request);
+        if (
+            !$routeStep
+            instanceof
+            WorkflowInstanceStep
+        ) {
+            return $next(
+                $request
+            );
         }
 
-        if ($routeStep->code !== 'REQUESTER-RECEIPT') {
-            return $next($request);
+        if (
+            $routeStep->code
+            !==
+            'REQUESTER-RECEIPT'
+        ) {
+            return $next(
+                $request
+            );
         }
 
-        $action = (string) $request->input('action', '');
+        $action =
+            (string) $request->input(
+                'action',
+                ''
+            );
 
         /*
-         * A generic WorkflowRuntime reject would reactivate
-         * FINAL-WAREHOUSE-DELIVERY while the assets have already moved out
-         * of warehouse custody. That would create an invalid state.
-         *
-         * Receipt discrepancy therefore stays blocked until its dedicated
-         * physical-return/dispute flow is implemented.
+         * Generic rejection is intentionally blocked.
+         * Any physical delivery discrepancy must use the dedicated
+         * delivery-dispute flow so custody and transactions remain truthful.
          */
         if ($action === 'reject') {
             throw ValidationException::withMessages([
                 'action' =>
                     'برای اعلام مغایرت تحویل، مسیر تخصصی برگشت به انبار باید استفاده شود. '
-                    . 'تا زمان تکمیل آن مسیر، از رد عمومی این مرحله استفاده نمی‌شود.',
+                    . 'مغایرت را از فرم اختصاصی ثبت کنید؛ رد عمومی مرحله تأیید دریافت مجاز نیست.',
             ]);
         }
 
-        if ($action !== 'approve') {
-            return $next($request);
+        if (
+            $action
+            !==
+            'approve'
+        ) {
+            return $next(
+                $request
+            );
         }
 
         return DB::transaction(
@@ -57,7 +81,10 @@ final class FinalizeRequesterReceiptOnApproval
                 $next,
                 $routeStep
             ): Response {
-                $response = $next($request);
+                $response =
+                    $next(
+                        $request
+                    );
 
                 $step =
                     WorkflowInstanceStep::query()
@@ -66,7 +93,11 @@ final class FinalizeRequesterReceiptOnApproval
                             $routeStep->id
                         );
 
-                if ($step->status !== 'approved') {
+                if (
+                    $step->status
+                    !==
+                    'approved'
+                ) {
                     throw ValidationException::withMessages([
                         'receipt' =>
                             'مرحله تأیید دریافت با موفقیت نهایی نشده است.',
@@ -85,7 +116,9 @@ final class FinalizeRequesterReceiptOnApproval
                     !==
                     InventoryRequest::class
                     ||
-                    $instance->subject_id === null
+                    $instance->subject_id
+                    ===
+                    null
                 ) {
                     throw ValidationException::withMessages([
                         'receipt' =>
@@ -111,9 +144,81 @@ final class FinalizeRequesterReceiptOnApproval
                     ]);
                 }
 
+                /*
+                 * If this receipt follows a replacement delivery,
+                 * close the corresponding open dispute at the same time.
+                 */
+                $replacementDisputes =
+                    DeliveryDispute::withoutGlobalScopes()
+                        ->where(
+                            'inventory_request_id',
+                            $inventoryRequest->id
+                        )
+                        ->where(
+                            'requester_receipt_step_id',
+                            $step->id
+                        )
+                        ->where(
+                            'status',
+                            'replacement_delivered'
+                        )
+                        ->lockForUpdate()
+                        ->get();
+
+                foreach (
+                    $replacementDisputes
+                    as
+                    $deliveryDispute
+                ) {
+                    $remaining =
+                        DeliveryDisputeItem::withoutGlobalScopes()
+                            ->where(
+                                'delivery_dispute_id',
+                                $deliveryDispute->id
+                            )
+                            ->where(
+                                'status',
+                                '!=',
+                                'replacement_delivered'
+                            )
+                            ->exists();
+
+                    if ($remaining) {
+                        throw ValidationException::withMessages([
+                            'receipt' =>
+                                'همه اقلام جایگزین این مغایرت هنوز به‌صورت تحویل‌شده ثبت نشده‌اند.',
+                        ]);
+                    }
+
+                    DeliveryDisputeItem::withoutGlobalScopes()
+                        ->where(
+                            'delivery_dispute_id',
+                            $deliveryDispute->id
+                        )
+                        ->where(
+                            'status',
+                            'replacement_delivered'
+                        )
+                        ->update([
+                            'status' =>
+                                'resolved',
+                        ]);
+
+                    $deliveryDispute->update([
+                        'status' =>
+                            'resolved',
+
+                        'resolved_at' =>
+                            now(),
+                    ]);
+                }
+
                 $inventoryRequest->update([
-                    'status' => 'fulfilled',
-                    'fulfilled_at' => now(),
+                    'status' =>
+                        'fulfilled',
+
+                    'fulfilled_at' =>
+                        now(),
                 ]);
 
                 return $response;

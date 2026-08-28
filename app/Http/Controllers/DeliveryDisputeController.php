@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\DeliveryDisputeRequest;
 use App\Http\Requests\DeliveryDisputeWarehouseReceiptRequest;
 use App\Http\Requests\DeliveryDisputeReplacementAllocationRequest;
+use App\Http\Requests\DeliveryDisputeReplacementDeliveryRequest;
 use App\Models\DeliveryDispute;
 use App\Models\DeliveryDisputeItem;
 use App\Models\Employee;
@@ -23,6 +24,7 @@ use Illuminate\Validation\ValidationException;
 use App\Services\AssetCustodyService;
 use App\Services\InventoryAssetAllocationService;
 use App\Services\DeliveryDisputeReplacementReviewService;
+use App\Services\DeliveryDisputeReplacementDeliveryService;
 use Illuminate\View\View;
 
 final class DeliveryDisputeController extends Controller
@@ -668,6 +670,50 @@ final class DeliveryDisputeController extends Controller
                             . ' مسیر تأیید تخصصی الزامی برای بازبینی مجدد فعال شد.'
                 );
         });
+    }
+
+    public function redeliverReplacement(
+        DeliveryDisputeReplacementDeliveryRequest $request,
+        DeliveryDispute $deliveryDispute,
+        DeliveryDisputeReplacementDeliveryService $deliveryService
+    ): RedirectResponse {
+        $user =
+            $request->user();
+
+        $employee =
+            $this->resolveEmployee(
+                $user
+            );
+
+        $deliveryService->deliver(
+            deliveryDispute:
+                $deliveryDispute,
+
+            actorUser:
+                $user,
+
+            actorEmployee:
+                $employee,
+
+            note:
+                $request->filled(
+                    'delivery_note'
+                )
+                    ? $request->string(
+                        'delivery_note'
+                    )->toString()
+                    : null,
+        );
+
+        return redirect()
+            ->route(
+                'delivery-disputes.show',
+                $deliveryDispute
+            )
+            ->with(
+                'success',
+                'تحویل مجدد کالاهای جایگزین ثبت شد. درخواست برای تأیید نهایی دریافت به درخواست‌کننده برگشت.'
+            );
     }
 
     public function warehouseReceive(

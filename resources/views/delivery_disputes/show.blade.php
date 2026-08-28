@@ -365,7 +365,69 @@
         سابقه دارایی‌های قبلی و تخصیص‌های برگشتی بدون حذف حفظ شده است.
     </div>
 @elseif($deliveryDispute->status === 'replacement_review_approved')
-    <div class="alert alert-success mt-4">
-        همه تأییدهای تخصصی الزامی کالاهای جایگزین تکمیل شده‌اند و درخواست آماده تحویل مجدد است.
+    <div class="card shadow-sm mt-4 border-success">
+        <div class="card-header">
+            تحویل مجدد کنترل‌شده کالای جایگزین
+        </div>
+
+        <div class="card-body">
+            <div class="alert alert-success">
+                همه تأییدهای تخصصی الزامی کالاهای جایگزین تکمیل شده‌اند.
+                با ثبت تحویل مجدد، Custody واقعی دارایی‌ها به همان مقصد درخواست
+                (شخص یا مقصد سازمانی) منتقل و برای هر دارایی یک تراکنش Delivery جدید ثبت می‌شود.
+            </div>
+
+            <div class="mb-3">
+                @foreach($deliveryDispute->items as $item)
+                    @if($item->status === 'replacement_approved')
+                        <div class="border rounded p-2 mb-2">
+                            <strong>
+                                {{ $item->replacementAsset?->title ?? 'دارایی جایگزین' }}
+                            </strong>
+
+                            <span
+                                class="text-muted ms-2"
+                                dir="ltr"
+                            >
+                                {{ $item->replacementAsset?->asset_code ?? '-' }}
+                            </span>
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+
+            <form
+                method="POST"
+                action="{{ route('delivery-disputes.redeliver-replacement', $deliveryDispute) }}"
+            >
+                @csrf
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        توضیح تحویل مجدد
+                    </label>
+
+                    <textarea
+                        name="delivery_note"
+                        class="form-control"
+                        rows="3"
+                        maxlength="4000"
+                        placeholder="توضیحات تحویل جایگزین (اختیاری)"
+                    ></textarea>
+                </div>
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                    onclick="return confirm('تحویل فیزیکی همه کالاهای جایگزین ثبت شود؟');"
+                >
+                    ثبت تحویل مجدد و ارسال برای تأیید دریافت
+                </button>
+            </form>
+        </div>
+    </div>
+@elseif($deliveryDispute->status === 'replacement_delivered')
+    <div class="alert alert-primary mt-4">
+        کالاهای جایگزین تحویل شده‌اند و درخواست اکنون منتظر تأیید نهایی دریافت توسط درخواست‌کننده است.
     </div>@endif
 @endsection
