@@ -329,24 +329,35 @@ Route::get('/asset-transactions', [
     ->name('asset-transactions.index');
 
 
-Route::get('/asset-transactions/create', [
-    AssetTransactionController::class,
-    'create',
-])
+/*
+ * Legacy direct-write endpoints are intentionally retained only as
+ * compatibility guards.
+ *
+ * All new Transfer / Return / Disposal operations must be submitted through
+ * AssetMovementRequest and its approval workflow. Initial delivery is handled
+ * by the inventory-request final-delivery workflow.
+ *
+ * Keeping the old route names avoids silently breaking old bookmarks/forms,
+ * while making the historical direct mutation controller unreachable.
+ */
+Route::get('/asset-transactions/create', function () {
+    return redirect()
+        ->route('asset-movement-requests.create');
+})
     ->middleware([
         EnsureActiveLoginSession::class,
-        
     ])
     ->name('asset-transactions.create');
 
 
-Route::post('/asset-transactions', [
-    AssetTransactionController::class,
-    'store',
-])
+Route::post('/asset-transactions', function () {
+    abort(
+        410,
+        'ثبت مستقیم گردش اموال غیرفعال شده است. عملیات را از مسیر درخواست جابه‌جایی اموال و گردش تأیید انجام دهید.'
+    );
+})
     ->middleware([
         EnsureActiveLoginSession::class,
-        
     ])
     ->name('asset-transactions.store');
 
