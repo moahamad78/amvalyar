@@ -107,6 +107,10 @@ final class PermissionRegistryService
             'view',
         ],
 
+        'company_storage' => [
+            'manage',
+        ],
+
         'stocktakes' => [
             'view',
             'create',
@@ -168,6 +172,8 @@ final class PermissionRegistryService
 
         'asset_completeness' =>
             'نواقص شناسنامه اموال',
+
+        'company_storage' => 'فضای ذخیره‌سازی شرکت',
 
         'companies' =>
             'شرکت‌ها',

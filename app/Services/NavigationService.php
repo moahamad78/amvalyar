@@ -365,6 +365,14 @@ $this->push(
         $this->push(
             $admin,
             $user,
+            'فضای ذخیره‌سازی شرکت',
+            'company-storage-profiles.index',
+            'company-storage-profiles.*',
+            'company_storage.manage'
+        );
+        $this->push(
+            $admin,
+            $user,
             'کاربران',
             'users.index',
             'users.*',

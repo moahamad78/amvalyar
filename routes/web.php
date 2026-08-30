@@ -2078,3 +2078,12 @@ Route::middleware([
     Route::post('/stocktakes/{stocktake}/complete', [\App\Http\Controllers\StocktakeController::class, 'complete'])
         ->middleware('permission:stocktakes.finalize')->name('stocktakes.complete');
 });
+Route::middleware(['auth'])->group(function () {
+    Route::get('/company-storage-profiles', [\App\Http\Controllers\CompanyStorageProfileController::class, 'index'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.index');
+    Route::get('/company-storage-profiles/create', [\App\Http\Controllers\CompanyStorageProfileController::class, 'create'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.create');
+    Route::post('/company-storage-profiles', [\App\Http\Controllers\CompanyStorageProfileController::class, 'store'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.store');
+    Route::get('/company-storage-profiles/{companyStorageProfile}/edit', [\App\Http\Controllers\CompanyStorageProfileController::class, 'edit'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.edit');
+    Route::put('/company-storage-profiles/{companyStorageProfile}', [\App\Http\Controllers\CompanyStorageProfileController::class, 'update'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.update');
+    Route::post('/company-storage-profiles/{companyStorageProfile}/test', [\App\Http\Controllers\CompanyStorageProfileController::class, 'testConnection'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.test');
+    Route::post('/company-storage-profiles/{companyStorageProfile}/default', [\App\Http\Controllers\CompanyStorageProfileController::class, 'makeDefault'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.default');
+});
