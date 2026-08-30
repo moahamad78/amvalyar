@@ -2049,3 +2049,32 @@ Route::get(
         'permission:assets.view',
     ])
     ->name('asset-plates.single');
+
+/*
+|--------------------------------------------------------------------------
+| Physical Stocktake
+|--------------------------------------------------------------------------
+*/
+Route::middleware([
+    'web',
+    \App\Http\Middleware\EnsureActiveLoginSession::class,
+])->group(function () {
+    Route::get('/stocktakes', [\App\Http\Controllers\StocktakeController::class, 'index'])
+        ->middleware('permission:stocktakes.view')->name('stocktakes.index');
+    Route::get('/stocktakes/create', [\App\Http\Controllers\StocktakeController::class, 'create'])
+        ->middleware('permission:stocktakes.create')->name('stocktakes.create');
+    Route::post('/stocktakes', [\App\Http\Controllers\StocktakeController::class, 'store'])
+        ->middleware('permission:stocktakes.create')->name('stocktakes.store');
+    Route::get('/stocktakes/{stocktake}', [\App\Http\Controllers\StocktakeController::class, 'show'])
+        ->middleware('permission:stocktakes.view')->name('stocktakes.show');
+    Route::post('/stocktakes/{stocktake}/start', [\App\Http\Controllers\StocktakeController::class, 'start'])
+        ->middleware('permission:stocktakes.start')->name('stocktakes.start');
+    Route::post('/stocktakes/{stocktake}/observe', [\App\Http\Controllers\StocktakeController::class, 'observe'])
+        ->middleware('permission:stocktakes.count')->name('stocktakes.observe');
+    Route::post('/stocktakes/{stocktake}/items/{item}/missing', [\App\Http\Controllers\StocktakeController::class, 'missing'])
+        ->middleware('permission:stocktakes.count')->name('stocktakes.missing');
+    Route::post('/stocktakes/{stocktake}/recount', [\App\Http\Controllers\StocktakeController::class, 'recount'])
+        ->middleware('permission:stocktakes.finalize')->name('stocktakes.recount');
+    Route::post('/stocktakes/{stocktake}/complete', [\App\Http\Controllers\StocktakeController::class, 'complete'])
+        ->middleware('permission:stocktakes.finalize')->name('stocktakes.complete');
+});

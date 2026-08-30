@@ -73,7 +73,15 @@ final class NavigationService
             'inventory_requests.view'
         );
 
-        $this->push(
+                $this->push(
+            $main,
+            $user,
+            'انبارگردانی فیزیکی',
+            'stocktakes.index',
+            'stocktakes.*',
+            'stocktakes.view'
+        );
+$this->push(
             $main,
             $user,
             'درخواست جابه‌جایی اموال',

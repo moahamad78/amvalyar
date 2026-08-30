@@ -107,6 +107,15 @@ final class PermissionRegistryService
             'view',
         ],
 
+        'stocktakes' => [
+            'view',
+            'create',
+            'start',
+            'count',
+            'finalize',
+        ],
+        'stocktakes' =>
+            'انبارگردانی',
         'asset_movement_requests' => [
             'view',
             'create',
@@ -232,6 +241,14 @@ final class PermissionRegistryService
         'submit' =>
             'ارسال برای تأیید',
 
+        'start' =>
+            'شروع',
+
+        'count' =>
+            'ثبت شمارش',
+
+        'finalize' =>
+            'نهایی‌سازی',
         'act' =>
             'اقدام روی تأیید',
     ];
