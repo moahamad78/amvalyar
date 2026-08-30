@@ -118,8 +118,6 @@ final class PermissionRegistryService
             'count',
             'finalize',
         ],
-        'stocktakes' =>
-            'انبارگردانی',
         'asset_movement_requests' => [
             'view',
             'create',
