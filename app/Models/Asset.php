@@ -171,6 +171,10 @@ class Asset extends Model
         );
     }
 
+    public function repairRequests(): HasMany
+    {
+        return $this->hasMany(AssetRepairRequest::class);
+    }
     public function transactions(): HasMany
     {
         return $this->hasMany(AssetTransaction::class);
