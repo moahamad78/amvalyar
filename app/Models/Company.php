@@ -39,6 +39,10 @@ final class Company extends Model
         return $this->hasMany(User::class);
     }
 
+    public function storageProfiles(): HasMany
+    {
+        return $this->hasMany(CompanyStorageProfile::class);
+    }
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);

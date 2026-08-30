@@ -17,6 +17,9 @@ final class AssetPhoto extends Model
 
         'company_id',
         'asset_id',
+        'storage_profile_id',
+        'storage_driver',
+        'object_key',
 
         'path',
         'original_name',
@@ -46,6 +49,10 @@ final class AssetPhoto extends Model
     ];
 
 
+    public function storageProfile(): BelongsTo
+    {
+        return $this->belongsTo(CompanyStorageProfile::class, 'storage_profile_id');
+    }
     public function asset(): BelongsTo
     {
         return $this->belongsTo(
