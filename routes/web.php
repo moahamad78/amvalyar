@@ -2087,3 +2087,79 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/company-storage-profiles/{companyStorageProfile}/test', [\App\Http\Controllers\CompanyStorageProfileController::class, 'testConnection'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.test');
     Route::post('/company-storage-profiles/{companyStorageProfile}/default', [\App\Http\Controllers\CompanyStorageProfileController::class, 'makeDefault'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.default');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Asset Repair Requests
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/asset-repairs', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'index',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.view',
+    ])
+    ->name('asset-repairs.index');
+
+Route::get('/asset-repairs/create', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'create',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.create',
+    ])
+    ->name('asset-repairs.create');
+
+Route::post('/asset-repairs', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'store',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.create',
+    ])
+    ->name('asset-repairs.store');
+
+Route::get('/asset-repairs/{assetRepair}', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'show',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.view',
+    ])
+    ->name('asset-repairs.show');
+
+Route::post('/asset-repairs/{assetRepair}/submit', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'submit',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.create',
+    ])
+    ->name('asset-repairs.submit');
+
+Route::post('/asset-repairs/{assetRepair}/start', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'start',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.manage',
+    ])
+    ->name('asset-repairs.start');
+
+Route::post('/asset-repairs/{assetRepair}/complete', [
+    \App\Http\Controllers\AssetRepairRequestController::class,
+    'complete',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:asset_repairs.manage',
+    ])
+    ->name('asset-repairs.complete');

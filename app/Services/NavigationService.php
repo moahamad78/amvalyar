@@ -231,6 +231,14 @@ $this->push(
             'organizational-assets.*',
             'assets.view'
         );
+        $this->push(
+            $assets,
+            $user,
+            'تعمیر و نگهداری اموال',
+            'asset-repairs.index',
+            'asset-repairs.*',
+            'asset_repairs.view'
+        );
 
         $this->push(
             $assets,

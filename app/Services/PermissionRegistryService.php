@@ -118,6 +118,11 @@ final class PermissionRegistryService
             'count',
             'finalize',
         ],
+        'asset_repairs' => [
+            'view',
+            'create',
+            'manage',
+        ],
         'asset_movement_requests' => [
             'view',
             'create',
@@ -178,6 +183,9 @@ final class PermissionRegistryService
 
         'bulk_import' =>
             'ورود گروهی',
+
+        'asset_repairs' =>
+            'تعمیر و نگهداری اموال',
 
         'asset_movement_requests' =>
             'درخواست جابه‌جایی اموال',
