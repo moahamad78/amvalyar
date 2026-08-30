@@ -17,7 +17,8 @@ final class WorkflowRuntimeService
 {
     public function __construct(
         private readonly WorkflowApproverResolver $approverResolver,
-        private readonly AssetMovementFinalizer $assetMovementFinalizer
+        private readonly AssetMovementFinalizer $assetMovementFinalizer,
+        private readonly AssetRepairWorkflowFinalizer $assetRepairWorkflowFinalizer
     ) {
     }
 
@@ -502,6 +503,11 @@ final class WorkflowRuntimeService
                             $instance
                         );
 
+                    $this->assetRepairWorkflowFinalizer
+                        ->finalizeCompleted(
+                            $instance
+                        );
+
 
 
                     return $instance->fresh([
@@ -803,6 +809,11 @@ final class WorkflowRuntimeService
             'rejected_at' =>
                 now(),
         ]);
+
+        $this->assetRepairWorkflowFinalizer
+            ->finalizeRejected(
+                $instance
+            );
 
 
         return $instance->fresh([
