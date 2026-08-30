@@ -54,8 +54,35 @@ final class CompanyStorageProfileController extends Controller
     public function testConnection(Request $request,CompanyStorageProfile $companyStorageProfile,CompanyStorageProfileService $service): RedirectResponse
     {
         $profile=$this->owned($request,$companyStorageProfile);
-        try{$disk=$service->disk($profile);$probe='.asset-system-health/'.bin2hex(random_bytes(8)).'.txt';$disk->put($probe,'ok');$disk->delete($probe);$profile->update(['last_tested_at'=>now(),'last_test_status'=>'success']);return back()->with('success','اتصال و دسترسی نوشتن/حذف با موفقیت تست شد.');}
-        catch(Throwable $e){$profile->update(['last_tested_at'=>now(),'last_test_status'=>'failed']);report($e);return back()->withErrors(['storage_profile'=>'تست اتصال ناموفق بود. تنظیمات Endpoint، Bucket و دسترسی‌ها را بررسی کنید.']);}
+
+        try {
+            $disk=$service->disk($profile);
+            $probe='.asset-system-health/'.bin2hex(random_bytes(8)).'.txt';
+
+            if ($disk->put($probe,'ok') !== true) {
+                throw new \RuntimeException('storage probe write failed');
+            }
+
+            if ($disk->delete($probe) !== true) {
+                throw new \RuntimeException('storage probe delete failed');
+            }
+
+            $profile->update([
+                'last_tested_at'=>now(),
+                'last_test_status'=>'success',
+            ]);
+
+            return back()->with('success','اتصال و دسترسی نوشتن/حذف با موفقیت تست شد.');
+        } catch (Throwable) {
+            $profile->update([
+                'last_tested_at'=>now(),
+                'last_test_status'=>'failed',
+            ]);
+
+            return back()->withErrors([
+                'storage_profile'=>'تست اتصال ناموفق بود. تنظیمات Endpoint، Bucket و دسترسی‌ها را بررسی کنید.',
+            ]);
+        }
     }
     private function validated(Request $request,?CompanyStorageProfile $profile=null): array
     {

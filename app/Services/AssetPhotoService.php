@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetPhoto;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Throwable;
 
 final class AssetPhotoService
 {
@@ -41,21 +42,34 @@ final class AssetPhotoService
             $stored = $this->storage->store($asset, $file);
             $isPrimary = !$hasPrimary;
 
-            AssetPhoto::query()->create([
-                'company_id' => $asset->company_id,
-                'asset_id' => $asset->id,
-                'storage_profile_id' => $stored['storage_profile_id'],
-                'storage_driver' => $stored['storage_driver'],
-                'object_key' => $stored['object_key'],
-                'path' => $stored['path'],
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'file_size' => $file->getSize(),
-                'photo_type' => 'general',
-                'is_primary' => $isPrimary,
-                'sort_order' => $nextSortOrder,
-                'uploaded_by_user_id' => $user->id,
-            ]);
+            try {
+                AssetPhoto::query()->create([
+                    'company_id' => $asset->company_id,
+                    'asset_id' => $asset->id,
+                    'storage_profile_id' => $stored['storage_profile_id'],
+                    'storage_driver' => $stored['storage_driver'],
+                    'object_key' => $stored['object_key'],
+                    'path' => $stored['path'],
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                    'photo_type' => 'general',
+                    'is_primary' => $isPrimary,
+                    'sort_order' => $nextSortOrder,
+                    'uploaded_by_user_id' => $user->id,
+                ]);
+            } catch (Throwable $e) {
+                try {
+                    $this->storage->cleanupStored(
+                        (int) $asset->company_id,
+                        $stored
+                    );
+                } catch (Throwable $cleanupError) {
+                    report($cleanupError);
+                }
+
+                throw $e;
+            }
 
             if ($isPrimary) {
                 $hasPrimary = true;
@@ -70,11 +84,14 @@ final class AssetPhotoService
         $this->storage->deleteBinary($photo);
 
         $assetId = $photo->asset_id;
+        $companyId = $photo->company_id;
         $wasPrimary = $photo->is_primary;
+
         $photo->delete();
 
         if ($wasPrimary) {
-            $next = AssetPhoto::query()
+            $next = AssetPhoto::withoutGlobalScopes()
+                ->where('company_id', $companyId)
                 ->where('asset_id', $assetId)
                 ->orderBy('sort_order')
                 ->orderBy('id')
