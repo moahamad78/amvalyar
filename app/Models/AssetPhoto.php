@@ -49,6 +49,11 @@ final class AssetPhoto extends Model
     ];
 
 
+    public function displayUrl(int $minutes = 10): string
+    {
+        return app(\App\Services\AssetPhotoStorageService::class)
+            ->url($this, $minutes);
+    }
     public function storageProfile(): BelongsTo
     {
         return $this->belongsTo(CompanyStorageProfile::class, 'storage_profile_id');

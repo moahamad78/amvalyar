@@ -696,7 +696,7 @@
                                 <div class="border rounded p-2">
 
                                     <img
-                                        src="{{ asset('storage/' . $photo->path) }}"
+                                        src="{{ $photo->displayUrl() }}"
                                         alt="تصویر دارایی"
                                         style="
                                             width:100%;

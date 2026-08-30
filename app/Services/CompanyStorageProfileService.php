@@ -5,7 +5,7 @@ use App\Models\CompanyStorageProfile;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-final class CompanyStorageProfileService
+class CompanyStorageProfileService
 {
     public function disk(CompanyStorageProfile $profile): FilesystemAdapter
     {
