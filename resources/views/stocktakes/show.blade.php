@@ -9,6 +9,12 @@ $resultLabels=['pending'=>'شمارش‌نشده','matched'=>'مطابق','missi
 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
+@if($stocktake->status==='completed' && (auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('stocktakes.reconcile')))
+<div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div><strong>رسیدگی مغایرت‌های انبارگردانی</strong><div class="small">پس از نهایی‌شدن شمارش، تغییر اطلاعات اصلی مال فقط از مسیر رسیدگی صریح انجام می‌شود.</div></div>
+    <a class="btn btn-warning" href="{{ route('stocktakes.reconciliation',$stocktake) }}">باز کردن کارتابل رسیدگی</a>
+</div>
+@endif
 <div class="row g-3 mb-4">
 @foreach(['pending'=>'شمارش‌نشده','matched'=>'مطابق','missing'=>'یافت‌نشده','misplaced'=>'مکان مغایر','custody_mismatch'=>'تحویل‌گیرنده مغایر','damaged'=>'آسیب‌دیده','recount'=>'بازشماری'] as $k=>$label)
 <div class="col-6 col-md"><div class="card h-100"><div class="card-body py-3"><div class="small text-muted">{{ $label }}</div><div class="h5 mb-0">{{ (int)($counts[$k] ?? 0) }}</div></div></div></div>

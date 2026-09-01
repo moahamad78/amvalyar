@@ -117,6 +117,7 @@ final class PermissionRegistryService
             'start',
             'count',
             'finalize',
+            'reconcile',
         ],
         'asset_repairs' => [
             'view',
@@ -261,7 +262,10 @@ final class PermissionRegistryService
 
         'finalize' =>
             'نهایی‌سازی',
-        'act' =>
+                'reconcile' =>
+            'رسیدگی مغایرت انبارگردانی',
+
+'act' =>
             'اقدام روی تأیید',
     ];
 

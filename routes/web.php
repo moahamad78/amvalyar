@@ -2077,7 +2077,12 @@ Route::middleware([
         ->middleware('permission:stocktakes.finalize')->name('stocktakes.recount');
     Route::post('/stocktakes/{stocktake}/complete', [\App\Http\Controllers\StocktakeController::class, 'complete'])
         ->middleware('permission:stocktakes.finalize')->name('stocktakes.complete');
-});
+    Route::get('/stocktakes/{stocktake}/reconciliation', [\App\Http\Controllers\StocktakeController::class, 'reconciliation'])
+        ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation');
+    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/apply', [\App\Http\Controllers\StocktakeController::class, 'applyReconciliation'])
+        ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation.apply');
+    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/resolve', [\App\Http\Controllers\StocktakeController::class, 'resolveReconciliation'])
+        ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation.resolve');});
 Route::middleware(['auth'])->group(function () {
     Route::get('/company-storage-profiles', [\App\Http\Controllers\CompanyStorageProfileController::class, 'index'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.index');
     Route::get('/company-storage-profiles/create', [\App\Http\Controllers\CompanyStorageProfileController::class, 'create'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.create');

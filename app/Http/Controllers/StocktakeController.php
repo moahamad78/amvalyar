@@ -11,6 +11,7 @@ use App\Models\Stocktake;
 use App\Models\StocktakeItem;
 use App\Services\StocktakeCountingService;
 use App\Services\StocktakeFinalizationService;
+use App\Services\StocktakeReconciliationService;
 use App\Services\StocktakeStartService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,6 +133,80 @@ final class StocktakeController extends Controller
         return back()->with('success','انبارگردانی نهایی شد.');
     }
 
+
+    public function reconciliation(Request $request, Stocktake $stocktake): View
+    {
+        $stocktake = $this->owned($request, $stocktake);
+        abort_unless($stocktake->status === Stocktake::STATUS_COMPLETED, 404);
+
+        $items = StocktakeItem::withoutGlobalScopes()
+            ->where('stocktake_id', $stocktake->id)
+            ->where('company_id', $stocktake->company_id)
+            ->whereIn('result_status', [
+                StocktakeItem::RESULT_MISSING,
+                StocktakeItem::RESULT_MISPLACED,
+                StocktakeItem::RESULT_CUSTODY_MISMATCH,
+                StocktakeItem::RESULT_DAMAGED,
+            ])
+            ->with(['asset', 'counter', 'reconciler'])
+            ->orderByRaw("CASE WHEN reconciliation_status = 'pending' THEN 0 ELSE 1 END")
+            ->orderBy('result_status')
+            ->orderBy('id')
+            ->paginate(30);
+
+        $counts = StocktakeItem::withoutGlobalScopes()
+            ->where('stocktake_id', $stocktake->id)
+            ->where('company_id', $stocktake->company_id)
+            ->whereIn('result_status', [
+                StocktakeItem::RESULT_MISSING,
+                StocktakeItem::RESULT_MISPLACED,
+                StocktakeItem::RESULT_CUSTODY_MISMATCH,
+                StocktakeItem::RESULT_DAMAGED,
+            ])
+            ->selectRaw('reconciliation_status, COUNT(*) as aggregate')
+            ->groupBy('reconciliation_status')
+            ->pluck('aggregate', 'reconciliation_status');
+
+        return view('stocktakes.reconciliation', compact('stocktake', 'items', 'counts'));
+    }
+
+    public function applyReconciliation(
+        Request $request,
+        Stocktake $stocktake,
+        StocktakeItem $item,
+        StocktakeReconciliationService $service
+    ): RedirectResponse {
+        $stocktake = $this->owned($request, $stocktake);
+        $this->ownedItem($stocktake, $item);
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:4000']]);
+
+        $service->applyObserved($item, $request->user(), $data['note'] ?? null);
+
+        return back()->with('success', 'Observed stocktake state was applied to the canonical asset record.');
+    }
+
+    public function resolveReconciliation(
+        Request $request,
+        Stocktake $stocktake,
+        StocktakeItem $item,
+        StocktakeReconciliationService $service
+    ): RedirectResponse {
+        $stocktake = $this->owned($request, $stocktake);
+        $this->ownedItem($stocktake, $item);
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:4000']]);
+
+        $service->resolveWithoutChange($item, $request->user(), $data['note'] ?? null);
+
+        return back()->with('success', 'Stocktake discrepancy was resolved without changing the canonical asset record.');
+    }
+
+    private function ownedItem(Stocktake $stocktake, StocktakeItem $item): StocktakeItem
+    {
+        return StocktakeItem::withoutGlobalScopes()
+            ->where('company_id', $stocktake->company_id)
+            ->where('stocktake_id', $stocktake->id)
+            ->findOrFail($item->id);
+    }
     private function companyId(Request $request): int
     {
         $user=$request->user();
