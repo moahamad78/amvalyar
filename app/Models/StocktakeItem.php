@@ -20,6 +20,14 @@ final class StocktakeItem extends Model
     public const RESULT_DAMAGED = 'damaged';
     public const RESULT_RECOUNT = 'recount';
 
+    public const RECONCILIATION_PENDING = 'pending';
+    public const RECONCILIATION_APPLIED = 'applied';
+    public const RECONCILIATION_NO_CHANGE = 'no_change';
+
+    protected $attributes = [
+        'reconciliation_status' => self::RECONCILIATION_PENDING,
+    ];
+
     protected $fillable = [
         'company_id',
         'stocktake_id',
@@ -42,11 +50,17 @@ final class StocktakeItem extends Model
         'counted_at',
         'count_round',
         'notes',
+        'reconciliation_status',
+        'reconciliation_action',
+        'reconciled_by',
+        'reconciled_at',
+        'reconciliation_note',
     ];
 
     protected $casts = [
         'counted_at' => 'datetime',
         'count_round' => 'integer',
+        'reconciled_at' => 'datetime',
     ];
 
     public function stocktake(): BelongsTo
@@ -59,6 +73,10 @@ final class StocktakeItem extends Model
         return $this->belongsTo(Asset::class);
     }
 
+    public function reconciler(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reconciled_by');
+    }
     public function counter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'counted_by');
