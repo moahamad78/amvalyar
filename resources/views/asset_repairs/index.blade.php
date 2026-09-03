@@ -35,6 +35,59 @@
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ route('asset-repairs.index') }}" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">دارایی</label>
+                    <select class="form-select" name="asset_id">
+                        <option value="">همه دارایی‌ها</option>
+                        @foreach($assets as $assetOption)
+                            <option value="{{ $assetOption->id }}" @selected((string)request('asset_id') === (string)$assetOption->id)>
+                                {{ $assetOption->title }} — {{ $assetOption->asset_code ?? $assetOption->inventory_code ?? '#' . $assetOption->id }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">وضعیت</label>
+                    <select class="form-select" name="status">
+                        <option value="">همه وضعیت‌ها</option>
+                        @foreach($statusLabels as $value => $label)
+                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">اولویت</label>
+                    <select class="form-select" name="priority">
+                        <option value="">همه اولویت‌ها</option>
+                        @foreach($priorityLabels as $value => $label)
+                            <option value="{{ $value }}" @selected(request('priority') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">از تاریخ</label>
+                    <input class="form-control" type="date" name="from" value="{{ request('from') }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">تا تاریخ</label>
+                    <input class="form-control" type="date" name="to" value="{{ request('to') }}">
+                </div>
+
+                <div class="col-md-1 d-grid gap-2">
+                    <button class="btn btn-outline-primary" type="submit">فیلتر</button>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ route('asset-repairs.index') }}">پاک</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">

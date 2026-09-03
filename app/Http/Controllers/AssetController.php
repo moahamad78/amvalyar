@@ -269,8 +269,38 @@ $asset =
             'transactions.fromUser',
             'transactions.toUser',
             'transactions.creator',
+
+            'repairRequests' =>
+                function ($query) {
+                    $query
+                        ->with([
+                            'requesterUser',
+                        ])
+                        ->latest('id');
+                },
         ]);
 
+
+        $repairSummary = [
+            'total' => $asset->repairRequests->count(),
+            'open' => $asset->repairRequests
+                ->whereIn('status', [
+                    \App\Models\AssetRepairRequest::STATUS_DRAFT,
+                    \App\Models\AssetRepairRequest::STATUS_SUBMITTED,
+                    \App\Models\AssetRepairRequest::STATUS_IN_REVIEW,
+                    \App\Models\AssetRepairRequest::STATUS_APPROVED,
+                    \App\Models\AssetRepairRequest::STATUS_IN_REPAIR,
+                ])
+                ->count(),
+            'completed' => $asset->repairRequests
+                ->where('status', \App\Models\AssetRepairRequest::STATUS_COMPLETED)
+                ->count(),
+            'actual_cost' => $asset->repairRequests
+                ->where('status', \App\Models\AssetRepairRequest::STATUS_COMPLETED)
+                ->sum(
+                    fn ($repair) => (float) ($repair->actual_cost ?? 0)
+                ),
+        ];
 
         $currentHolder =
             null;
@@ -314,7 +344,8 @@ $asset =
             'assets.show',
             compact(
                 'asset',
-                'currentHolder'
+                'currentHolder',
+                'repairSummary'
             )
         );
     }

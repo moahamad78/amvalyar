@@ -28,9 +28,62 @@ final class AssetRepairRequestController extends Controller
             $query->where('company_id', $user->company_id);
         }
 
-        $repairs = $query->paginate(20);
+        $filters = $request->validate([
+            'status' => ['nullable', 'in:draft,submitted,in_review,approved,in_repair,completed,rejected,cancelled'],
+            'priority' => ['nullable', 'in:low,normal,high,critical'],
+            'asset_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
 
-        return view('asset_repairs.index', compact('repairs'));
+        $query
+            ->when(
+                isset($filters['status']),
+                fn ($builder) => $builder->where('status', $filters['status'])
+            )
+            ->when(
+                isset($filters['priority']),
+                fn ($builder) => $builder->where('priority', $filters['priority'])
+            )
+            ->when(
+                isset($filters['asset_id']),
+                function ($builder) use ($filters, $user) {
+                    $assetQuery = Asset::withoutGlobalScopes()
+                        ->whereKey((int) $filters['asset_id']);
+
+                    if (!$user->isSuperAdmin()) {
+                        $assetQuery->where('company_id', $user->company_id);
+                    }
+
+                    $assetQuery->firstOrFail();
+
+                    $builder->where('asset_id', (int) $filters['asset_id']);
+                }
+            )
+            ->when(
+                isset($filters['from']),
+                fn ($builder) => $builder->whereDate('reported_at', '>=', $filters['from'])
+            )
+            ->when(
+                isset($filters['to']),
+                fn ($builder) => $builder->whereDate('reported_at', '<=', $filters['to'])
+            );
+
+        $repairs = $query
+            ->paginate(20)
+            ->withQueryString();
+
+        $assets = Asset::withoutGlobalScopes()
+            ->when(
+                !$user->isSuperAdmin(),
+                fn ($builder) => $builder->where('company_id', $user->company_id)
+            )
+            ->where('is_active', true)
+            ->orderBy('title')
+            ->orderBy('id')
+            ->get(['id', 'title', 'asset_code', 'inventory_code']);
+
+        return view('asset_repairs.index', compact('repairs', 'assets', 'filters'));
     }
 
     public function create(Request $request): View
