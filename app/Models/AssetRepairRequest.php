@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class AssetRepairRequest extends Model
 {
@@ -51,4 +52,12 @@ final class AssetRepairRequest extends Model
     public function workflowInstance(): BelongsTo { return $this->belongsTo(WorkflowInstance::class); }
     public function requesterUser(): BelongsTo { return $this->belongsTo(User::class, 'requested_by_user_id'); }
     public function requesterEmployee(): BelongsTo { return $this->belongsTo(Employee::class, 'requested_by_employee_id'); }
+
+    public function workOrder(): HasOne
+    {
+        return $this->hasOne(
+            AssetRepairWorkOrder::class,
+            'asset_repair_request_id'
+        );
+    }
 }
