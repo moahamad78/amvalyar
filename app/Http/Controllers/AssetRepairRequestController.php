@@ -243,7 +243,7 @@ final class AssetRepairRequestController extends Controller
 
         $service->startRepair($repair, $request->user());
 
-        return back()->with('success', 'ط¯ط³طھظˆط± ع©ط§ط± ط«ط¨طھ ظˆ ط¹ظ…ظ„غŒط§طھ طھط¹ظ…غŒط± ط´ط±ظˆط¹ ط´ط¯.');
+        return back()->with('success', 'دستور کار ثبت و عملیات تعمیر شروع شد.');
     }
 
     public function complete(
