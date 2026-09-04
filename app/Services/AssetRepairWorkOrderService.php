@@ -128,6 +128,70 @@ final class AssetRepairWorkOrderService
         });
     }
 
+    public function updateCosts(
+        AssetRepairRequest $repairRequest,
+        User $actor,
+        int|float|string $laborCost,
+        int|float|string $partsCost,
+        int|float|string $externalServiceCost
+    ): AssetRepairWorkOrder {
+        return DB::transaction(function () use (
+            $repairRequest,
+            $actor,
+            $laborCost,
+            $partsCost,
+            $externalServiceCost
+        ): AssetRepairWorkOrder {
+            $repair = AssetRepairRequest::withoutGlobalScopes()
+                ->whereKey($repairRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->ensureActorCompany($repair, $actor);
+
+            $workOrder = AssetRepairWorkOrder::withoutGlobalScopes()
+                ->where('company_id', $repair->company_id)
+                ->where('asset_repair_request_id', $repair->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($workOrder === null) {
+                throw ValidationException::withMessages([
+                    'work_order' => 'A work order is required before costs can be recorded.',
+                ]);
+            }
+
+            if ($workOrder->status !== AssetRepairWorkOrder::STATUS_IN_PROGRESS) {
+                throw ValidationException::withMessages([
+                    'work_order' => 'Costs can only be updated for an in-progress work order.',
+                ]);
+            }
+
+            $costs = [
+                'labor_cost' => $laborCost,
+                'parts_cost' => $partsCost,
+                'external_service_cost' => $externalServiceCost,
+            ];
+
+            foreach ($costs as $field => $value) {
+                if (!is_numeric($value) || (float) $value < 0) {
+                    throw ValidationException::withMessages([
+                        $field => 'Work order costs must be zero or greater.',
+                    ]);
+                }
+            }
+
+            $workOrder->update([
+                'labor_cost' => $laborCost,
+                'parts_cost' => $partsCost,
+                'external_service_cost' => $externalServiceCost,
+                'updated_by_user_id' => $actor->id,
+            ]);
+
+            return $workOrder->fresh(['assignedEmployee', 'repairRequest']);
+        });
+    }
+
     private function nextWorkOrderNumber(int $companyId): string
     {
         return sprintf(

@@ -6,9 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetRepairRequest;
+use App\Models\AssetRepairWorkOrder;
 use App\Models\Employee;
 use App\Services\AssetRepairLifecycleService;
 use App\Services\AssetRepairRequestService;
+use App\Services\AssetRepairWorkOrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -165,9 +167,21 @@ final class AssetRepairRequestController extends Controller
         AssetRepairRequest $assetRepair
     ): View {
         $repair = $this->owned($request, $assetRepair)
-            ->load(['asset', 'requesterUser', 'requesterEmployee', 'workflowInstance']);
+            ->load([
+                'asset',
+                'requesterUser',
+                'requesterEmployee',
+                'workflowInstance',
+                'workOrder.assignedEmployee',
+            ]);
 
-        return view('asset_repairs.show', compact('repair'));
+        $employees = Employee::withoutGlobalScopes()
+            ->where('company_id', $repair->company_id)
+            ->where('is_active', true)
+            ->orderBy('display_name')
+            ->get(['id', 'display_name', 'personnel_code']);
+
+        return view('asset_repairs.show', compact('repair', 'employees'));
     }
 
     public function submit(
@@ -194,12 +208,42 @@ final class AssetRepairRequestController extends Controller
     public function start(
         Request $request,
         AssetRepairRequest $assetRepair,
-        AssetRepairLifecycleService $service
+        AssetRepairLifecycleService $service,
+        AssetRepairWorkOrderService $workOrders
     ): RedirectResponse {
+        $validated = $request->validate([
+            'repair_type' => ['required', 'in:internal,external'],
+            'assigned_employee_id' => ['nullable', 'integer'],
+            'external_provider_name' => ['nullable', 'string', 'max:255'],
+            'expected_return_at' => ['nullable', 'date'],
+            'work_order_notes' => ['nullable', 'string', 'max:6000'],
+        ]);
+
         $repair = $this->owned($request, $assetRepair);
+        $employee = null;
+        if (isset($validated['assigned_employee_id'])) {
+            $employee = Employee::withoutGlobalScopes()
+                ->where('company_id', $repair->company_id)
+                ->where('is_active', true)
+                ->whereKey((int) $validated['assigned_employee_id'])
+                ->firstOrFail();
+        }
+
+        if ($repair->workOrder()->withoutGlobalScopes()->doesntExist()) {
+            $workOrders->createForRepair(
+                repairRequest: $repair,
+                actor: $request->user(),
+                repairType: (string) $validated['repair_type'],
+                assignedEmployee: $employee,
+                externalProviderName: $validated['external_provider_name'] ?? null,
+                expectedReturnAt: $request->date('expected_return_at'),
+                notes: $validated['work_order_notes'] ?? null
+            );
+        }
+
         $service->startRepair($repair, $request->user());
 
-        return back()->with('success', 'عملیات تعمیر شروع شد.');
+        return back()->with('success', 'ط¯ط³طھظˆط± ع©ط§ط± ط«ط¨طھ ظˆ ط¹ظ…ظ„غŒط§طھ طھط¹ظ…غŒط± ط´ط±ظˆط¹ ط´ط¯.');
     }
 
     public function complete(
@@ -210,17 +254,29 @@ final class AssetRepairRequestController extends Controller
         $validated = $request->validate([
             'diagnosis' => ['required', 'string', 'max:4000'],
             'repair_notes' => ['required', 'string', 'max:6000'],
-            'actual_cost' => ['nullable', 'numeric', 'min:0'],
+            'outcome' => ['required', 'in:repaired,partially_repaired,unrepairable'],
+            'labor_cost' => ['required', 'numeric', 'min:0'],
+            'parts_cost' => ['required', 'numeric', 'min:0'],
+            'external_service_cost' => ['required', 'numeric', 'min:0'],
         ]);
 
         $repair = $this->owned($request, $assetRepair);
+
+        app(AssetRepairWorkOrderService::class)->updateCosts(
+            repairRequest: $repair,
+            actor: $request->user(),
+            laborCost: $validated['labor_cost'],
+            partsCost: $validated['parts_cost'],
+            externalServiceCost: $validated['external_service_cost']
+        );
 
         $service->completeRepair(
             repairRequest: $repair,
             actor: $request->user(),
             diagnosis: (string) $validated['diagnosis'],
             repairNotes: (string) $validated['repair_notes'],
-            actualCost: $validated['actual_cost'] ?? null
+            actualCost: null,
+            outcome: (string) $validated['outcome']
         );
 
         return back()->with('success', 'تعمیر با موفقیت تکمیل شد.');
