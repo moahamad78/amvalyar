@@ -66,6 +66,6 @@ RUN composer dump-autoload --no-dev --classmap-authoritative --no-scripts \
         bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-EXPOSE 10000
+EXPOSE 80
 
 CMD ["/usr/local/bin/start-render"]
