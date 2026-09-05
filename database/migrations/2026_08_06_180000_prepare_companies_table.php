@@ -50,6 +50,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('companies');
+        // The canonical companies migration owns rollback. This compatibility
+        // migration only guarantees correct ordering for fresh databases.
     }
 };
