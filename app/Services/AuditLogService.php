@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -16,10 +17,10 @@ final class AuditLogService
         array $oldValues = [],
         array $newValues = [],
         ?string $description = null,
-        ?Request $request = null
+        ?Request $request = null,
+        ?User $actor = null
     ): AuditLog {
-
-        $user = auth()->user();
+        $user = $actor ?? auth()->user();
 
         $companyId =
             $user?->isSuperAdmin()
@@ -35,7 +36,6 @@ final class AuditLogService
                 )
                 : $user?->company_id;
 
-
         $subjectLabel = null;
 
         if ($subject !== null) {
@@ -48,50 +48,37 @@ final class AuditLogService
                 ?? null;
         }
 
-
         $request ??=
             request();
 
-
         return AuditLog::query()->create([
-            'company_id' =>
-                $companyId,
+            'company_id' => $companyId,
 
-            'user_id' =>
-                $user?->id,
+            'user_id' => $user?->id,
 
-            'action' =>
-                $action,
+            'action' => $action,
 
-            'subject_type' =>
-                $subject
+            'subject_type' => $subject
                     ? $subject::class
                     : null,
 
-            'subject_id' =>
-                $subject?->getKey(),
+            'subject_id' => $subject?->getKey(),
 
-            'subject_label' =>
-                $subjectLabel,
+            'subject_label' => $subjectLabel,
 
-            'old_values' =>
-                $oldValues !== []
+            'old_values' => $oldValues !== []
                     ? $oldValues
                     : null,
 
-            'new_values' =>
-                $newValues !== []
+            'new_values' => $newValues !== []
                     ? $newValues
                     : null,
 
-            'description' =>
-                $description,
+            'description' => $description,
 
-            'ip_address' =>
-                $request?->ip(),
+            'ip_address' => $request?->ip(),
 
-            'user_agent' =>
-                $request?->userAgent(),
+            'user_agent' => $request?->userAgent(),
         ]);
     }
 }

@@ -15,6 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 final class AssetRepairWorkOrderService
 {
+    public function __construct(
+        private readonly AuditLogService $auditLogService
+    ) {}
+
     public function createForRepair(
         AssetRepairRequest $repairRequest,
         User $actor,
@@ -40,7 +44,7 @@ final class AssetRepairWorkOrderService
 
             $this->ensureActorCompany($repair, $actor);
 
-            if (!in_array($repair->status, [
+            if (! in_array($repair->status, [
                 AssetRepairRequest::STATUS_APPROVED,
                 AssetRepairRequest::STATUS_IN_REPAIR,
             ], true)) {
@@ -58,7 +62,7 @@ final class AssetRepairWorkOrderService
 
                 if (
                     (int) $employee->company_id !== (int) $repair->company_id
-                    || !$employee->is_active
+                    || ! $employee->is_active
                 ) {
                     throw ValidationException::withMessages([
                         'assigned_employee' => 'Assigned employee must be active and belong to the repair company.',
@@ -174,12 +178,18 @@ final class AssetRepairWorkOrderService
             ];
 
             foreach ($costs as $field => $value) {
-                if (!is_numeric($value) || (float) $value < 0) {
+                if (! is_numeric($value) || (float) $value < 0) {
                     throw ValidationException::withMessages([
                         $field => 'Work order costs must be zero or greater.',
                     ]);
                 }
             }
+
+            $oldCosts = [
+                'labor_cost' => $workOrder->labor_cost,
+                'parts_cost' => $workOrder->parts_cost,
+                'external_service_cost' => $workOrder->external_service_cost,
+            ];
 
             $workOrder->update([
                 'labor_cost' => $laborCost,
@@ -187,6 +197,20 @@ final class AssetRepairWorkOrderService
                 'external_service_cost' => $externalServiceCost,
                 'updated_by_user_id' => $actor->id,
             ]);
+
+            $this->auditLogService->log(
+                action: 'asset_repair.costs_updated',
+                subject: $repair,
+                oldValues: $oldCosts,
+                newValues: [
+                    'labor_cost' => $workOrder->labor_cost,
+                    'parts_cost' => $workOrder->parts_cost,
+                    'external_service_cost' => $workOrder->external_service_cost,
+                    'total_cost' => $workOrder->total_cost,
+                ],
+                description: 'Asset repair work-order costs updated.',
+                actor: $actor
+            );
 
             return $workOrder->fresh(['assignedEmployee', 'repairRequest']);
         });
@@ -203,7 +227,7 @@ final class AssetRepairWorkOrderService
 
     private function validateRepairType(string $repairType): void
     {
-        if (!in_array($repairType, [
+        if (! in_array($repairType, [
             AssetRepairWorkOrder::TYPE_INTERNAL,
             AssetRepairWorkOrder::TYPE_EXTERNAL,
         ], true)) {
@@ -218,7 +242,7 @@ final class AssetRepairWorkOrderService
         User $actor
     ): void {
         if (
-            !$actor->isSuperAdmin()
+            ! $actor->isSuperAdmin()
             && (int) $actor->company_id !== (int) $repair->company_id
         ) {
             throw ValidationException::withMessages([

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\AssetRepair;
 
-use App\Services\NavigationService;
 use App\Services\PermissionRegistryService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +23,9 @@ final class AssetRepairUiTest extends TestCase
             'asset-repairs.submit' => 'asset_repairs.create',
             'asset-repairs.start' => 'asset_repairs.manage',
             'asset-repairs.complete' => 'asset_repairs.manage',
+            'asset-repairs.cancel' => 'asset_repairs.manage',
+            'asset-repairs.reopen' => 'asset_repairs.manage',
+            'reports.repairs' => 'reports.view',
         ];
 
         $routes = collect(Route::getRoutes()->getRoutes())
@@ -53,6 +55,7 @@ final class AssetRepairUiTest extends TestCase
         $this->assertTrue(view()->exists('asset_repairs.index'));
         $this->assertTrue(view()->exists('asset_repairs.create'));
         $this->assertTrue(view()->exists('asset_repairs.show'));
+        $this->assertTrue(view()->exists('reports.repairs'));
     }
 
     public function test_navigation_service_contains_repair_workspace_contract(): void

@@ -6,11 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetRepairRequest;
-use App\Models\AssetRepairWorkOrder;
 use App\Models\Employee;
 use App\Services\AssetRepairLifecycleService;
 use App\Services\AssetRepairRequestService;
-use App\Services\AssetRepairWorkOrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -23,10 +21,10 @@ final class AssetRepairRequestController extends Controller
         $user = $request->user();
 
         $query = AssetRepairRequest::withoutGlobalScopes()
-            ->with(['asset', 'requesterUser', 'workflowInstance'])
+            ->with(['asset', 'requesterUser', 'workflowInstance', 'workOrder'])
             ->latest('id');
 
-        if (!$user->isSuperAdmin()) {
+        if (! $user->isSuperAdmin()) {
             $query->where('company_id', $user->company_id);
         }
 
@@ -36,6 +34,7 @@ final class AssetRepairRequestController extends Controller
             'asset_id' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'sla' => ['nullable', 'in:overdue,critical,due_soon'],
         ]);
 
         $query
@@ -53,7 +52,7 @@ final class AssetRepairRequestController extends Controller
                     $assetQuery = Asset::withoutGlobalScopes()
                         ->whereKey((int) $filters['asset_id']);
 
-                    if (!$user->isSuperAdmin()) {
+                    if (! $user->isSuperAdmin()) {
                         $assetQuery->where('company_id', $user->company_id);
                     }
 
@@ -69,6 +68,26 @@ final class AssetRepairRequestController extends Controller
             ->when(
                 isset($filters['to']),
                 fn ($builder) => $builder->whereDate('reported_at', '<=', $filters['to'])
+            )
+            ->when(
+                ($filters['sla'] ?? null) === 'overdue',
+                fn ($builder) => $builder
+                    ->where('status', AssetRepairRequest::STATUS_IN_REPAIR)
+                    ->whereHas('workOrder', fn ($workOrder) => $workOrder
+                        ->withoutGlobalScopes()
+                        ->where('expected_return_at', '<', now()))
+            )
+            ->when(
+                ($filters['sla'] ?? null) === 'critical',
+                fn ($builder) => $builder->where('priority', AssetRepairRequest::PRIORITY_CRITICAL)
+            )
+            ->when(
+                ($filters['sla'] ?? null) === 'due_soon',
+                fn ($builder) => $builder
+                    ->where('status', AssetRepairRequest::STATUS_IN_REPAIR)
+                    ->whereHas('workOrder', fn ($workOrder) => $workOrder
+                        ->withoutGlobalScopes()
+                        ->whereBetween('expected_return_at', [now(), now()->addDay()]))
             );
 
         $repairs = $query
@@ -77,7 +96,7 @@ final class AssetRepairRequestController extends Controller
 
         $assets = Asset::withoutGlobalScopes()
             ->when(
-                !$user->isSuperAdmin(),
+                ! $user->isSuperAdmin(),
                 fn ($builder) => $builder->where('company_id', $user->company_id)
             )
             ->where('is_active', true)
@@ -192,7 +211,7 @@ final class AssetRepairRequestController extends Controller
         $repair = $this->owned($request, $assetRepair);
 
         if (
-            !$request->user()->isSuperAdmin()
+            ! $request->user()->isSuperAdmin()
             && (int) $repair->requested_by_user_id !== (int) $request->user()->id
         ) {
             throw ValidationException::withMessages([
@@ -208,8 +227,7 @@ final class AssetRepairRequestController extends Controller
     public function start(
         Request $request,
         AssetRepairRequest $assetRepair,
-        AssetRepairLifecycleService $service,
-        AssetRepairWorkOrderService $workOrders
+        AssetRepairLifecycleService $service
     ): RedirectResponse {
         $validated = $request->validate([
             'repair_type' => ['required', 'in:internal,external'],
@@ -229,19 +247,15 @@ final class AssetRepairRequestController extends Controller
                 ->firstOrFail();
         }
 
-        if ($repair->workOrder()->withoutGlobalScopes()->doesntExist()) {
-            $workOrders->createForRepair(
-                repairRequest: $repair,
-                actor: $request->user(),
-                repairType: (string) $validated['repair_type'],
-                assignedEmployee: $employee,
-                externalProviderName: $validated['external_provider_name'] ?? null,
-                expectedReturnAt: $request->date('expected_return_at'),
-                notes: $validated['work_order_notes'] ?? null
-            );
-        }
-
-        $service->startRepair($repair, $request->user());
+        $service->startRepair(
+            repairRequest: $repair,
+            actor: $request->user(),
+            repairType: (string) $validated['repair_type'],
+            assignedEmployee: $employee,
+            externalProviderName: $validated['external_provider_name'] ?? null,
+            expectedReturnAt: $request->date('expected_return_at'),
+            workOrderNotes: $validated['work_order_notes'] ?? null
+        );
 
         return back()->with('success', 'دستور کار ثبت و عملیات تعمیر شروع شد.');
     }
@@ -262,24 +276,34 @@ final class AssetRepairRequestController extends Controller
 
         $repair = $this->owned($request, $assetRepair);
 
-        app(AssetRepairWorkOrderService::class)->updateCosts(
-            repairRequest: $repair,
-            actor: $request->user(),
-            laborCost: $validated['labor_cost'],
-            partsCost: $validated['parts_cost'],
-            externalServiceCost: $validated['external_service_cost']
-        );
-
-        $service->completeRepair(
+        $service->completeRepairWithCosts(
             repairRequest: $repair,
             actor: $request->user(),
             diagnosis: (string) $validated['diagnosis'],
             repairNotes: (string) $validated['repair_notes'],
-            actualCost: null,
+            laborCost: $validated['labor_cost'],
+            partsCost: $validated['parts_cost'],
+            externalServiceCost: $validated['external_service_cost'],
             outcome: (string) $validated['outcome']
         );
 
         return back()->with('success', 'تعمیر با موفقیت تکمیل شد.');
+    }
+
+    public function cancel(Request $request, AssetRepairRequest $assetRepair, AssetRepairLifecycleService $service): RedirectResponse
+    {
+        $validated = $request->validate(['cancellation_reason' => ['required', 'string', 'max:4000']]);
+        $service->cancelRepair($this->owned($request, $assetRepair), $request->user(), $validated['cancellation_reason']);
+
+        return back()->with('success', 'درخواست تعمیر لغو شد.');
+    }
+
+    public function reopen(Request $request, AssetRepairRequest $assetRepair, AssetRepairLifecycleService $service): RedirectResponse
+    {
+        $validated = $request->validate(['reopen_reason' => ['required', 'string', 'max:4000']]);
+        $service->reopenRepair($this->owned($request, $assetRepair), $request->user(), $validated['reopen_reason']);
+
+        return back()->with('success', 'درخواست تعمیر دوباره فعال شد.');
     }
 
     private function owned(
@@ -289,7 +313,7 @@ final class AssetRepairRequestController extends Controller
         $query = AssetRepairRequest::withoutGlobalScopes()
             ->whereKey($repair->id);
 
-        if (!$request->user()->isSuperAdmin()) {
+        if (! $request->user()->isSuperAdmin()) {
             $query->where('company_id', $request->user()->company_id);
         }
 

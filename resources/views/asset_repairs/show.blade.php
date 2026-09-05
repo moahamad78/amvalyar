@@ -28,6 +28,8 @@
                 <dt class="col-sm-4">ثبت‌کننده</dt><dd class="col-sm-8">{{ $repair->requesterUser?->name ?? '—' }}</dd>
                 <dt class="col-sm-4">هزینه برآوردی</dt><dd class="col-sm-8">{{ $repair->estimated_cost !== null ? number_format((float)$repair->estimated_cost, 2) : '—' }}</dd>
                 <dt class="col-sm-4">شرح مشکل</dt><dd class="col-sm-8" style="white-space:pre-wrap">{{ $repair->problem_description }}</dd>
+                @if($repair->cancellation_reason)<dt class="col-sm-4">دلیل آخرین لغو</dt><dd class="col-sm-8">{{ $repair->cancellation_reason }}</dd>@endif
+                @if($repair->reopen_reason)<dt class="col-sm-4">دلیل فعال‌سازی مجدد</dt><dd class="col-sm-8">{{ $repair->reopen_reason }}</dd>@endif
             </dl></div></div>
 
             @if($workOrder)
@@ -82,6 +84,19 @@
                         <div class="col-md-4 mb-3"><label class="form-label">خدمات خارجی</label><input class="form-control" type="number" min="0" step="0.01" name="external_service_cost" value="{{ old('external_service_cost', $workOrder?->external_service_cost ?? 0) }}" required></div>
                     </div>
                     <button class="btn btn-success w-100">تکمیل تعمیر</button>
+                </form>
+            @endif
+
+            @if(auth()->user()->hasPermission('asset_repairs.manage') && in_array($repair->status, ['draft','approved','in_repair'], true))
+                <hr><form method="POST" action="{{ route('asset-repairs.cancel', $repair) }}">@csrf
+                    <div class="mb-2"><label class="form-label">دلیل لغو</label><textarea class="form-control" name="cancellation_reason" required maxlength="4000"></textarea></div>
+                    <button class="btn btn-outline-danger w-100" onclick="return confirm('از لغو این درخواست مطمئن هستید؟')">لغو کنترل‌شده</button>
+                </form>
+            @endif
+            @if(auth()->user()->hasPermission('asset_repairs.manage') && $repair->status === 'cancelled')
+                <form method="POST" action="{{ route('asset-repairs.reopen', $repair) }}">@csrf
+                    <div class="mb-2"><label class="form-label">دلیل فعال‌سازی مجدد</label><textarea class="form-control" name="reopen_reason" required maxlength="4000"></textarea></div>
+                    <button class="btn btn-outline-primary w-100">فعال‌سازی مجدد</button>
                 </form>
             @endif
 

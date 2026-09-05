@@ -26,7 +26,7 @@ final class AssetRepairWorkOrderUiIntegrationTest extends TestCase
     {
         $view = file_get_contents(resource_path('views/asset_repairs/show.blade.php'));
         foreach (['repair_type', 'assigned_employee_id', 'external_provider_name', 'expected_return_at', 'outcome', 'labor_cost', 'parts_cost', 'external_service_cost'] as $field) {
-            $this->assertStringContainsString('name="' . $field . '"', $view);
+            $this->assertStringContainsString('name="'.$field.'"', $view);
         }
         $this->assertStringContainsString('$workOrder->work_order_number', $view);
         $this->assertStringContainsString('$workOrder->total_cost', $view);
@@ -35,8 +35,9 @@ final class AssetRepairWorkOrderUiIntegrationTest extends TestCase
     public function test_controller_uses_tenant_scoped_employee_and_canonical_services(): void
     {
         $source = file_get_contents(app_path('Http/Controllers/AssetRepairRequestController.php'));
-        $this->assertStringContainsString("->where('company_id', " . '$repair->company_id)', $source);
-        $this->assertStringContainsString('AssetRepairWorkOrderService::class', $source);
+        $this->assertStringContainsString("->where('company_id', ".'$repair->company_id)', $source);
+        $this->assertStringContainsString('completeRepairWithCosts(', $source);
+        $this->assertStringNotContainsString('app(AssetRepairWorkOrderService::class)', $source);
         $this->assertStringContainsString('outcome:', $source);
         $this->assertStringNotContainsString("'actual_cost' => ['nullable'", $source);
     }
@@ -47,7 +48,7 @@ final class AssetRepairWorkOrderUiIntegrationTest extends TestCase
         $this->assertTrue($method->isPublic());
         $source = file_get_contents(app_path('Services/AssetRepairWorkOrderService.php'));
         $this->assertStringContainsString('STATUS_IN_PROGRESS', $source);
-        $this->assertStringContainsString("->where('company_id', " . '$repair->company_id)', $source);
-        $this->assertStringContainsString("'updated_by_user_id' => " . '$actor->id', $source);
+        $this->assertStringContainsString("->where('company_id', ".'$repair->company_id)', $source);
+        $this->assertStringContainsString("'updated_by_user_id' => ".'$actor->id', $source);
     }
 }

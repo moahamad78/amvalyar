@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: amvalyar
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: feature/organizational-asset-plate-workflow
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /up
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_NAME
+        value: AmvalYar
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: amvalyar-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_ENCRYPT
+        value: "true"
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_HTTP_ONLY
+        value: "true"
+      - key: SESSION_SAME_SITE
+        value: lax
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: PRODUCTION_REQUIRE_HTTPS
+        value: "true"
+      - key: PRODUCTION_REQUIRE_SECURE_SESSION_COOKIE
+        value: "true"
+      - key: DEMO_ADMIN_USERNAME
+        sync: false
+      - key: DEMO_ADMIN_NAME
+        value: AmvalYar Admin
+      - key: DEMO_ADMIN_EMAIL
+        sync: false
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: amvalyar-db
+    plan: free
+    region: frankfurt
+    databaseName: amvalyar
+    user: amvalyar

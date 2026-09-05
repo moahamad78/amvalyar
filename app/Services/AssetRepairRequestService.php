@@ -15,9 +15,9 @@ use Illuminate\Validation\ValidationException;
 final class AssetRepairRequestService
 {
     public function __construct(
-        private readonly WorkflowRuntimeService $workflowRuntimeService
-    ) {
-    }
+        private readonly WorkflowRuntimeService $workflowRuntimeService,
+        private readonly AuditLogService $auditLogService
+    ) {}
 
     public function createDraft(
         Asset $asset,
@@ -33,18 +33,52 @@ final class AssetRepairRequestService
         $this->validatePriority($priority);
         $this->ensureNoOpenRepair($asset);
 
-        return AssetRepairRequest::withoutGlobalScopes()->create([
-            'company_id' => $asset->company_id,
-            'asset_id' => $asset->id,
-            'requested_by_user_id' => $requesterUser->id,
-            'requested_by_employee_id' => $requesterEmployee?->id,
-            'status' => AssetRepairRequest::STATUS_DRAFT,
-            'priority' => $priority,
-            'title' => trim($title),
-            'problem_description' => trim($problemDescription),
-            'estimated_cost' => $estimatedCost,
-            'reported_at' => now(),
-        ]);
+        return DB::transaction(function () use (
+            $asset,
+            $requesterUser,
+            $requesterEmployee,
+            $title,
+            $problemDescription,
+            $priority,
+            $estimatedCost
+        ): AssetRepairRequest {
+            $lockedAsset = Asset::withoutGlobalScopes()
+                ->whereKey($asset->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->validateRequester($lockedAsset, $requesterUser, $requesterEmployee);
+            $this->validateAsset($lockedAsset);
+            $this->ensureNoOpenRepair($lockedAsset);
+
+            $repair = AssetRepairRequest::withoutGlobalScopes()->create([
+                'company_id' => $lockedAsset->company_id,
+                'asset_id' => $lockedAsset->id,
+                'requested_by_user_id' => $requesterUser->id,
+                'requested_by_employee_id' => $requesterEmployee?->id,
+                'status' => AssetRepairRequest::STATUS_DRAFT,
+                'priority' => $priority,
+                'title' => trim($title),
+                'problem_description' => trim($problemDescription),
+                'estimated_cost' => $estimatedCost,
+                'reported_at' => now(),
+            ]);
+
+            $this->auditLogService->log(
+                action: 'asset_repair.created',
+                subject: $repair,
+                newValues: [
+                    'status' => $repair->status,
+                    'asset_id' => $repair->asset_id,
+                    'priority' => $repair->priority,
+                    'estimated_cost' => $repair->estimated_cost,
+                ],
+                description: 'Asset repair request created.',
+                actor: $requesterUser
+            );
+
+            return $repair;
+        });
     }
 
     public function submit(AssetRepairRequest $repairRequest): AssetRepairRequest
@@ -124,6 +158,22 @@ final class AssetRepairRequestService
                 'submitted_at' => now(),
             ]);
 
+            $this->auditLogService->log(
+                action: 'asset_repair.submitted',
+                subject: $locked,
+                oldValues: [
+                    'status' => AssetRepairRequest::STATUS_DRAFT,
+                    'workflow_instance_id' => null,
+                ],
+                newValues: [
+                    'status' => $locked->status,
+                    'workflow_instance_id' => $locked->workflow_instance_id,
+                    'submitted_at' => $locked->submitted_at,
+                ],
+                description: 'Asset repair request submitted for approval.',
+                actor: $requesterUser
+            );
+
             return $locked->fresh([
                 'asset',
                 'requesterUser',
@@ -139,7 +189,7 @@ final class AssetRepairRequestService
         ?Employee $requesterEmployee
     ): void {
         if (
-            !$requesterUser->isSuperAdmin()
+            ! $requesterUser->isSuperAdmin()
             && (int) $requesterUser->company_id !== (int) $asset->company_id
         ) {
             throw ValidationException::withMessages([
@@ -169,7 +219,7 @@ final class AssetRepairRequestService
 
     private function validateAsset(Asset $asset): void
     {
-        if (!$asset->is_active || $asset->status === 'destroyed') {
+        if (! $asset->is_active || $asset->status === 'destroyed') {
             throw ValidationException::withMessages([
                 'asset' => 'Inactive or destroyed assets cannot enter repair workflow.',
             ]);
@@ -178,7 +228,7 @@ final class AssetRepairRequestService
 
     private function validatePriority(string $priority): void
     {
-        if (!in_array($priority, [
+        if (! in_array($priority, [
             AssetRepairRequest::PRIORITY_LOW,
             AssetRepairRequest::PRIORITY_NORMAL,
             AssetRepairRequest::PRIORITY_HIGH,

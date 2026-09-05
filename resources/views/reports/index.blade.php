@@ -3,6 +3,7 @@
 @section('title', 'گزارش‌های اموال')
 
 @section('content')
+<div class="container-fluid mb-3"><a class="btn btn-outline-primary" href="{{ route('reports.repairs') }}">گزارش تعمیر و نگهداری</a></div>
 @php
     $statusLabels = [
         'warehouse' => 'موجود در انبار',

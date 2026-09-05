@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AssetRepairRequest;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkflowInstanceBranch;
@@ -43,6 +44,11 @@ final class TaskCenterService
                     $employee
                 )
             )
+            ->concat(
+                $this->repairTasks(
+                    $user
+                )
+            )
             ->sort(
                 function (
                     array $a,
@@ -61,6 +67,13 @@ final class TaskCenterService
                             $a['is_overdue']
                                 ? -1
                                 : 1;
+                    }
+
+                    $aCritical = $a['is_critical'] ?? false;
+                    $bCritical = $b['is_critical'] ?? false;
+
+                    if ($aCritical !== $bCritical) {
+                        return $aCritical ? -1 : 1;
                     }
 
                     /*
@@ -209,10 +222,9 @@ final class TaskCenterService
             ->map(
                 fn (
                     WorkflowInstanceStep $step
-                ): array =>
-                    $this->presentStep(
-                        $step
-                    )
+                ): array => $this->presentStep(
+                    $step
+                )
             );
     }
 
@@ -269,10 +281,9 @@ final class TaskCenterService
             ->map(
                 fn (
                     WorkflowInstanceBranch $branch
-                ): array =>
-                    $this->presentSpecialistBranch(
-                        $branch
-                    )
+                ): array => $this->presentSpecialistBranch(
+                    $branch
+                )
             );
     }
 
@@ -345,11 +356,59 @@ final class TaskCenterService
             ->map(
                 fn (
                     WorkflowInstanceBranch $branch
-                ): array =>
-                    $this->presentRecoveryBranch(
-                        $branch
-                    )
+                ): array => $this->presentRecoveryBranch(
+                    $branch
+                )
             );
+    }
+
+    private function repairTasks(User $user): Collection
+    {
+        if (! $user->hasPermission('asset_repairs.manage')) {
+            return collect();
+        }
+
+        return AssetRepairRequest::withoutGlobalScopes()
+            ->where('company_id', $user->company_id)
+            ->whereIn('status', [
+                AssetRepairRequest::STATUS_APPROVED,
+                AssetRepairRequest::STATUS_IN_REPAIR,
+            ])
+            ->with(['asset', 'workOrder', 'workflowInstance'])
+            ->get()
+            ->map(function (AssetRepairRequest $repair): array {
+                $dueAt = $repair->status === AssetRepairRequest::STATUS_IN_REPAIR
+                    ? $repair->workOrder?->expected_return_at
+                    : null;
+
+                return [
+                    'task_key' => 'repair-'.$repair->id,
+                    'task_type' => 'repair',
+                    'task_id' => $repair->id,
+                    'step_id' => null,
+                    'branch_id' => null,
+                    'instance_id' => $repair->workflow_instance_id,
+                    'title' => $repair->title,
+                    'code' => $repair->asset?->asset_code
+                        ?? $repair->asset?->inventory_code
+                        ?? ('REPAIR-'.$repair->id),
+                    'process_type' => 'asset_repair',
+                    'process_label' => 'تعمیر و نگهداری',
+                    'subject_id' => $repair->id,
+                    'workflow_name' => $repair->workflowInstance?->workflow_name,
+                    'category_name' => null,
+                    'activated_at' => $repair->started_at ?? $repair->updated_at,
+                    'due_at' => $dueAt,
+                    'is_overdue' => $dueAt !== null && $dueAt->isPast(),
+                    'is_critical' => $repair->priority === AssetRepairRequest::PRIORITY_CRITICAL,
+                    'route' => 'asset-repairs.show',
+                    'route_parameter' => $repair->id,
+                    'workspace' => 'repair',
+                    'status_label' => $repair->status === AssetRepairRequest::STATUS_APPROVED
+                        ? 'آماده شروع تعمیر'
+                        : 'در حال تعمیر',
+                ];
+            });
     }
 
     private function presentStep(
@@ -364,72 +423,52 @@ final class TaskCenterService
             );
 
         return [
-            'task_key' =>
-                'step-' . $step->id,
+            'task_key' => 'step-'.$step->id,
 
-            'task_type' =>
-                'step',
+            'task_type' => 'step',
 
-            'task_id' =>
-                $step->id,
+            'task_id' => $step->id,
 
-            'step_id' =>
-                $step->id,
+            'step_id' => $step->id,
 
-            'branch_id' =>
-                null,
+            'branch_id' => null,
 
-            'instance_id' =>
-                $instance?->id,
+            'instance_id' => $instance?->id,
 
-            'title' =>
-                $step->name
+            'title' => $step->name
                 ?: $this->labelForCode(
                     $step->code
                 ),
 
-            'code' =>
-                $step->code,
+            'code' => $step->code,
 
-            'process_type' =>
-                $instance?->process_type,
+            'process_type' => $instance?->process_type,
 
-            'process_label' =>
-                $this->processLabel(
-                    $instance?->process_type
-                ),
+            'process_label' => $this->processLabel(
+                $instance?->process_type
+            ),
 
-            'subject_id' =>
-                $instance?->subject_id,
+            'subject_id' => $instance?->subject_id,
 
-            'workflow_name' =>
-                $instance?->workflow_name,
+            'workflow_name' => $instance?->workflow_name,
 
-            'category_name' =>
-                null,
+            'category_name' => null,
 
-            'activated_at' =>
-                $step->activated_at,
+            'activated_at' => $step->activated_at,
 
-            'due_at' =>
-                $step->due_at,
+            'due_at' => $step->due_at,
 
-            'is_overdue' =>
-                $step->due_at !== null
+            'is_overdue' => $step->due_at !== null
                 &&
                 $step->due_at->isPast(),
 
-            'route' =>
-                $route['name'],
+            'route' => $route['name'],
 
-            'route_parameter' =>
-                $step->id,
+            'route_parameter' => $step->id,
 
-            'workspace' =>
-                $route['workspace'],
+            'workspace' => $route['workspace'],
 
-            'status_label' =>
-                'منتظر اقدام',
+            'status_label' => 'منتظر اقدام',
         ];
     }
 
@@ -440,28 +479,21 @@ final class TaskCenterService
             $branch->instance;
 
         return [
-            'task_key' =>
-                'specialist-branch-'
+            'task_key' => 'specialist-branch-'
                 .
                 $branch->id,
 
-            'task_type' =>
-                'branch',
+            'task_type' => 'branch',
 
-            'task_id' =>
-                $branch->id,
+            'task_id' => $branch->id,
 
-            'step_id' =>
-                null,
+            'step_id' => null,
 
-            'branch_id' =>
-                $branch->id,
+            'branch_id' => $branch->id,
 
-            'instance_id' =>
-                $instance?->id,
+            'instance_id' => $instance?->id,
 
-            'title' =>
-                'بررسی تخصصی'
+            'title' => 'بررسی تخصصی'
                 .
                 (
                     $branch->category?->name
@@ -471,47 +503,34 @@ final class TaskCenterService
                         : ''
                 ),
 
-            'code' =>
-                $branch->branch_key
+            'code' => $branch->branch_key
                 ?: 'SPECIALIST',
 
-            'process_type' =>
-                $instance?->process_type,
+            'process_type' => $instance?->process_type,
 
-            'process_label' =>
-                $this->processLabel(
-                    $instance?->process_type
-                ),
+            'process_label' => $this->processLabel(
+                $instance?->process_type
+            ),
 
-            'subject_id' =>
-                $instance?->subject_id,
+            'subject_id' => $instance?->subject_id,
 
-            'workflow_name' =>
-                $instance?->workflow_name,
+            'workflow_name' => $instance?->workflow_name,
 
-            'category_name' =>
-                $branch->category?->name,
+            'category_name' => $branch->category?->name,
 
-            'activated_at' =>
-                $branch->activated_at,
+            'activated_at' => $branch->activated_at,
 
-            'due_at' =>
-                null,
+            'due_at' => null,
 
-            'is_overdue' =>
-                false,
+            'is_overdue' => false,
 
-            'route' =>
-                'specialist-approvals.show',
+            'route' => 'specialist-approvals.show',
 
-            'route_parameter' =>
-                $branch->id,
+            'route_parameter' => $branch->id,
 
-            'workspace' =>
-                'specialist',
+            'workspace' => 'specialist',
 
-            'status_label' =>
-                'منتظر بررسی تخصصی',
+            'status_label' => 'منتظر بررسی تخصصی',
         ];
     }
 
@@ -522,28 +541,21 @@ final class TaskCenterService
             $branch->instance;
 
         return [
-            'task_key' =>
-                'recovery-branch-'
+            'task_key' => 'recovery-branch-'
                 .
                 $branch->id,
 
-            'task_type' =>
-                'branch',
+            'task_type' => 'branch',
 
-            'task_id' =>
-                $branch->id,
+            'task_id' => $branch->id,
 
-            'step_id' =>
-                null,
+            'step_id' => null,
 
-            'branch_id' =>
-                $branch->id,
+            'branch_id' => $branch->id,
 
-            'instance_id' =>
-                $instance?->id,
+            'instance_id' => $instance?->id,
 
-            'title' =>
-                'اصلاح تخصیص انبار'
+            'title' => 'اصلاح تخصیص انبار'
                 .
                 (
                     $branch->category?->name
@@ -553,53 +565,40 @@ final class TaskCenterService
                         : ''
                 ),
 
-            'code' =>
-                $branch->branch_key
+            'code' => $branch->branch_key
                 ?: 'WAREHOUSE-RECOVERY',
 
-            'process_type' =>
-                $instance?->process_type,
+            'process_type' => $instance?->process_type,
 
-            'process_label' =>
-                $this->processLabel(
-                    $instance?->process_type
-                ),
+            'process_label' => $this->processLabel(
+                $instance?->process_type
+            ),
 
-            'subject_id' =>
-                $instance?->subject_id,
+            'subject_id' => $instance?->subject_id,
 
-            'workflow_name' =>
-                $instance?->workflow_name,
+            'workflow_name' => $instance?->workflow_name,
 
-            'category_name' =>
-                $branch->category?->name,
+            'category_name' => $branch->category?->name,
 
             /*
              * rejected branch has no due_at.
              * acted_at represents rejection time.
              */
-            'activated_at' =>
-                $branch->acted_at
+            'activated_at' => $branch->acted_at
                 ??
                 $branch->activated_at,
 
-            'due_at' =>
-                null,
+            'due_at' => null,
 
-            'is_overdue' =>
-                false,
+            'is_overdue' => false,
 
-            'route' =>
-                'warehouse-recoveries.show',
+            'route' => 'warehouse-recoveries.show',
 
-            'route_parameter' =>
-                $branch->id,
+            'route_parameter' => $branch->id,
 
-            'workspace' =>
-                'warehouse_recovery',
+            'workspace' => 'warehouse_recovery',
 
-            'status_label' =>
-                'نیازمند اصلاح',
+            'status_label' => 'نیازمند اصلاح',
         ];
     }
 
@@ -611,27 +610,21 @@ final class TaskCenterService
         ) {
 
             'ASSET-MANAGER' => [
-                'name' =>
-                    'asset-manager-requests.show',
+                'name' => 'asset-manager-requests.show',
 
-                'workspace' =>
-                    'asset_manager',
+                'workspace' => 'asset_manager',
             ],
 
             'FINAL-WAREHOUSE-DELIVERY' => [
-                'name' =>
-                    'final-warehouse-deliveries.show',
+                'name' => 'final-warehouse-deliveries.show',
 
-                'workspace' =>
-                    'final_delivery',
+                'workspace' => 'final_delivery',
             ],
 
             default => [
-                'name' =>
-                    'approvals.show',
+                'name' => 'approvals.show',
 
-                'workspace' =>
-                    'approval',
+                'workspace' => 'approval',
             ],
         };
     }
@@ -643,20 +636,17 @@ final class TaskCenterService
             $processType
         ) {
 
-            'inventory_request' =>
-                'درخواست کالا',
+            'inventory_request' => 'درخواست کالا',
 
-            'asset_transfer' =>
-                'انتقال مال',
+            'asset_transfer' => 'انتقال مال',
 
-            'asset_return' =>
-                'عودت مال',
+            'asset_return' => 'عودت مال',
 
-            'asset_disposal' =>
-                'اسقاط مال',
+            'asset_disposal' => 'اسقاط مال',
 
-            default =>
-                $processType
+            'asset_repair' => 'تعمیر و نگهداری',
+
+            default => $processType
                 ?: 'گردش کاری',
         };
     }
@@ -666,20 +656,15 @@ final class TaskCenterService
     ): string {
         return match ($code) {
 
-            'DIRECT-MANAGER' =>
-                'تأیید مدیر مستقیم',
+            'DIRECT-MANAGER' => 'تأیید مدیر مستقیم',
 
-            'ASSET-MANAGER' =>
-                'بررسی جمعدار اموال',
+            'ASSET-MANAGER' => 'بررسی جمعدار اموال',
 
-            'WAREHOUSE' =>
-                'تأیید انباردار',
+            'WAREHOUSE' => 'تأیید انباردار',
 
-            'FINAL-WAREHOUSE-DELIVERY' =>
-                'تحویل نهایی انبار',
+            'FINAL-WAREHOUSE-DELIVERY' => 'تحویل نهایی انبار',
 
-            default =>
-                $code
+            default => $code
                 ?: 'کار در انتظار',
         };
     }

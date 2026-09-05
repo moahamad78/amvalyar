@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Asset;
 use App\Models\AssetMovementRequest;
+use App\Models\AssetRepairRequest;
 use App\Models\AssetTransaction;
 use App\Models\User;
 use App\Models\WorkflowInstance;
@@ -18,8 +19,7 @@ final class OperationalAlertService
 
     public function __construct(
         private readonly TaskCenterService $taskCenter
-    ) {
-    }
+    ) {}
 
     public function alertsFor(
         User $user
@@ -49,6 +49,11 @@ final class OperationalAlertService
                 )
                 ->concat(
                     $this->movementHealthAlerts(
+                        $user
+                    )
+                )
+                ->concat(
+                    $this->repairHealthAlerts(
                         $user
                     )
                 )
@@ -117,32 +122,28 @@ final class OperationalAlertService
             );
 
         return [
-            'total' =>
-                $alerts->count(),
+            'total' => $alerts->count(),
 
-            'critical' =>
-                $alerts
-                    ->where(
-                        'severity',
-                        'critical'
-                    )
-                    ->count(),
+            'critical' => $alerts
+                ->where(
+                    'severity',
+                    'critical'
+                )
+                ->count(),
 
-            'warning' =>
-                $alerts
-                    ->where(
-                        'severity',
-                        'warning'
-                    )
-                    ->count(),
+            'warning' => $alerts
+                ->where(
+                    'severity',
+                    'warning'
+                )
+                ->count(),
 
-            'info' =>
-                $alerts
-                    ->where(
-                        'severity',
-                        'info'
-                    )
-                    ->count(),
+            'info' => $alerts
+                ->where(
+                    'severity',
+                    'info'
+                )
+                ->count(),
         ];
     }
 
@@ -174,36 +175,27 @@ final class OperationalAlertService
                         $task['is_overdue']
                     ) {
                         return $this->alert(
-                            key:
-                                'task-overdue-'
+                            key: 'task-overdue-'
                                 .
                                 $task['task_key'],
 
-                            severity:
-                                'critical',
+                            severity: 'critical',
 
-                            type:
-                                'task_overdue',
+                            type: 'task_overdue',
 
-                            title:
-                                'کار از سررسید عبور کرده',
+                            title: 'کار از سررسید عبور کرده',
 
-                            message:
-                                $task['title']
+                            message: $task['title']
                                 .
                                 ' نیازمند اقدام فوری است.',
 
-                            sourceLabel:
-                                $task['process_label'],
+                            sourceLabel: $task['process_label'],
 
-                            detectedAt:
-                                $task['due_at'],
+                            detectedAt: $task['due_at'],
 
-                            actionRoute:
-                                $task['route'],
+                            actionRoute: $task['route'],
 
-                            actionParameter:
-                                $task['route_parameter']
+                            actionParameter: $task['route_parameter']
                         );
                     }
 
@@ -215,36 +207,27 @@ final class OperationalAlertService
                         )
                     ) {
                         return $this->alert(
-                            key:
-                                'task-stale-'
+                            key: 'task-stale-'
                                 .
                                 $task['task_key'],
 
-                            severity:
-                                'warning',
+                            severity: 'warning',
 
-                            type:
-                                'task_stale',
+                            type: 'task_stale',
 
-                            title:
-                                'کار بیش از ۲۴ ساعت بدون اقدام مانده',
+                            title: 'کار بیش از ۲۴ ساعت بدون اقدام مانده',
 
-                            message:
-                                $task['title']
+                            message: $task['title']
                                 .
                                 ' هنوز در انتظار اقدام شماست.',
 
-                            sourceLabel:
-                                $task['process_label'],
+                            sourceLabel: $task['process_label'],
 
-                            detectedAt:
-                                $task['activated_at'],
+                            detectedAt: $task['activated_at'],
 
-                            actionRoute:
-                                $task['route'],
+                            actionRoute: $task['route'],
 
-                            actionParameter:
-                                $task['route_parameter']
+                            actionParameter: $task['route_parameter']
                         );
                     }
 
@@ -280,39 +263,31 @@ final class OperationalAlertService
                         $instance->current_step_id === null
                     ) {
                         return $this->alert(
-                            key:
-                                'workflow-no-current-step-'
+                            key: 'workflow-no-current-step-'
                                 .
                                 $instance->id,
 
-                            severity:
-                                'critical',
+                            severity: 'critical',
 
-                            type:
-                                'workflow_inconsistent',
+                            type: 'workflow_inconsistent',
 
-                            title:
-                                'گردش کاری بدون مرحله جاری',
+                            title: 'گردش کاری بدون مرحله جاری',
 
-                            message:
-                                'گردش #'
+                            message: 'گردش #'
                                 .
                                 $instance->id
                                 .
                                 ' در وضعیت pending است اما مرحله جاری ندارد.',
 
-                            sourceLabel:
-                                $this->processLabel(
-                                    $instance->process_type
-                                ),
+                            sourceLabel: $this->processLabel(
+                                $instance->process_type
+                            ),
 
-                            detectedAt:
-                                $instance->updated_at,
+                            detectedAt: $instance->updated_at,
 
-                            actionRoute:
-                                Route::has(
-                                    'task-center.index'
-                                )
+                            actionRoute: Route::has(
+                                'task-center.index'
+                            )
                                     ? 'task-center.index'
                                     : null
                         );
@@ -322,39 +297,31 @@ final class OperationalAlertService
                         $instance->currentStep === null
                     ) {
                         return $this->alert(
-                            key:
-                                'workflow-missing-current-step-'
+                            key: 'workflow-missing-current-step-'
                                 .
                                 $instance->id,
 
-                            severity:
-                                'critical',
+                            severity: 'critical',
 
-                            type:
-                                'workflow_inconsistent',
+                            type: 'workflow_inconsistent',
 
-                            title:
-                                'مرحله جاری گردش پیدا نشد',
+                            title: 'مرحله جاری گردش پیدا نشد',
 
-                            message:
-                                'گردش #'
+                            message: 'گردش #'
                                 .
                                 $instance->id
                                 .
                                 ' به مرحله‌ای اشاره می‌کند که در دسترس نیست.',
 
-                            sourceLabel:
-                                $this->processLabel(
-                                    $instance->process_type
-                                ),
+                            sourceLabel: $this->processLabel(
+                                $instance->process_type
+                            ),
 
-                            detectedAt:
-                                $instance->updated_at,
+                            detectedAt: $instance->updated_at,
 
-                            actionRoute:
-                                Route::has(
-                                    'task-center.index'
-                                )
+                            actionRoute: Route::has(
+                                'task-center.index'
+                            )
                                     ? 'task-center.index'
                                     : null
                         );
@@ -366,22 +333,17 @@ final class OperationalAlertService
                         'pending'
                     ) {
                         return $this->alert(
-                            key:
-                                'workflow-current-step-status-'
+                            key: 'workflow-current-step-status-'
                                 .
                                 $instance->id,
 
-                            severity:
-                                'critical',
+                            severity: 'critical',
 
-                            type:
-                                'workflow_inconsistent',
+                            type: 'workflow_inconsistent',
 
-                            title:
-                                'وضعیت مرحله جاری با گردش ناسازگار است',
+                            title: 'وضعیت مرحله جاری با گردش ناسازگار است',
 
-                            message:
-                                'گردش #'
+                            message: 'گردش #'
                                 .
                                 $instance->id
                                 .
@@ -391,18 +353,15 @@ final class OperationalAlertService
                                 .
                                 ' است.',
 
-                            sourceLabel:
-                                $this->processLabel(
-                                    $instance->process_type
-                                ),
+                            sourceLabel: $this->processLabel(
+                                $instance->process_type
+                            ),
 
-                            detectedAt:
-                                $instance->updated_at,
+                            detectedAt: $instance->updated_at,
 
-                            actionRoute:
-                                Route::has(
-                                    'task-center.index'
-                                )
+                            actionRoute: Route::has(
+                                'task-center.index'
+                            )
                                     ? 'task-center.index'
                                     : null
                         );
@@ -455,42 +414,33 @@ final class OperationalAlertService
                     ) {
                         $alerts[] =
                             $this->alert(
-                                key:
-                                    'movement-submitted-no-workflow-'
+                                key: 'movement-submitted-no-workflow-'
                                     .
                                     $request->id,
 
-                                severity:
-                                    'critical',
+                                severity: 'critical',
 
-                                type:
-                                    'movement_inconsistent',
+                                type: 'movement_inconsistent',
 
-                                title:
-                                    'درخواست جابه‌جایی بدون گردش کاری',
+                                title: 'درخواست جابه‌جایی بدون گردش کاری',
 
-                                message:
-                                    'درخواست #'
+                                message: 'درخواست #'
                                     .
                                     $request->id
                                     .
                                     ' ثبت شده اما گردش کاری معتبر ندارد.',
 
-                                sourceLabel:
-                                    $this->movementLabel(
-                                        $request->movement_type
-                                    ),
+                                sourceLabel: $this->movementLabel(
+                                    $request->movement_type
+                                ),
 
-                                detectedAt:
-                                    $request->submitted_at
+                                detectedAt: $request->submitted_at
                                     ??
                                     $request->updated_at,
 
-                                actionRoute:
-                                    $route,
+                                actionRoute: $route,
 
-                                actionParameter:
-                                    $request->id
+                                actionParameter: $request->id
                             );
                     }
 
@@ -504,40 +454,31 @@ final class OperationalAlertService
                         ) {
                             $alerts[] =
                                 $this->alert(
-                                    key:
-                                        'movement-completed-no-time-'
+                                    key: 'movement-completed-no-time-'
                                         .
                                         $request->id,
 
-                                    severity:
-                                        'warning',
+                                    severity: 'warning',
 
-                                    type:
-                                        'movement_inconsistent',
+                                    type: 'movement_inconsistent',
 
-                                    title:
-                                        'درخواست تکمیل شده بدون زمان تکمیل',
+                                    title: 'درخواست تکمیل شده بدون زمان تکمیل',
 
-                                    message:
-                                        'درخواست #'
+                                    message: 'درخواست #'
                                         .
                                         $request->id
                                         .
                                         ' completed است اما completed_at ندارد.',
 
-                                    sourceLabel:
-                                        $this->movementLabel(
-                                            $request->movement_type
-                                        ),
+                                    sourceLabel: $this->movementLabel(
+                                        $request->movement_type
+                                    ),
 
-                                    detectedAt:
-                                        $request->updated_at,
+                                    detectedAt: $request->updated_at,
 
-                                    actionRoute:
-                                        $route,
+                                    actionRoute: $route,
 
-                                    actionParameter:
-                                        $request->id
+                                    actionParameter: $request->id
                                 );
                         }
 
@@ -550,46 +491,37 @@ final class OperationalAlertService
                                 ->exists();
 
                         if (
-                            !$transactionExists
+                            ! $transactionExists
                         ) {
                             $alerts[] =
                                 $this->alert(
-                                    key:
-                                        'movement-completed-no-transaction-'
+                                    key: 'movement-completed-no-transaction-'
                                         .
                                         $request->id,
 
-                                    severity:
-                                        'critical',
+                                    severity: 'critical',
 
-                                    type:
-                                        'movement_inconsistent',
+                                    type: 'movement_inconsistent',
 
-                                    title:
-                                        'درخواست تکمیل شده بدون سند گردش',
+                                    title: 'درخواست تکمیل شده بدون سند گردش',
 
-                                    message:
-                                        'برای درخواست #'
+                                    message: 'برای درخواست #'
                                         .
                                         $request->id
                                         .
                                         ' هیچ AssetTransaction مرتبط ثبت نشده است.',
 
-                                    sourceLabel:
-                                        $this->movementLabel(
-                                            $request->movement_type
-                                        ),
+                                    sourceLabel: $this->movementLabel(
+                                        $request->movement_type
+                                    ),
 
-                                    detectedAt:
-                                        $request->completed_at
+                                    detectedAt: $request->completed_at
                                         ??
                                         $request->updated_at,
 
-                                    actionRoute:
-                                        $route,
+                                    actionRoute: $route,
 
-                                    actionParameter:
-                                        $request->id
+                                    actionParameter: $request->id
                                 );
                         }
 
@@ -597,17 +529,13 @@ final class OperationalAlertService
                             match (
                                 $request->movement_type
                             ) {
-                                AssetMovementRequest::TYPE_TRANSFER =>
-                                    'assigned',
+                                AssetMovementRequest::TYPE_TRANSFER => 'assigned',
 
-                                AssetMovementRequest::TYPE_RETURN =>
-                                    'warehouse',
+                                AssetMovementRequest::TYPE_RETURN => 'warehouse',
 
-                                AssetMovementRequest::TYPE_DISPOSAL =>
-                                    'destroyed',
+                                AssetMovementRequest::TYPE_DISPOSAL => 'destroyed',
 
-                                default =>
-                                    null,
+                                default => null,
                             };
 
                         if (
@@ -621,22 +549,17 @@ final class OperationalAlertService
                         ) {
                             $alerts[] =
                                 $this->alert(
-                                    key:
-                                        'movement-final-state-'
+                                    key: 'movement-final-state-'
                                         .
                                         $request->id,
 
-                                    severity:
-                                        'critical',
+                                    severity: 'critical',
 
-                                    type:
-                                        'movement_inconsistent',
+                                    type: 'movement_inconsistent',
 
-                                    title:
-                                        'وضعیت نهایی مال با درخواست جابه‌جایی سازگار نیست',
+                                    title: 'وضعیت نهایی مال با درخواست جابه‌جایی سازگار نیست',
 
-                                    message:
-                                        'درخواست #'
+                                    message: 'درخواست #'
                                         .
                                         $request->id
                                         .
@@ -650,19 +573,15 @@ final class OperationalAlertService
                                         .
                                         ' است.',
 
-                                    sourceLabel:
-                                        $this->movementLabel(
-                                            $request->movement_type
-                                        ),
+                                    sourceLabel: $this->movementLabel(
+                                        $request->movement_type
+                                    ),
 
-                                    detectedAt:
-                                        $request->updated_at,
+                                    detectedAt: $request->updated_at,
 
-                                    actionRoute:
-                                        $route,
+                                    actionRoute: $route,
 
-                                    actionParameter:
-                                        $request->id
+                                    actionParameter: $request->id
                                 );
                         }
                     }
@@ -726,40 +645,31 @@ final class OperationalAlertService
                         )
                     ) {
                         return $this->alert(
-                            key:
-                                'asset-assigned-no-holder-'
+                            key: 'asset-assigned-no-holder-'
                                 .
                                 $asset->id,
 
-                            severity:
-                                'warning',
+                            severity: 'warning',
 
-                            type:
-                                'asset_inconsistent',
+                            type: 'asset_inconsistent',
 
-                            title:
-                                'مال تحویل‌شده بدون دارنده معتبر',
+                            title: 'مال تحویل‌شده بدون دارنده معتبر',
 
-                            message:
-                                'مال #'
+                            message: 'مال #'
                                 .
                                 $asset->id
                                 .
                                 ' assigned است اما آخرین گردش دارنده مقصد ندارد.',
 
-                            sourceLabel:
-                                $asset->title
+                            sourceLabel: $asset->title
                                 ??
                                 'مال',
 
-                            detectedAt:
-                                $asset->updated_at,
+                            detectedAt: $asset->updated_at,
 
-                            actionRoute:
-                                $route,
+                            actionRoute: $route,
 
-                            actionParameter:
-                                $parameter
+                            actionParameter: $parameter
                         );
                     }
 
@@ -782,40 +692,31 @@ final class OperationalAlertService
                         $last->to_user_id !== null
                     ) {
                         return $this->alert(
-                            key:
-                                'asset-warehouse-last-assigned-'
+                            key: 'asset-warehouse-last-assigned-'
                                 .
                                 $asset->id,
 
-                            severity:
-                                'warning',
+                            severity: 'warning',
 
-                            type:
-                                'asset_inconsistent',
+                            type: 'asset_inconsistent',
 
-                            title:
-                                'وضعیت انبار با آخرین گردش سازگار نیست',
+                            title: 'وضعیت انبار با آخرین گردش سازگار نیست',
 
-                            message:
-                                'مال #'
+                            message: 'مال #'
                                 .
                                 $asset->id
                                 .
                                 ' در انبار است اما آخرین گردش آن به کاربر تحویل شده است.',
 
-                            sourceLabel:
-                                $asset->title
+                            sourceLabel: $asset->title
                                 ??
                                 'مال',
 
-                            detectedAt:
-                                $asset->updated_at,
+                            detectedAt: $asset->updated_at,
 
-                            actionRoute:
-                                $route,
+                            actionRoute: $route,
 
-                            actionParameter:
-                                $parameter
+                            actionParameter: $parameter
                         );
                     }
 
@@ -833,40 +734,31 @@ final class OperationalAlertService
                         )
                     ) {
                         return $this->alert(
-                            key:
-                                'asset-destroyed-no-destroy-transaction-'
+                            key: 'asset-destroyed-no-destroy-transaction-'
                                 .
                                 $asset->id,
 
-                            severity:
-                                'critical',
+                            severity: 'critical',
 
-                            type:
-                                'asset_inconsistent',
+                            type: 'asset_inconsistent',
 
-                            title:
-                                'مال اسقاط‌شده بدون سند اسقاط معتبر',
+                            title: 'مال اسقاط‌شده بدون سند اسقاط معتبر',
 
-                            message:
-                                'مال #'
+                            message: 'مال #'
                                 .
                                 $asset->id
                                 .
                                 ' destroyed است اما آخرین گردش destroy نیست.',
 
-                            sourceLabel:
-                                $asset->title
+                            sourceLabel: $asset->title
                                 ??
                                 'مال',
 
-                            detectedAt:
-                                $asset->updated_at,
+                            detectedAt: $asset->updated_at,
 
-                            actionRoute:
-                                $route,
+                            actionRoute: $route,
 
-                            actionParameter:
-                                $parameter
+                            actionParameter: $parameter
                         );
                     }
 
@@ -877,10 +769,90 @@ final class OperationalAlertService
             ->values();
     }
 
+    private function repairHealthAlerts(User $user): Collection
+    {
+        $now = now();
+        $dueSoonAt = $now->copy()->addDay();
+        $openStatuses = [
+            AssetRepairRequest::STATUS_DRAFT,
+            AssetRepairRequest::STATUS_SUBMITTED,
+            AssetRepairRequest::STATUS_IN_REVIEW,
+            AssetRepairRequest::STATUS_APPROVED,
+            AssetRepairRequest::STATUS_IN_REPAIR,
+        ];
+
+        return AssetRepairRequest::withoutGlobalScopes()
+            ->where('company_id', $user->company_id)
+            ->whereIn('status', $openStatuses)
+            ->with(['asset', 'workOrder'])
+            ->get()
+            ->map(function (AssetRepairRequest $repair) use ($now, $dueSoonAt): ?array {
+                $route = Route::has('asset-repairs.show')
+                    ? 'asset-repairs.show'
+                    : null;
+                $dueAt = $repair->workOrder?->expected_return_at;
+                $source = $repair->asset?->title ?? ('درخواست تعمیر #'.$repair->id);
+
+                if (
+                    $repair->status === AssetRepairRequest::STATUS_IN_REPAIR
+                    && $dueAt !== null
+                    && $dueAt->lt($now)
+                ) {
+                    return $this->alert(
+                        key: 'repair-overdue-'.$repair->id,
+                        severity: 'critical',
+                        type: 'repair_overdue',
+                        title: 'تعمیر از موعد بازگشت عبور کرده',
+                        message: 'درخواست تعمیر #'.$repair->id.' هنوز تکمیل نشده و نیازمند پیگیری فوری است.',
+                        sourceLabel: $source,
+                        detectedAt: $dueAt,
+                        actionRoute: $route,
+                        actionParameter: $repair->id
+                    );
+                }
+
+                if ($repair->priority === AssetRepairRequest::PRIORITY_CRITICAL) {
+                    return $this->alert(
+                        key: 'repair-critical-'.$repair->id,
+                        severity: 'critical',
+                        type: 'repair_critical',
+                        title: 'درخواست تعمیر بحرانی باز',
+                        message: 'درخواست تعمیر بحرانی #'.$repair->id.' در وضعیت '.$repair->status.' قرار دارد.',
+                        sourceLabel: $source,
+                        detectedAt: $repair->reported_at ?? $repair->created_at,
+                        actionRoute: $route,
+                        actionParameter: $repair->id
+                    );
+                }
+
+                if (
+                    $repair->status === AssetRepairRequest::STATUS_IN_REPAIR
+                    && $dueAt !== null
+                    && $dueAt->betweenIncluded($now, $dueSoonAt)
+                ) {
+                    return $this->alert(
+                        key: 'repair-due-soon-'.$repair->id,
+                        severity: 'warning',
+                        type: 'repair_due_soon',
+                        title: 'موعد بازگشت تعمیر نزدیک است',
+                        message: 'کمتر از ۲۴ ساعت تا موعد بازگشت درخواست تعمیر #'.$repair->id.' باقی مانده است.',
+                        sourceLabel: $source,
+                        detectedAt: $dueAt,
+                        actionRoute: $route,
+                        actionParameter: $repair->id
+                    );
+                }
+
+                return null;
+            })
+            ->filter()
+            ->values();
+    }
+
     private function canSeeCompanyHealth(
         User $user
     ): bool {
-        return in_array(
+        return $user->hasPermission('asset_repairs.manage') || in_array(
             $user->role?->name,
             [
                 'admin',
@@ -903,32 +875,23 @@ final class OperationalAlertService
         mixed $actionParameter = null
     ): array {
         return [
-            'key' =>
-                $key,
+            'key' => $key,
 
-            'severity' =>
-                $severity,
+            'severity' => $severity,
 
-            'type' =>
-                $type,
+            'type' => $type,
 
-            'title' =>
-                $title,
+            'title' => $title,
 
-            'message' =>
-                $message,
+            'message' => $message,
 
-            'source_label' =>
-                $sourceLabel,
+            'source_label' => $sourceLabel,
 
-            'detected_at' =>
-                $detectedAt,
+            'detected_at' => $detectedAt,
 
-            'action_route' =>
-                $actionRoute,
+            'action_route' => $actionRoute,
 
-            'action_parameter' =>
-                $actionParameter,
+            'action_parameter' => $actionParameter,
         ];
     }
 
@@ -936,20 +899,15 @@ final class OperationalAlertService
         ?string $type
     ): string {
         return match ($type) {
-            'inventory_request' =>
-                'درخواست کالا',
+            'inventory_request' => 'درخواست کالا',
 
-            'asset_transfer' =>
-                'انتقال مال',
+            'asset_transfer' => 'انتقال مال',
 
-            'asset_return' =>
-                'عودت مال',
+            'asset_return' => 'عودت مال',
 
-            'asset_disposal' =>
-                'اسقاط مال',
+            'asset_disposal' => 'اسقاط مال',
 
-            default =>
-                $type
+            default => $type
                 ?: 'گردش کاری',
         };
     }
@@ -958,17 +916,13 @@ final class OperationalAlertService
         string $type
     ): string {
         return match ($type) {
-            AssetMovementRequest::TYPE_TRANSFER =>
-                'انتقال مال',
+            AssetMovementRequest::TYPE_TRANSFER => 'انتقال مال',
 
-            AssetMovementRequest::TYPE_RETURN =>
-                'عودت مال',
+            AssetMovementRequest::TYPE_RETURN => 'عودت مال',
 
-            AssetMovementRequest::TYPE_DISPOSAL =>
-                'اسقاط مال',
+            AssetMovementRequest::TYPE_DISPOSAL => 'اسقاط مال',
 
-            default =>
-                $type,
+            default => $type,
         };
     }
 }

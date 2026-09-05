@@ -80,7 +80,17 @@
                     <input class="form-control" type="date" name="to" value="{{ request('to') }}">
                 </div>
 
-                <div class="col-md-1 d-grid gap-2">
+                <div class="col-md-2">
+                    <label class="form-label">وضعیت SLA</label>
+                    <select class="form-select" name="sla">
+                        <option value="">همه</option>
+                        <option value="overdue" @selected(request('sla') === 'overdue')>سررسید گذشته</option>
+                        <option value="due_soon" @selected(request('sla') === 'due_soon')>سررسید تا ۲۴ ساعت</option>
+                        <option value="critical" @selected(request('sla') === 'critical')>بحرانی</option>
+                    </select>
+                </div>
+
+                <div class="col-md-12 d-flex gap-2 justify-content-end">
                     <button class="btn btn-outline-primary" type="submit">فیلتر</button>
                     <a class="btn btn-outline-secondary btn-sm" href="{{ route('asset-repairs.index') }}">پاک</a>
                 </div>
@@ -99,6 +109,7 @@
                         <th>عنوان</th>
                         <th>اولویت</th>
                         <th>وضعیت</th>
+                        <th>SLA</th>
                         <th>ثبت‌کننده</th>
                         <th>تاریخ گزارش</th>
                         <th></th>
@@ -115,6 +126,18 @@
                             <td>{{ $repair->title }}</td>
                             <td>{{ $priorityLabels[$repair->priority] ?? $repair->priority }}</td>
                             <td>{{ $statusLabels[$repair->status] ?? $repair->status }}</td>
+                            <td>
+                                @php($dueAt = $repair->workOrder?->expected_return_at)
+                                @if($repair->status === 'in_repair' && $dueAt && $dueAt->isPast())
+                                    <span class="badge bg-danger">سررسید گذشته</span>
+                                @elseif($repair->priority === 'critical' && !in_array($repair->status, ['completed', 'rejected', 'cancelled'], true))
+                                    <span class="badge bg-danger">بحرانی</span>
+                                @elseif($repair->status === 'in_repair' && $dueAt && $dueAt->betweenIncluded(now(), now()->addDay()))
+                                    <span class="badge bg-warning text-dark">نزدیک سررسید</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                             <td>{{ $repair->requesterUser?->name ?? '—' }}</td>
                             <td>{{ $repair->reported_at ? \App\Support\JalaliDate::dateTime($repair->reported_at) : '—' }}</td>
                             <td>
@@ -122,7 +145,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="text-center text-muted py-5">هنوز درخواست تعمیری ثبت نشده است.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-5">هنوز درخواست تعمیری ثبت نشده است.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

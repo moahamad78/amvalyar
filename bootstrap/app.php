@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureActiveLoginSession;
+use App\Http\Middleware\EnsureCompanySubscription;
 use App\Http\Middleware\EnsurePermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,12 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        
+        $middleware->trustProxies(at: '*');
+
         $middleware->appendToGroup(
             'web',
-            \App\Http\Middleware\EnsureCompanySubscription::class
+            EnsureCompanySubscription::class
         );
-$middleware->alias([
+        $middleware->alias([
             'active.session' => EnsureActiveLoginSession::class,
             'permission' => EnsurePermission::class,
         ]);

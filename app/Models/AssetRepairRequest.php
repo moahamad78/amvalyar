@@ -14,17 +14,27 @@ final class AssetRepairRequest extends Model
     use BelongsToCompany;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_SUBMITTED = 'submitted';
+
     public const STATUS_IN_REVIEW = 'in_review';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_IN_REPAIR = 'in_repair';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_REJECTED = 'rejected';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_NORMAL = 'normal';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_CRITICAL = 'critical';
 
     protected $fillable = [
@@ -33,6 +43,8 @@ final class AssetRepairRequest extends Model
         'status', 'priority', 'title', 'problem_description',
         'diagnosis', 'repair_notes', 'estimated_cost', 'actual_cost',
         'reported_at', 'submitted_at', 'started_at', 'completed_at', 'cancelled_at',
+        'cancelled_from_status', 'cancellation_reason', 'cancelled_by_user_id',
+        'reopened_at', 'reopen_reason', 'reopened_by_user_id',
     ];
 
     protected function casts(): array
@@ -45,13 +57,29 @@ final class AssetRepairRequest extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'reopened_at' => 'datetime',
         ];
     }
 
-    public function asset(): BelongsTo { return $this->belongsTo(Asset::class); }
-    public function workflowInstance(): BelongsTo { return $this->belongsTo(WorkflowInstance::class); }
-    public function requesterUser(): BelongsTo { return $this->belongsTo(User::class, 'requested_by_user_id'); }
-    public function requesterEmployee(): BelongsTo { return $this->belongsTo(Employee::class, 'requested_by_employee_id'); }
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
+    }
+
+    public function workflowInstance(): BelongsTo
+    {
+        return $this->belongsTo(WorkflowInstance::class);
+    }
+
+    public function requesterUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by_user_id');
+    }
+
+    public function requesterEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'requested_by_employee_id');
+    }
 
     public function workOrder(): HasOne
     {

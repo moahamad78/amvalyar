@@ -20,56 +20,56 @@ final class TaskCenterController extends Controller
             );
 
         $summary = [
-            'total' =>
-                $tasks->count(),
+            'total' => $tasks->count(),
 
-            'overdue' =>
-                $tasks
-                    ->where(
-                        'is_overdue',
-                        true
-                    )
-                    ->count(),
+            'overdue' => $tasks
+                ->where(
+                    'is_overdue',
+                    true
+                )
+                ->count(),
 
-            'approvals' =>
-                $tasks
-                    ->where(
-                        'workspace',
-                        'approval'
-                    )
-                    ->count(),
+            'approvals' => $tasks
+                ->where(
+                    'workspace',
+                    'approval'
+                )
+                ->count(),
 
-            'asset_manager' =>
-                $tasks
-                    ->where(
-                        'workspace',
-                        'asset_manager'
-                    )
-                    ->count(),
+            'asset_manager' => $tasks
+                ->where(
+                    'workspace',
+                    'asset_manager'
+                )
+                ->count(),
 
-            'final_delivery' =>
-                $tasks
-                    ->where(
-                        'workspace',
-                        'final_delivery'
-                    )
-                    ->count(),
+            'final_delivery' => $tasks
+                ->where(
+                    'workspace',
+                    'final_delivery'
+                )
+                ->count(),
 
-            'specialist' =>
-                $tasks
-                    ->where(
-                        'workspace',
-                        'specialist'
-                    )
-                    ->count(),
+            'specialist' => $tasks
+                ->where(
+                    'workspace',
+                    'specialist'
+                )
+                ->count(),
 
-            'warehouse_recovery' =>
-                $tasks
-                    ->where(
-                        'workspace',
-                        'warehouse_recovery'
-                    )
-                    ->count(),
+            'warehouse_recovery' => $tasks
+                ->where(
+                    'workspace',
+                    'warehouse_recovery'
+                )
+                ->count(),
+
+            'repair' => $tasks
+                ->where(
+                    'workspace',
+                    'repair'
+                )
+                ->count(),
         ];
 
         return view(

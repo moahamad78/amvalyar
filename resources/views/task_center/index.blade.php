@@ -142,7 +142,7 @@
                 <div class="card-body">
 
                     <div class="text-muted small">
-                        عملیات تخصصی
+                        عملیات تخصصی و تعمیرات
                     </div>
 
                     <div class="fs-3 fw-bold">
@@ -150,6 +150,8 @@
                             $summary['asset_manager']
                             +
                             $summary['final_delivery']
+                            +
+                            $summary['repair']
                         }}
                     </div>
 
@@ -227,9 +229,13 @@
 
                                             Step #{{ $task['step_id'] }}
 
-                                        @else
+                                        @elseif($task['task_type'] === 'branch')
 
                                             Branch #{{ $task['branch_id'] }}
+
+                                        @else
+
+                                            Repair #{{ $task['task_id'] }}
 
                                         @endif
 
@@ -286,6 +292,14 @@
 
                                         <span class="badge bg-danger">
                                             معوق
+                                        </span>
+
+                                    @elseif(
+                                        ($task['is_critical'] ?? false)
+                                    )
+
+                                        <span class="badge bg-danger">
+                                            بحرانی
                                         </span>
 
                                     @elseif(

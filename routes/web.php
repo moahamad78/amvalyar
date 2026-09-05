@@ -2,38 +2,56 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\SpecialistApprovalController;
-
-use App\Http\Controllers\AssetTransactionController;
-use App\Http\Controllers\AssetController;
-use App\Http\Controllers\AssetCompletenessQueueController;
-use App\Http\Controllers\AssetManagerCompletionController;
-use App\Http\Controllers\AssetTypeSettingsController;
-use App\Http\Controllers\AssetCodeMasterDataController;
-use App\Http\Controllers\AssetCodeFormulaSettingsController;
-use App\Http\Controllers\AssetCodeSettingsController;
-use App\Http\Controllers\AssetPlateTemplateController;
 use App\Http\Controllers\AssetAttributeController;
-use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\AssetCategoryApprovalRouteController;
+use App\Http\Controllers\AssetCodeFormulaSettingsController;
+use App\Http\Controllers\AssetCodeMasterDataController;
+use App\Http\Controllers\AssetCodeSettingsController;
+use App\Http\Controllers\AssetCompletenessQueueController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetManagerCompletionController;
+use App\Http\Controllers\AssetManagerRequestController;
+use App\Http\Controllers\AssetMovementRequestController;
+use App\Http\Controllers\AssetPlatePrintController;
+use App\Http\Controllers\AssetPlateTemplateController;
+use App\Http\Controllers\AssetReferenceController;
+use App\Http\Controllers\AssetRepairReportController;
+use App\Http\Controllers\AssetRepairRequestController;
+use App\Http\Controllers\AssetTransactionController;
+use App\Http\Controllers\AssetTypeSettingsController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\BulkImportController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanyStorageProfileController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\RoleController;
+use App\Http\Controllers\DeliveryDisputeController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\FinalWarehouseDeliveryController;
+use App\Http\Controllers\FinalWarehousePlatePrintController;
+use App\Http\Controllers\InventoryRequestController;
+use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MyApprovalController;
+use App\Http\Controllers\OperationalAlertController;
+use App\Http\Controllers\OrganizationalAssetController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\LocationController;
-use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\SpecialistApprovalController;
+use App\Http\Controllers\StocktakeController;
+use App\Http\Controllers\TaskCenterController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\WarehouseRecoveryController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\WorkflowStepController;
-use App\Http\Controllers\AssetCategoryApprovalRouteController;
-use App\Http\Controllers\MyApprovalController;
-use App\Http\Controllers\DeliveryDisputeController;
-use App\Http\Controllers\InventoryRequestController;
-use App\Http\Controllers\UserController;
 use App\Http\Middleware\EnsureActiveLoginSession;
+use App\Http\Middleware\EnsureAssetManagerAssetContext;
+use App\Http\Middleware\EnsureAssetManagerReadyForApproval;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\FinalizeRequesterReceiptOnApproval;
+use App\Http\Middleware\FinalizeWarehouseDeliveryOnApproval;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -220,10 +238,10 @@ Route::resource(
     'companies',
     CompanyController::class
 )
-->middleware([
-    EnsureActiveLoginSession::class,
-    EnsureSuperAdmin::class,
-]);
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        EnsureSuperAdmin::class,
+    ]);
 
 /*
 |--------------------------------------------------------------------------
@@ -241,7 +259,6 @@ Route::get('/inventory-assets', [
     ])
     ->name('assets.index');
 
-
 Route::get('/inventory-assets/create', [
     AssetController::class,
     'create',
@@ -251,7 +268,6 @@ Route::get('/inventory-assets/create', [
         'permission:assets.create',
     ])
     ->name('assets.create');
-
 
 Route::post('/inventory-assets', [
     AssetController::class,
@@ -263,7 +279,6 @@ Route::post('/inventory-assets', [
     ])
     ->name('assets.store');
 
-
 Route::get('/inventory-assets/{asset}', [
     AssetController::class,
     'show',
@@ -274,7 +289,6 @@ Route::get('/inventory-assets/{asset}', [
     ])
     ->name('assets.show');
 
-
 Route::get('/inventory-assets/{asset}/edit', [
     AssetController::class,
     'edit',
@@ -284,7 +298,6 @@ Route::get('/inventory-assets/{asset}/edit', [
         'permission:assets.edit',
     ])
     ->name('assets.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -300,7 +313,6 @@ Route::match(
     ])
     ->name('assets.update');
 
-
 Route::delete('/inventory-assets/{asset}', [
     AssetController::class,
     'destroy',
@@ -310,7 +322,6 @@ Route::delete('/inventory-assets/{asset}', [
         'permission:assets.delete',
     ])
     ->name('assets.destroy');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -327,7 +338,6 @@ Route::get('/asset-transactions', [
         'permission:assets.view',
     ])
     ->name('asset-transactions.index');
-
 
 /*
  * Legacy direct-write endpoints are intentionally retained only as
@@ -349,7 +359,6 @@ Route::get('/asset-transactions/create', function () {
     ])
     ->name('asset-transactions.create');
 
-
 Route::post('/asset-transactions', function () {
     abort(
         410,
@@ -360,7 +369,6 @@ Route::post('/asset-transactions', function () {
         EnsureActiveLoginSession::class,
     ])
     ->name('asset-transactions.store');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -385,6 +393,9 @@ Route::get('/reports/export', ReportExportController::class)
     ])
     ->name('reports.export');
 
+Route::get('/reports/repairs', AssetRepairReportController::class)
+    ->middleware([EnsureActiveLoginSession::class, 'permission:reports.view'])
+    ->name('reports.repairs');
 
 /*
 |--------------------------------------------------------------------------
@@ -402,7 +413,6 @@ Route::get('/sites', [
     ])
     ->name('sites.index');
 
-
 Route::get('/sites/create', [
     SiteController::class,
     'create',
@@ -412,7 +422,6 @@ Route::get('/sites/create', [
         'permission:sites.create',
     ])
     ->name('sites.create');
-
 
 Route::post('/sites', [
     SiteController::class,
@@ -424,7 +433,6 @@ Route::post('/sites', [
     ])
     ->name('sites.store');
 
-
 Route::get('/sites/{site}/edit', [
     SiteController::class,
     'edit',
@@ -434,7 +442,6 @@ Route::get('/sites/{site}/edit', [
         'permission:sites.edit',
     ])
     ->name('sites.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -450,7 +457,6 @@ Route::match(
     ])
     ->name('sites.update');
 
-
 Route::delete('/sites/{site}', [
     SiteController::class,
     'destroy',
@@ -460,7 +466,6 @@ Route::delete('/sites/{site}', [
         'permission:sites.delete',
     ])
     ->name('sites.destroy');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -478,7 +483,6 @@ Route::get('/departments', [
     ])
     ->name('departments.index');
 
-
 Route::get('/departments/create', [
     DepartmentController::class,
     'create',
@@ -488,7 +492,6 @@ Route::get('/departments/create', [
         'permission:departments.create',
     ])
     ->name('departments.create');
-
 
 Route::post('/departments', [
     DepartmentController::class,
@@ -500,7 +503,6 @@ Route::post('/departments', [
     ])
     ->name('departments.store');
 
-
 Route::get('/departments/{department}/edit', [
     DepartmentController::class,
     'edit',
@@ -510,7 +512,6 @@ Route::get('/departments/{department}/edit', [
         'permission:departments.edit',
     ])
     ->name('departments.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -526,7 +527,6 @@ Route::match(
     ])
     ->name('departments.update');
 
-
 Route::delete('/departments/{department}', [
     DepartmentController::class,
     'destroy',
@@ -536,7 +536,6 @@ Route::delete('/departments/{department}', [
         'permission:departments.delete',
     ])
     ->name('departments.destroy');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -554,7 +553,6 @@ Route::get('/locations', [
     ])
     ->name('locations.index');
 
-
 Route::get('/locations/create', [
     LocationController::class,
     'create',
@@ -564,7 +562,6 @@ Route::get('/locations/create', [
         'permission:locations.create',
     ])
     ->name('locations.create');
-
 
 Route::post('/locations', [
     LocationController::class,
@@ -576,7 +573,6 @@ Route::post('/locations', [
     ])
     ->name('locations.store');
 
-
 Route::get('/locations/{location}/edit', [
     LocationController::class,
     'edit',
@@ -586,7 +582,6 @@ Route::get('/locations/{location}/edit', [
         'permission:locations.edit',
     ])
     ->name('locations.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -602,7 +597,6 @@ Route::match(
     ])
     ->name('locations.update');
 
-
 Route::delete('/locations/{location}', [
     LocationController::class,
     'destroy',
@@ -612,7 +606,6 @@ Route::delete('/locations/{location}', [
         'permission:locations.delete',
     ])
     ->name('locations.destroy');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -630,7 +623,6 @@ Route::get('/employees', [
     ])
     ->name('employees.index');
 
-
 Route::get('/employees/create', [
     EmployeeController::class,
     'create',
@@ -640,7 +632,6 @@ Route::get('/employees/create', [
         'permission:employees.create',
     ])
     ->name('employees.create');
-
 
 Route::post('/employees', [
     EmployeeController::class,
@@ -652,7 +643,6 @@ Route::post('/employees', [
     ])
     ->name('employees.store');
 
-
 Route::get('/employees/{employee}/edit', [
     EmployeeController::class,
     'edit',
@@ -662,7 +652,6 @@ Route::get('/employees/{employee}/edit', [
         'permission:employees.edit',
     ])
     ->name('employees.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -678,7 +667,6 @@ Route::match(
     ])
     ->name('employees.update');
 
-
 Route::delete('/employees/{employee}', [
     EmployeeController::class,
     'destroy',
@@ -688,7 +676,6 @@ Route::delete('/employees/{employee}', [
         'permission:employees.delete',
     ])
     ->name('employees.destroy');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -706,7 +693,6 @@ Route::get('/workflows', [
     ])
     ->name('workflows.index');
 
-
 Route::get('/workflows/create', [
     WorkflowController::class,
     'create',
@@ -716,7 +702,6 @@ Route::get('/workflows/create', [
         'permission:workflows.create',
     ])
     ->name('workflows.create');
-
 
 Route::post('/workflows', [
     WorkflowController::class,
@@ -728,7 +713,6 @@ Route::post('/workflows', [
     ])
     ->name('workflows.store');
 
-
 Route::get('/workflows/{workflow}/edit', [
     WorkflowController::class,
     'edit',
@@ -738,7 +722,6 @@ Route::get('/workflows/{workflow}/edit', [
         'permission:workflows.edit',
     ])
     ->name('workflows.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -754,7 +737,6 @@ Route::match(
     ])
     ->name('workflows.update');
 
-
 Route::delete('/workflows/{workflow}', [
     WorkflowController::class,
     'destroy',
@@ -764,7 +746,6 @@ Route::delete('/workflows/{workflow}', [
         'permission:workflows.delete',
     ])
     ->name('workflows.destroy');
-
 
 Route::post('/workflows/{workflow}/steps', [
     WorkflowStepController::class,
@@ -776,7 +757,6 @@ Route::post('/workflows/{workflow}/steps', [
     ])
     ->name('workflows.steps.store');
 
-
 Route::put('/workflows/{workflow}/steps/{step}', [
     WorkflowStepController::class,
     'update',
@@ -786,7 +766,6 @@ Route::put('/workflows/{workflow}/steps/{step}', [
         'permission:workflows.edit',
     ])
     ->name('workflows.steps.update');
-
 
 Route::delete('/workflows/{workflow}/steps/{step}', [
     WorkflowStepController::class,
@@ -798,7 +777,6 @@ Route::delete('/workflows/{workflow}/steps/{step}', [
     ])
     ->name('workflows.steps.destroy');
 
-
 Route::post('/workflows/{workflow}/steps/reorder', [
     WorkflowStepController::class,
     'reorder',
@@ -808,7 +786,6 @@ Route::post('/workflows/{workflow}/steps/reorder', [
         'permission:workflows.edit',
     ])
     ->name('workflows.steps.reorder');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -935,7 +912,6 @@ Route::get('/approvals', [
     ])
     ->name('approvals.index');
 
-
 Route::get('/approvals/{step}', [
     MyApprovalController::class,
     'show',
@@ -946,7 +922,6 @@ Route::get('/approvals/{step}', [
     ])
     ->name('approvals.show');
 
-
 Route::post('/approvals/{step}/act', [
     MyApprovalController::class,
     'act',
@@ -954,12 +929,11 @@ Route::post('/approvals/{step}/act', [
     ->middleware([
         EnsureActiveLoginSession::class,
         'permission:approvals.act',
-        \App\Http\Middleware\EnsureAssetManagerReadyForApproval::class,
-        \App\Http\Middleware\FinalizeWarehouseDeliveryOnApproval::class,
-        \App\Http\Middleware\FinalizeRequesterReceiptOnApproval::class,
+        EnsureAssetManagerReadyForApproval::class,
+        FinalizeWarehouseDeliveryOnApproval::class,
+        FinalizeRequesterReceiptOnApproval::class,
     ])
     ->name('approvals.act');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -977,7 +951,6 @@ Route::get('/inventory-requests', [
     ])
     ->name('inventory-requests.index');
 
-
 Route::get('/inventory-requests/create', [
     InventoryRequestController::class,
     'create',
@@ -987,7 +960,6 @@ Route::get('/inventory-requests/create', [
         'permission:inventory_requests.create',
     ])
     ->name('inventory-requests.create');
-
 
 Route::post('/inventory-requests', [
     InventoryRequestController::class,
@@ -999,7 +971,6 @@ Route::post('/inventory-requests', [
     ])
     ->name('inventory-requests.store');
 
-
 Route::get('/inventory-requests/{inventoryRequest}/edit', [
     InventoryRequestController::class,
     'edit',
@@ -1009,7 +980,6 @@ Route::get('/inventory-requests/{inventoryRequest}/edit', [
         'permission:inventory_requests.edit',
     ])
     ->name('inventory-requests.edit');
-
 
 Route::match(
     ['put', 'patch'],
@@ -1025,7 +995,6 @@ Route::match(
     ])
     ->name('inventory-requests.update');
 
-
 Route::delete('/inventory-requests/{inventoryRequest}', [
     InventoryRequestController::class,
     'destroy',
@@ -1036,7 +1005,6 @@ Route::delete('/inventory-requests/{inventoryRequest}', [
     ])
     ->name('inventory-requests.destroy');
 
-
 Route::post('/inventory-requests/{inventoryRequest}/submit', [
     InventoryRequestController::class,
     'submit',
@@ -1046,7 +1014,6 @@ Route::post('/inventory-requests/{inventoryRequest}/submit', [
         'permission:inventory_requests.submit',
     ])
     ->name('inventory-requests.submit');
-
 
 Route::post(
     '/approvals/{step}/warehouse-allocations',
@@ -1063,13 +1030,11 @@ Route::post(
         'approvals.warehouse-allocations.store'
     );
 
-
 /*
 |--------------------------------------------------------------------------
 | Asset Identity Settings
 |--------------------------------------------------------------------------
 */
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1116,7 +1081,6 @@ Route::get(
         'asset-settings.plate-templates.index'
     );
 
-
 Route::get(
     '/asset-settings/plate-templates/create',
     [
@@ -1131,7 +1095,6 @@ Route::get(
     ->name(
         'asset-settings.plate-templates.create'
     );
-
 
 Route::post(
     '/asset-settings/plate-templates',
@@ -1148,7 +1111,6 @@ Route::post(
         'asset-settings.plate-templates.store'
     );
 
-
 Route::get(
     '/asset-settings/plate-templates/{plateTemplate}/edit',
     [
@@ -1163,7 +1125,6 @@ Route::get(
     ->name(
         'asset-settings.plate-templates.edit'
     );
-
 
 Route::match(
     ['put', 'patch'],
@@ -1180,7 +1141,6 @@ Route::match(
     ->name(
         'asset-settings.plate-templates.update'
     );
-
 
 Route::delete(
     '/asset-settings/plate-templates/{plateTemplate}',
@@ -1227,7 +1187,6 @@ Route::get(
         'asset-settings.code-formula.index'
     );
 
-
 Route::match(
     ['put', 'patch'],
     '/asset-settings/code-formula',
@@ -1259,7 +1218,6 @@ Route::get(
         'asset-settings.code-master-data.index'
     );
 
-
 Route::match(
     ['put', 'patch'],
     '/asset-settings/code-master-data',
@@ -1278,10 +1236,9 @@ Route::match(
 
 Route::get(
     '/asset-settings/code-policy',
-    fn () =>
-        redirect()->route(
-            'asset-settings.code.index'
-        )
+    fn () => redirect()->route(
+        'asset-settings.code.index'
+    )
 )
     ->middleware([
         EnsureActiveLoginSession::class,
@@ -1290,8 +1247,6 @@ Route::get(
     ->name(
         'asset-settings.code-policy.index'
     );
-
-
 
 Route::get(
     '/asset-settings/types',
@@ -1308,7 +1263,6 @@ Route::get(
         'asset-settings.types.index'
     );
 
-
 Route::get(
     '/asset-settings/types/{assetType}/attributes',
     [
@@ -1323,7 +1277,6 @@ Route::get(
     ->name(
         'asset-settings.attributes.index'
     );
-
 
 Route::get(
     '/asset-settings/types/{assetType}/attributes/create',
@@ -1340,7 +1293,6 @@ Route::get(
         'asset-settings.attributes.create'
     );
 
-
 Route::post(
     '/asset-settings/types/{assetType}/attributes',
     [
@@ -1356,7 +1308,6 @@ Route::post(
         'asset-settings.attributes.store'
     );
 
-
 Route::get(
     '/asset-settings/types/{assetType}/attributes/{attribute}/edit',
     [
@@ -1371,7 +1322,6 @@ Route::get(
     ->name(
         'asset-settings.attributes.edit'
     );
-
 
 Route::match(
     ['put', 'patch'],
@@ -1389,7 +1339,6 @@ Route::match(
         'asset-settings.attributes.update'
     );
 
-
 Route::delete(
     '/asset-settings/types/{assetType}/attributes/{attribute}',
     [
@@ -1404,7 +1353,6 @@ Route::delete(
     ->name(
         'asset-settings.attributes.destroy'
     );
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1427,7 +1375,6 @@ Route::get(
         'asset-settings.types.create'
     );
 
-
 Route::post(
     '/asset-settings/types',
     [
@@ -1443,7 +1390,6 @@ Route::post(
         'asset-settings.types.store'
     );
 
-
 Route::get(
     '/asset-settings/types/{assetType}/edit',
     [
@@ -1458,7 +1404,6 @@ Route::get(
     ->name(
         'asset-settings.types.edit'
     );
-
 
 Route::match(
     ['put', 'patch'],
@@ -1476,7 +1421,6 @@ Route::match(
         'asset-settings.types.update'
     );
 
-
 Route::delete(
     '/asset-settings/types/{assetType}',
     [
@@ -1491,7 +1435,6 @@ Route::delete(
     ->name(
         'asset-settings.types.destroy'
     );
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1514,7 +1457,6 @@ Route::get(
         'asset-completeness.index'
     );
 
-
 /*
 |--------------------------------------------------------------------------
 | Asset Manager Completion
@@ -1531,12 +1473,11 @@ Route::get(
     ->middleware([
         EnsureActiveLoginSession::class,
         'permission:asset_completeness.view',
-        \App\Http\Middleware\EnsureAssetManagerAssetContext::class,
+        EnsureAssetManagerAssetContext::class,
     ])
     ->name(
         'asset-completeness.edit'
     );
-
 
 Route::match(
     ['put', 'patch'],
@@ -1549,12 +1490,11 @@ Route::match(
     ->middleware([
         EnsureActiveLoginSession::class,
         'permission:assets.edit',
-        \App\Http\Middleware\EnsureAssetManagerAssetContext::class,
+        EnsureAssetManagerAssetContext::class,
     ])
     ->name(
         'asset-completeness.update'
     );
-
 
 Route::post(
     '/asset-completeness/{asset}/issue-code',
@@ -1566,13 +1506,11 @@ Route::post(
     ->middleware([
         EnsureActiveLoginSession::class,
         'permission:assets.edit',
-        \App\Http\Middleware\EnsureAssetManagerAssetContext::class,
+        EnsureAssetManagerAssetContext::class,
     ])
     ->name(
         'asset-completeness.issue-code'
     );
-
-
 
 Route::post(
     '/approvals/{step}/warehouse-finalize',
@@ -1588,7 +1526,6 @@ Route::post(
     ->name(
         'approvals.warehouse-finalize'
     );
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1611,7 +1548,6 @@ Route::get(
         'specialist-approvals.index'
     );
 
-
 Route::get(
     '/specialist-approvals/{branch}',
     [
@@ -1626,7 +1562,6 @@ Route::get(
     ->name(
         'specialist-approvals.show'
     );
-
 
 Route::post(
     '/specialist-approvals/{branch}/act',
@@ -1643,7 +1578,6 @@ Route::post(
         'specialist-approvals.act'
     );
 
-
 /*
 |--------------------------------------------------------------------------
 | Specialist Rejection Warehouse Recovery
@@ -1653,7 +1587,7 @@ Route::post(
 Route::get(
     '/warehouse-recoveries',
     [
-        \App\Http\Controllers\WarehouseRecoveryController::class,
+        WarehouseRecoveryController::class,
         'index',
     ]
 )
@@ -1665,11 +1599,10 @@ Route::get(
         'warehouse-recoveries.index'
     );
 
-
 Route::get(
     '/warehouse-recoveries/{branch}',
     [
-        \App\Http\Controllers\WarehouseRecoveryController::class,
+        WarehouseRecoveryController::class,
         'show',
     ]
 )
@@ -1681,11 +1614,10 @@ Route::get(
         'warehouse-recoveries.show'
     );
 
-
 Route::put(
     '/warehouse-recoveries/{branch}',
     [
-        \App\Http\Controllers\WarehouseRecoveryController::class,
+        WarehouseRecoveryController::class,
         'update',
     ]
 )
@@ -1697,7 +1629,6 @@ Route::put(
         'warehouse-recoveries.update'
     );
 
-
 /*
 |--------------------------------------------------------------------------
 | Asset Manager Request Workspace
@@ -1707,7 +1638,7 @@ Route::put(
 Route::get(
     '/asset-manager-requests',
     [
-        \App\Http\Controllers\AssetManagerRequestController::class,
+        AssetManagerRequestController::class,
         'index',
     ]
 )
@@ -1719,11 +1650,10 @@ Route::get(
         'asset-manager-requests.index'
     );
 
-
 Route::get(
     '/asset-manager-requests/{step}',
     [
-        \App\Http\Controllers\AssetManagerRequestController::class,
+        AssetManagerRequestController::class,
         'show',
     ]
 )
@@ -1735,7 +1665,6 @@ Route::get(
         'asset-manager-requests.show'
     );
 
-
 /*
 |--------------------------------------------------------------------------
 | Final Warehouse Delivery Workspace
@@ -1745,7 +1674,7 @@ Route::get(
 Route::get(
     '/final-warehouse-deliveries',
     [
-        \App\Http\Controllers\FinalWarehouseDeliveryController::class,
+        FinalWarehouseDeliveryController::class,
         'index',
     ]
 )
@@ -1757,11 +1686,10 @@ Route::get(
         'final-warehouse-deliveries.index'
     );
 
-
 Route::get(
     '/final-warehouse-deliveries/{step}',
     [
-        \App\Http\Controllers\FinalWarehouseDeliveryController::class,
+        FinalWarehouseDeliveryController::class,
         'show',
     ]
 )
@@ -1775,33 +1703,33 @@ Route::get(
 
 Route::middleware([
     'web',
-    \App\Http\Middleware\EnsureActiveLoginSession::class,
+    EnsureActiveLoginSession::class,
 ])->group(function () {
 
     Route::get(
         '/asset-movement-requests',
-        [\App\Http\Controllers\AssetMovementRequestController::class, 'index']
+        [AssetMovementRequestController::class, 'index']
     )
         ->middleware('permission:asset_movement_requests.view')
         ->name('asset-movement-requests.index');
 
     Route::get(
         '/asset-movement-requests/create',
-        [\App\Http\Controllers\AssetMovementRequestController::class, 'create']
+        [AssetMovementRequestController::class, 'create']
     )
         ->middleware('permission:asset_movement_requests.create')
         ->name('asset-movement-requests.create');
 
     Route::post(
         '/asset-movement-requests',
-        [\App\Http\Controllers\AssetMovementRequestController::class, 'store']
+        [AssetMovementRequestController::class, 'store']
     )
         ->middleware('permission:asset_movement_requests.create')
         ->name('asset-movement-requests.store');
 
     Route::get(
         '/asset-movement-requests/{assetMovementRequest}',
-        [\App\Http\Controllers\AssetMovementRequestController::class, 'show']
+        [AssetMovementRequestController::class, 'show']
     )
         ->middleware('permission:asset_movement_requests.view')
         ->name('asset-movement-requests.show');
@@ -1810,28 +1738,27 @@ Route::middleware([
 
 Route::middleware([
     'web',
-    \App\Http\Middleware\EnsureActiveLoginSession::class,
+    EnsureActiveLoginSession::class,
 ])->group(function () {
 
     Route::get(
         '/task-center',
-        [\App\Http\Controllers\TaskCenterController::class, 'index']
+        [TaskCenterController::class, 'index']
     )->name('task-center.index');
 
 });
 
 Route::middleware([
     'web',
-    \App\Http\Middleware\EnsureActiveLoginSession::class,
+    EnsureActiveLoginSession::class,
 ])->group(function () {
 
     Route::get(
         '/operational-alerts',
-        [\App\Http\Controllers\OperationalAlertController::class, 'index']
+        [OperationalAlertController::class, 'index']
     )->name('operational-alerts.index');
 
 });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1841,17 +1768,17 @@ Route::middleware([
 Route::middleware('auth')->group(function (): void {
     Route::get(
         '/organizational-assets',
-        [\App\Http\Controllers\OrganizationalAssetController::class, 'index']
+        [OrganizationalAssetController::class, 'index']
     )->name('organizational-assets.index');
 
     Route::get(
         '/organizational-assets/create',
-        [\App\Http\Controllers\OrganizationalAssetController::class, 'create']
+        [OrganizationalAssetController::class, 'create']
     )->name('organizational-assets.create');
 
     Route::post(
         '/organizational-assets',
-        [\App\Http\Controllers\OrganizationalAssetController::class, 'store']
+        [OrganizationalAssetController::class, 'store']
     )->name('organizational-assets.store');
 });
 
@@ -1863,73 +1790,73 @@ Route::middleware('auth')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get(
         '/bulk-import',
-        [\App\Http\Controllers\BulkImportController::class, 'index']
+        [BulkImportController::class, 'index']
     )->name('bulk-import.index');
 
     Route::get(
         '/bulk-import/employees/template',
-        [\App\Http\Controllers\BulkImportController::class, 'employeeTemplate']
+        [BulkImportController::class, 'employeeTemplate']
     )->name('bulk-import.employees.template');
 
     Route::post(
         '/bulk-import/employees/preview',
-        [\App\Http\Controllers\BulkImportController::class, 'employeePreview']
+        [BulkImportController::class, 'employeePreview']
     )->name('bulk-import.employees.preview');
 });
 
 Route::post(
     '/bulk-import/employees/commit',
-    [\App\Http\Controllers\BulkImportController::class, 'employeeCommit']
+    [BulkImportController::class, 'employeeCommit']
 )->middleware('auth')
-  ->name('bulk-import.employees.commit');
+    ->name('bulk-import.employees.commit');
 
 Route::get(
     '/bulk-import/assets',
-    [\App\Http\Controllers\BulkImportController::class, 'assetIndex']
+    [BulkImportController::class, 'assetIndex']
 )->middleware('auth')
-  ->name('bulk-import.assets.index');
+    ->name('bulk-import.assets.index');
 
 Route::get(
     '/bulk-import/assets/template',
-    [\App\Http\Controllers\BulkImportController::class, 'assetTemplate']
+    [BulkImportController::class, 'assetTemplate']
 )->middleware('auth')
-  ->name('bulk-import.assets.template');
+    ->name('bulk-import.assets.template');
 
 Route::post(
     '/bulk-import/assets/preview',
-    [\App\Http\Controllers\BulkImportController::class, 'assetPreview']
+    [BulkImportController::class, 'assetPreview']
 )->middleware('auth')
-  ->name('bulk-import.assets.preview');
+    ->name('bulk-import.assets.preview');
 
 Route::post(
     '/bulk-import/assets/commit',
-    [\App\Http\Controllers\BulkImportController::class, 'assetCommit']
+    [BulkImportController::class, 'assetCommit']
 )->middleware('auth')
-  ->name('bulk-import.assets.commit');
+    ->name('bulk-import.assets.commit');
 
 Route::get(
     '/bulk-import/reference-structure',
-    [\App\Http\Controllers\BulkImportController::class, 'referenceStructureIndex']
+    [BulkImportController::class, 'referenceStructureIndex']
 )->middleware('auth')
-  ->name('bulk-import.reference-structure.index');
+    ->name('bulk-import.reference-structure.index');
 
 Route::get(
     '/bulk-import/reference-structure/template',
-    [\App\Http\Controllers\BulkImportController::class, 'referenceStructureTemplate']
+    [BulkImportController::class, 'referenceStructureTemplate']
 )->middleware('auth')
-  ->name('bulk-import.reference-structure.template');
+    ->name('bulk-import.reference-structure.template');
 
 Route::post(
     '/bulk-import/reference-structure/preview',
-    [\App\Http\Controllers\BulkImportController::class, 'referenceStructurePreview']
+    [BulkImportController::class, 'referenceStructurePreview']
 )->middleware('auth')
-  ->name('bulk-import.reference-structure.preview');
+    ->name('bulk-import.reference-structure.preview');
 
 Route::post(
     '/bulk-import/reference-structure/commit',
-    [\App\Http\Controllers\BulkImportController::class, 'referenceStructureCommit']
+    [BulkImportController::class, 'referenceStructureCommit']
 )->middleware('auth')
-  ->name('bulk-import.reference-structure.commit');
+    ->name('bulk-import.reference-structure.commit');
 
 Route::middleware('auth')
     ->prefix('asset-reference')
@@ -1938,57 +1865,57 @@ Route::middleware('auth')
 
         Route::get(
             '/',
-            [\App\Http\Controllers\AssetReferenceController::class, 'index']
+            [AssetReferenceController::class, 'index']
         )->name('index');
 
         Route::get(
             '/categories/create',
-            [\App\Http\Controllers\AssetReferenceController::class, 'createCategory']
+            [AssetReferenceController::class, 'createCategory']
         )->name('categories.create');
 
         Route::post(
             '/categories',
-            [\App\Http\Controllers\AssetReferenceController::class, 'storeCategory']
+            [AssetReferenceController::class, 'storeCategory']
         )->name('categories.store');
 
         Route::get(
             '/categories/{category}/edit',
-            [\App\Http\Controllers\AssetReferenceController::class, 'editCategory']
+            [AssetReferenceController::class, 'editCategory']
         )->name('categories.edit');
 
         Route::put(
             '/categories/{category}',
-            [\App\Http\Controllers\AssetReferenceController::class, 'updateCategory']
+            [AssetReferenceController::class, 'updateCategory']
         )->name('categories.update');
 
         Route::delete(
             '/categories/{category}',
-            [\App\Http\Controllers\AssetReferenceController::class, 'destroyCategory']
+            [AssetReferenceController::class, 'destroyCategory']
         )->name('categories.destroy');
 
         Route::get(
             '/types/create',
-            [\App\Http\Controllers\AssetReferenceController::class, 'createType']
+            [AssetReferenceController::class, 'createType']
         )->name('types.create');
 
         Route::post(
             '/types',
-            [\App\Http\Controllers\AssetReferenceController::class, 'storeType']
+            [AssetReferenceController::class, 'storeType']
         )->name('types.store');
 
         Route::get(
             '/types/{type}/edit',
-            [\App\Http\Controllers\AssetReferenceController::class, 'editType']
+            [AssetReferenceController::class, 'editType']
         )->name('types.edit');
 
         Route::put(
             '/types/{type}',
-            [\App\Http\Controllers\AssetReferenceController::class, 'updateType']
+            [AssetReferenceController::class, 'updateType']
         )->name('types.update');
 
         Route::delete(
             '/types/{type}',
-            [\App\Http\Controllers\AssetReferenceController::class, 'destroyType']
+            [AssetReferenceController::class, 'destroyType']
         )->name('types.destroy');
     });
 
@@ -2001,12 +1928,12 @@ Route::middleware('auth')
 Route::get(
     '/asset-plates',
     [
-        \App\Http\Controllers\AssetPlatePrintController::class,
+        AssetPlatePrintController::class,
         'index',
     ]
 )
     ->middleware([
-        \App\Http\Middleware\EnsureActiveLoginSession::class,
+        EnsureActiveLoginSession::class,
         'permission:assets.view',
     ])
     ->name('asset-plates.index');
@@ -2014,12 +1941,12 @@ Route::get(
 Route::post(
     '/asset-plates/preview',
     [
-        \App\Http\Controllers\AssetPlatePrintController::class,
+        AssetPlatePrintController::class,
         'preview',
     ]
 )
     ->middleware([
-        \App\Http\Middleware\EnsureActiveLoginSession::class,
+        EnsureActiveLoginSession::class,
         'permission:assets.view',
     ])
     ->name('asset-plates.preview');
@@ -2027,12 +1954,12 @@ Route::post(
 Route::post(
     '/final-warehouse-deliveries/{step}/plates/preview',
     [
-        \App\Http\Controllers\FinalWarehousePlatePrintController::class,
+        FinalWarehousePlatePrintController::class,
         'preview',
     ]
 )
     ->middleware([
-        \App\Http\Middleware\EnsureActiveLoginSession::class,
+        EnsureActiveLoginSession::class,
         'permission:approvals.view',
     ])
     ->name('final-warehouse-deliveries.plates.preview');
@@ -2040,12 +1967,12 @@ Route::post(
 Route::get(
     '/asset-plates/{asset}/print',
     [
-        \App\Http\Controllers\AssetPlatePrintController::class,
+        AssetPlatePrintController::class,
         'single',
     ]
 )
     ->middleware([
-        \App\Http\Middleware\EnsureActiveLoginSession::class,
+        EnsureActiveLoginSession::class,
         'permission:assets.view',
     ])
     ->name('asset-plates.single');
@@ -2057,40 +1984,41 @@ Route::get(
 */
 Route::middleware([
     'web',
-    \App\Http\Middleware\EnsureActiveLoginSession::class,
+    EnsureActiveLoginSession::class,
 ])->group(function () {
-    Route::get('/stocktakes', [\App\Http\Controllers\StocktakeController::class, 'index'])
+    Route::get('/stocktakes', [StocktakeController::class, 'index'])
         ->middleware('permission:stocktakes.view')->name('stocktakes.index');
-    Route::get('/stocktakes/create', [\App\Http\Controllers\StocktakeController::class, 'create'])
+    Route::get('/stocktakes/create', [StocktakeController::class, 'create'])
         ->middleware('permission:stocktakes.create')->name('stocktakes.create');
-    Route::post('/stocktakes', [\App\Http\Controllers\StocktakeController::class, 'store'])
+    Route::post('/stocktakes', [StocktakeController::class, 'store'])
         ->middleware('permission:stocktakes.create')->name('stocktakes.store');
-    Route::get('/stocktakes/{stocktake}', [\App\Http\Controllers\StocktakeController::class, 'show'])
+    Route::get('/stocktakes/{stocktake}', [StocktakeController::class, 'show'])
         ->middleware('permission:stocktakes.view')->name('stocktakes.show');
-    Route::post('/stocktakes/{stocktake}/start', [\App\Http\Controllers\StocktakeController::class, 'start'])
+    Route::post('/stocktakes/{stocktake}/start', [StocktakeController::class, 'start'])
         ->middleware('permission:stocktakes.start')->name('stocktakes.start');
-    Route::post('/stocktakes/{stocktake}/observe', [\App\Http\Controllers\StocktakeController::class, 'observe'])
+    Route::post('/stocktakes/{stocktake}/observe', [StocktakeController::class, 'observe'])
         ->middleware('permission:stocktakes.count')->name('stocktakes.observe');
-    Route::post('/stocktakes/{stocktake}/items/{item}/missing', [\App\Http\Controllers\StocktakeController::class, 'missing'])
+    Route::post('/stocktakes/{stocktake}/items/{item}/missing', [StocktakeController::class, 'missing'])
         ->middleware('permission:stocktakes.count')->name('stocktakes.missing');
-    Route::post('/stocktakes/{stocktake}/recount', [\App\Http\Controllers\StocktakeController::class, 'recount'])
+    Route::post('/stocktakes/{stocktake}/recount', [StocktakeController::class, 'recount'])
         ->middleware('permission:stocktakes.finalize')->name('stocktakes.recount');
-    Route::post('/stocktakes/{stocktake}/complete', [\App\Http\Controllers\StocktakeController::class, 'complete'])
+    Route::post('/stocktakes/{stocktake}/complete', [StocktakeController::class, 'complete'])
         ->middleware('permission:stocktakes.finalize')->name('stocktakes.complete');
-    Route::get('/stocktakes/{stocktake}/reconciliation', [\App\Http\Controllers\StocktakeController::class, 'reconciliation'])
+    Route::get('/stocktakes/{stocktake}/reconciliation', [StocktakeController::class, 'reconciliation'])
         ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation');
-    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/apply', [\App\Http\Controllers\StocktakeController::class, 'applyReconciliation'])
+    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/apply', [StocktakeController::class, 'applyReconciliation'])
         ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation.apply');
-    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/resolve', [\App\Http\Controllers\StocktakeController::class, 'resolveReconciliation'])
-        ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation.resolve');});
+    Route::post('/stocktakes/{stocktake}/items/{item}/reconciliation/resolve', [StocktakeController::class, 'resolveReconciliation'])
+        ->middleware('permission:stocktakes.reconcile')->name('stocktakes.reconciliation.resolve');
+});
 Route::middleware(['auth'])->group(function () {
-    Route::get('/company-storage-profiles', [\App\Http\Controllers\CompanyStorageProfileController::class, 'index'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.index');
-    Route::get('/company-storage-profiles/create', [\App\Http\Controllers\CompanyStorageProfileController::class, 'create'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.create');
-    Route::post('/company-storage-profiles', [\App\Http\Controllers\CompanyStorageProfileController::class, 'store'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.store');
-    Route::get('/company-storage-profiles/{companyStorageProfile}/edit', [\App\Http\Controllers\CompanyStorageProfileController::class, 'edit'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.edit');
-    Route::put('/company-storage-profiles/{companyStorageProfile}', [\App\Http\Controllers\CompanyStorageProfileController::class, 'update'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.update');
-    Route::post('/company-storage-profiles/{companyStorageProfile}/test', [\App\Http\Controllers\CompanyStorageProfileController::class, 'testConnection'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.test');
-    Route::post('/company-storage-profiles/{companyStorageProfile}/default', [\App\Http\Controllers\CompanyStorageProfileController::class, 'makeDefault'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.default');
+    Route::get('/company-storage-profiles', [CompanyStorageProfileController::class, 'index'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.index');
+    Route::get('/company-storage-profiles/create', [CompanyStorageProfileController::class, 'create'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.create');
+    Route::post('/company-storage-profiles', [CompanyStorageProfileController::class, 'store'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.store');
+    Route::get('/company-storage-profiles/{companyStorageProfile}/edit', [CompanyStorageProfileController::class, 'edit'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.edit');
+    Route::put('/company-storage-profiles/{companyStorageProfile}', [CompanyStorageProfileController::class, 'update'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.update');
+    Route::post('/company-storage-profiles/{companyStorageProfile}/test', [CompanyStorageProfileController::class, 'testConnection'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.test');
+    Route::post('/company-storage-profiles/{companyStorageProfile}/default', [CompanyStorageProfileController::class, 'makeDefault'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.default');
 });
 
 /*
@@ -2100,7 +2028,7 @@ Route::middleware(['auth'])->group(function () {
 */
 
 Route::get('/asset-repairs', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'index',
 ])
     ->middleware([
@@ -2110,7 +2038,7 @@ Route::get('/asset-repairs', [
     ->name('asset-repairs.index');
 
 Route::get('/asset-repairs/create', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'create',
 ])
     ->middleware([
@@ -2120,7 +2048,7 @@ Route::get('/asset-repairs/create', [
     ->name('asset-repairs.create');
 
 Route::post('/asset-repairs', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'store',
 ])
     ->middleware([
@@ -2130,7 +2058,7 @@ Route::post('/asset-repairs', [
     ->name('asset-repairs.store');
 
 Route::get('/asset-repairs/{assetRepair}', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'show',
 ])
     ->middleware([
@@ -2140,7 +2068,7 @@ Route::get('/asset-repairs/{assetRepair}', [
     ->name('asset-repairs.show');
 
 Route::post('/asset-repairs/{assetRepair}/submit', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'submit',
 ])
     ->middleware([
@@ -2150,7 +2078,7 @@ Route::post('/asset-repairs/{assetRepair}/submit', [
     ->name('asset-repairs.submit');
 
 Route::post('/asset-repairs/{assetRepair}/start', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'start',
 ])
     ->middleware([
@@ -2160,7 +2088,7 @@ Route::post('/asset-repairs/{assetRepair}/start', [
     ->name('asset-repairs.start');
 
 Route::post('/asset-repairs/{assetRepair}/complete', [
-    \App\Http\Controllers\AssetRepairRequestController::class,
+    AssetRepairRequestController::class,
     'complete',
 ])
     ->middleware([
@@ -2168,3 +2096,11 @@ Route::post('/asset-repairs/{assetRepair}/complete', [
         'permission:asset_repairs.manage',
     ])
     ->name('asset-repairs.complete');
+
+Route::post('/asset-repairs/{assetRepair}/cancel', [AssetRepairRequestController::class, 'cancel'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:asset_repairs.manage'])
+    ->name('asset-repairs.cancel');
+
+Route::post('/asset-repairs/{assetRepair}/reopen', [AssetRepairRequestController::class, 'reopen'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:asset_repairs.manage'])
+    ->name('asset-repairs.reopen');
