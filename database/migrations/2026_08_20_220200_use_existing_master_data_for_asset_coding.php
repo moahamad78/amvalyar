@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -22,7 +21,7 @@ return new class extends Migration
         */
 
         if (
-            !Schema::hasColumn(
+            ! Schema::hasColumn(
                 'asset_categories',
                 'coding_code'
             )
@@ -43,10 +42,9 @@ return new class extends Migration
                 }
             );
         }
-
 
         if (
-            !Schema::hasColumn(
+            ! Schema::hasColumn(
                 'asset_types',
                 'coding_code'
             )
@@ -67,7 +65,6 @@ return new class extends Migration
                 }
             );
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -78,31 +75,21 @@ return new class extends Migration
         |
         */
 
-        $indexes =
-            collect(
-                DB::select(
-                    "PRAGMA index_list('assets')"
-                )
-            )
-                ->pluck(
-                    'name'
-                )
-                ->all();
-
-
         if (
-            in_array(
+            Schema::hasIndex(
+                'assets',
                 'assets_company_code_natures_idx',
-                $indexes,
-                true
             )
         ) {
-
-            DB::statement(
-                'DROP INDEX "assets_company_code_natures_idx"'
+            Schema::table(
+                'assets',
+                function (Blueprint $table): void {
+                    $table->dropIndex(
+                        'assets_company_code_natures_idx'
+                    );
+                }
             );
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -130,7 +117,6 @@ return new class extends Migration
                 }
             );
 
-
             Schema::table(
                 'assets',
                 function (Blueprint $table): void {
@@ -141,7 +127,6 @@ return new class extends Migration
                 }
             );
         }
-
 
         if (
             Schema::hasColumn(
@@ -160,7 +145,6 @@ return new class extends Migration
                 }
             );
 
-
             Schema::table(
                 'assets',
                 function (Blueprint $table): void {
@@ -171,7 +155,6 @@ return new class extends Migration
                 }
             );
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -187,7 +170,6 @@ return new class extends Migration
             'asset_code_main_natures'
         );
 
-
         /*
         |--------------------------------------------------------------------------
         | Keep permanent issuance context
@@ -201,7 +183,7 @@ return new class extends Migration
         */
 
         if (
-            !Schema::hasColumn(
+            ! Schema::hasColumn(
                 'assets',
                 'coding_site_id'
             )
@@ -224,7 +206,6 @@ return new class extends Migration
             );
         }
 
-
         foreach ([
             'coding_site_code_snapshot' => 50,
             'main_nature_code_snapshot' => 30,
@@ -232,7 +213,7 @@ return new class extends Migration
         ] as $column => $length) {
 
             if (
-                !Schema::hasColumn(
+                ! Schema::hasColumn(
                     'assets',
                     $column
                 )
@@ -255,7 +236,6 @@ return new class extends Migration
             }
         }
     }
-
 
     public function down(): void
     {
@@ -283,7 +263,6 @@ return new class extends Migration
                 }
             );
         }
-
 
         if (
             Schema::hasColumn(
