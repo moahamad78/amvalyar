@@ -54,7 +54,7 @@ COPY --from=frontend /app/public/build ./public/build
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/start-render.sh /usr/local/bin/start-render
 
-RUN composer dump-autoload --no-dev --classmap-authoritative \
+RUN composer dump-autoload --no-dev --classmap-authoritative --no-scripts \
     && chmod +x /usr/local/bin/start-render \
     && mkdir -p \
         storage/app/private \

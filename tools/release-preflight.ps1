@@ -18,9 +18,11 @@ function Invoke-Gate([string]$Label, [scriptblock]$Command) {
 Invoke-Gate 'Composer validation' { composer validate --no-check-publish }
 Invoke-Gate 'Frontend production build' { npm run build }
 $ChangedPhp = @(
-    & git diff --name-only --diff-filter=ACMR -- '*.php'
-    & git ls-files --others --exclude-standard -- '*.php'
-) | Sort-Object -Unique
+    @(
+        & git diff --name-only --diff-filter=ACMR -- '*.php'
+        & git ls-files --others --exclude-standard -- '*.php'
+    ) | Sort-Object -Unique
+)
 
 if ($ChangedPhp.Count -gt 0) {
     Invoke-Gate 'Changed PHP formatting' { vendor\bin\pint --test @ChangedPhp }
