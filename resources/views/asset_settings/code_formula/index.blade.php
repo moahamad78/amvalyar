@@ -27,7 +27,7 @@
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
-            <a href="{ route('asset-settings.code.index') }"
+            <a href="{{ route('asset-settings.code.index') }}"
                class="btn btn-outline-primary">
                 مرکز تنظیمات کد اموال
             </a>

@@ -55,4 +55,26 @@ final class AssetCodeSettingsConsolidationTest extends TestCase
             )
         );
     }
+
+    public function test_specialized_settings_pages_link_back_to_the_unified_panel(): void
+    {
+        $views = [
+            resource_path('views/asset_settings/code_policy/index.blade.php'),
+            resource_path('views/asset_settings/code_master_data/index.blade.php'),
+            resource_path('views/asset_settings/code_formula/index.blade.php'),
+        ];
+
+        foreach ($views as $view) {
+            $source = file_get_contents($view);
+            self::assertIsString($source);
+            self::assertStringContainsString(
+                "{{ route('asset-settings.code.index') }}",
+                $source
+            );
+            self::assertStringNotContainsString(
+                'href="{ route(',
+                $source
+            );
+        }
+    }
 }

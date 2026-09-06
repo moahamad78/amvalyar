@@ -35,12 +35,14 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyApprovalController;
 use App\Http\Controllers\OperationalAlertController;
 use App\Http\Controllers\OrganizationalAssetController;
+use App\Http\Controllers\PublicSupportTicketController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SpecialistApprovalController;
 use App\Http\Controllers\StocktakeController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TaskCenterController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseRecoveryController;
@@ -62,6 +64,20 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+Route::post('/support/requests', [PublicSupportTicketController::class, 'store'])
+    ->middleware('throttle:4,10')
+    ->name('support-tickets.store');
+
+Route::middleware([
+    EnsureActiveLoginSession::class,
+    EnsureSuperAdmin::class,
+])->group(function (): void {
+    Route::get('/admin/support-requests', [SupportTicketController::class, 'index'])
+        ->name('support-tickets.index');
+    Route::patch('/admin/support-requests/{supportTicket}', [SupportTicketController::class, 'update'])
+        ->name('support-tickets.update');
 });
 
 /*

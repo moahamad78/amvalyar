@@ -7,7 +7,7 @@
     <div style="margin-bottom:16px;padding:12px 16px;border:1px solid #ddd;border-radius:8px;background:#f8f9fa;">
         این صفحه فقط برای سازگاری Legacy نگهداری شده است.
         مسیر صدور دائمی جمعدار اموال از Formula Engine استفاده می‌کند.
-        <a href="{ route('asset-settings.code.index') }" style="margin-right:8px;">
+        <a href="{{ route('asset-settings.code.index') }}" style="margin-right:8px;">
             بازگشت به مرکز تنظیمات کد اموال
         </a>
     </div>

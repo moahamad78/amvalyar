@@ -11,6 +11,7 @@ use App\Models\AssetType;
 use App\Models\Company;
 use App\Models\Site;
 use App\Services\AssetCode\AssetCodeFormulaService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -19,8 +20,16 @@ final class AssetCodeSettingsController extends Controller
     public function index(
         Request $request,
         AssetCodeFormulaService $formulaService
-    ): View {
+    ): View|RedirectResponse {
         $company = $this->resolveCompany($request);
+
+        if ($company === null) {
+            return redirect()
+                ->route('companies.create')
+                ->withErrors([
+                    'company' => 'برای تنظیم کد اموال، ابتدا یک شرکت ایجاد کنید.',
+                ]);
+        }
 
         $companies = $request->user()->isSuperAdmin()
             ? Company::query()->orderBy('name')->get()
@@ -115,11 +124,11 @@ final class AssetCodeSettingsController extends Controller
         ));
     }
 
-    private function resolveCompany(Request $request): Company
+    private function resolveCompany(Request $request): ?Company
     {
         $user = $request->user();
 
-        if (!$user->isSuperAdmin()) {
+        if (! $user->isSuperAdmin()) {
             return Company::query()->findOrFail((int) $user->company_id);
         }
 
@@ -136,6 +145,8 @@ final class AssetCodeSettingsController extends Controller
                 ->value('id');
         }
 
-        return Company::query()->findOrFail($companyId);
+        return $companyId > 0
+            ? Company::query()->findOrFail($companyId)
+            : null;
     }
 }

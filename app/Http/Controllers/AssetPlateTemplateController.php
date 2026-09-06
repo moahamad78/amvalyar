@@ -33,9 +33,13 @@ final class AssetPlateTemplateController extends Controller
         'barcode',
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $company = $this->resolveCompany($request);
+
+        if ($company === null) {
+            return $this->redirectToCompanyCreation();
+        }
 
         $companies = $request->user()->isSuperAdmin()
             ? Company::query()->orderBy('name')->get()
@@ -57,9 +61,13 @@ final class AssetPlateTemplateController extends Controller
         );
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $company = $this->resolveCompany($request);
+
+        if ($company === null) {
+            return $this->redirectToCompanyCreation();
+        }
 
         $template = new AssetPlateTemplate([
             'company_id' => $company->id,
@@ -233,44 +241,40 @@ final class AssetPlateTemplateController extends Controller
             JSON_THROW_ON_ERROR
         );
 
-        if (!is_array($elements) || count($elements) > 50) {
+        if (! is_array($elements) || count($elements) > 50) {
             throw ValidationException::withMessages([
-                'elements_json' =>
-                    'ساختار اجزای پلاک معتبر نیست.',
+                'elements_json' => 'ساختار اجزای پلاک معتبر نیست.',
             ]);
         }
 
         $clean = [];
 
         foreach ($elements as $index => $element) {
-            if (!is_array($element)) {
+            if (! is_array($element)) {
                 throw ValidationException::withMessages([
-                    'elements_json' =>
-                        'یکی از اجزای پلاک معتبر نیست.',
+                    'elements_json' => 'یکی از اجزای پلاک معتبر نیست.',
                 ]);
             }
 
             $type = (string) ($element['type'] ?? '');
             $field = (string) ($element['field'] ?? '');
 
-            if (!in_array($type, self::ALLOWED_TYPES, true)) {
+            if (! in_array($type, self::ALLOWED_TYPES, true)) {
                 throw ValidationException::withMessages([
-                    'elements_json' =>
-                        'نوع یکی از اجزای پلاک پشتیبانی نمی‌شود.',
+                    'elements_json' => 'نوع یکی از اجزای پلاک پشتیبانی نمی‌شود.',
                 ]);
             }
 
             if (
                 $type !== 'text'
-                && !in_array(
+                && ! in_array(
                     $field,
                     self::ALLOWED_FIELDS,
                     true
                 )
             ) {
                 throw ValidationException::withMessages([
-                    'elements_json' =>
-                        'فیلد یکی از اجزای پلاک معتبر نیست.',
+                    'elements_json' => 'فیلد یکی از اجزای پلاک معتبر نیست.',
                 ]);
             }
 
@@ -304,7 +308,7 @@ final class AssetPlateTemplateController extends Controller
             $align = (string) ($element['align'] ?? 'center');
 
             if (
-                !in_array(
+                ! in_array(
                     $align,
                     [
                         'right',
@@ -320,7 +324,7 @@ final class AssetPlateTemplateController extends Controller
             $clean[] = [
                 'id' => (string) (
                     $element['id']
-                    ?? ('element_' . $index)
+                    ?? ('element_'.$index)
                 ),
                 'type' => $type,
                 'field' => $field,
@@ -393,11 +397,11 @@ final class AssetPlateTemplateController extends Controller
         }
     }
 
-    private function resolveCompany(Request $request): Company
+    private function resolveCompany(Request $request): ?Company
     {
         $user = $request->user();
 
-        if (!$user->isSuperAdmin()) {
+        if (! $user->isSuperAdmin()) {
             return Company::query()
                 ->findOrFail(
                     (int) $user->company_id
@@ -417,9 +421,17 @@ final class AssetPlateTemplateController extends Controller
                 ->value('id');
         }
 
-        return Company::query()
-            ->findOrFail(
-                $companyId
-            );
+        return $companyId > 0
+            ? Company::query()->findOrFail($companyId)
+            : null;
+    }
+
+    private function redirectToCompanyCreation(): RedirectResponse
+    {
+        return redirect()
+            ->route('companies.create')
+            ->withErrors([
+                'company' => 'برای طراحی قالب پلاک، ابتدا یک شرکت ایجاد کنید.',
+            ]);
     }
 }

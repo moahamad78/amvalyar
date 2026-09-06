@@ -10,6 +10,14 @@
     <title>ورود به اموال‌یار</title>
 
     <style>
+        @font-face {
+            font-family: "Vazirmatn";
+            src: url("{{ asset('fonts/Vazirmatn-variable.woff2') }}") format("woff2");
+            font-weight: 100 900;
+            font-style: normal;
+            font-display: swap;
+        }
+
         * {
             box-sizing: border-box;
         }
@@ -20,7 +28,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: Tahoma, Arial, sans-serif;
+            font-family: "Vazirmatn", Tahoma, Arial, sans-serif;
+            font-feature-settings: "ss01";
             background:
                 radial-gradient(circle at top right, #1e3a8a, transparent 35%),
                 linear-gradient(135deg, #0f172a, #111827);

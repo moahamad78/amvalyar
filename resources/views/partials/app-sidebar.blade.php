@@ -103,7 +103,7 @@
                     'app-sidebar-link',
                     'active' =>
                         request()->routeIs(
-                            'asset-settings.code-policy.*'
+                            'asset-settings.code*'
                         ),
                 ])
             >
@@ -116,6 +116,21 @@
                 </span>
             </a>
 
+        @endif
+
+        @if($currentUser->isSuperAdmin() && \Illuminate\Support\Facades\Route::has('support-tickets.index'))
+            <a href="{{ route('support-tickets.index') }}" @class(['app-sidebar-link','active' => request()->routeIs('support-tickets.*')])>
+                <span class="app-sidebar-link-icon">✦</span>
+                <span class="app-sidebar-link-text">فروش و پشتیبانی</span>
+                @php
+                    $newSupportTickets = \App\Models\SupportTicket::query()
+                        ->where('status', 'new')
+                        ->count();
+                @endphp
+                @if($newSupportTickets > 0)
+                    <span class="app-sidebar-badge">{{ $newSupportTickets }}</span>
+                @endif
+            </a>
         @endif
 
         @foreach($sidebarGroups as $group)

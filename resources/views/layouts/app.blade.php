@@ -32,11 +32,20 @@
 
     <style>
 
+        @font-face {
+            font-family: "Vazirmatn";
+            src: url("{{ asset('fonts/Vazirmatn-variable.woff2') }}") format("woff2");
+            font-weight: 100 900;
+            font-style: normal;
+            font-display: swap;
+        }
+
         body {
             margin: 0;
             background: #f8fafc;
             color: #0f172a;
-            font-family: Tahoma, Arial, sans-serif;
+            font-family: "Vazirmatn", Tahoma, Arial, sans-serif;
+            font-feature-settings: "ss01";
         }
 
 

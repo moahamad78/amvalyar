@@ -20,7 +20,7 @@
 
         <div class="d-flex gap-2">
             <a
-                href="{ route('asset-settings.code.index') }"
+                href="{{ route('asset-settings.code.index') }}"
                 class="btn btn-outline-primary"
             >
                 مرکز تنظیمات کد اموال
