@@ -18,6 +18,6 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertSee('نرم‌افزار مدیریت اموال و دارایی‌های سازمانی')
             ->assertSee('https://amvalyar.ir/', false)
-            ->assertSee('branding/amvalyar-logo-original-light.svg', false);
+            ->assertSee('branding/amvalyar-logo-original.svg', false);
     }
 }
