@@ -10,10 +10,14 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_root_redirects_to_the_application_entry_point(): void
+    public function test_root_renders_the_public_product_page(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect();
+        $response
+            ->assertOk()
+            ->assertSee('نرم‌افزار مدیریت اموال و دارایی‌های سازمانی')
+            ->assertSee('https://amvalyar.ir/', false)
+            ->assertSee('branding/amvalyar-logo-original-light.svg', false);
     }
 }

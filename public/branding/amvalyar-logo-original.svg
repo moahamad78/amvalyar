@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 128" role="img" aria-labelledby="title desc">
+  <title id="title">اموال‌یار</title>
+  <desc id="desc">لوگوی رسمی پلتفرم مدیریت دارایی اموال‌یار</desc>
+
+  <g transform="translate(398 16)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 13H66C75.39 13 83 20.61 83 30V51" stroke="#7C7DF4" stroke-width="10"/>
+    <path d="M83 67C83 75.84 75.84 83 67 83H45" stroke="#7C7DF4" stroke-width="10"/>
+    <path d="M29 83C20.16 83 13 75.84 13 67V31C13 21.06 21.06 13 31 13" stroke="#F8FAFC" stroke-width="10"/>
+    <path d="M35 31H61C64.31 31 67 33.69 67 37V59C67 63.42 63.42 67 59 67H37C32.58 67 29 63.42 29 59V39" stroke="#F8FAFC" stroke-width="9"/>
+    <circle cx="48" cy="49" r="7" fill="#FF6755" stroke="none"/>
+    <circle cx="79" cy="17" r="4" fill="#FF6755" stroke="none"/>
+  </g>
+
+  <text x="370" y="79" direction="rtl" unicode-bidi="bidi-override"
+        text-anchor="start" fill="#F8FAFC"
+        font-family="Vazirmatn, IRANSansX, Tahoma, sans-serif"
+        font-size="57" font-weight="800" letter-spacing="-1.5">اموال‌یار</text>
+</svg>

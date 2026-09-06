@@ -15,6 +15,9 @@
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#12141a">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('branding/amvalyar-mark-original.svg') }}">
 
     <title>
         @yield('title', 'سامانه مدیریت اموال')
@@ -71,10 +74,15 @@
 
 
         .navbar-brand {
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 20px;
+            display: inline-flex;
+            align-items: center;
             text-decoration: none;
+        }
+
+        .navbar-brand img {
+            display: block;
+            width: 174px;
+            height: auto;
         }
 
 
@@ -414,7 +422,7 @@
                     href="{{ route('dashboard') }}"
                     class="navbar-brand"
                 >
-                    سامانه مدیریت اموال
+                    <img src="{{ asset('branding/amvalyar-logo-original.svg') }}" alt="اموال‌یار">
                 </a>
 <button
     type="button"

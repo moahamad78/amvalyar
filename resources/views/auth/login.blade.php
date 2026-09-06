@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#12141a">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('branding/amvalyar-mark-original.svg') }}">
 
     <title>ورود به اموال‌یار</title>
 
@@ -52,11 +55,12 @@
             align-items: center;
             justify-content: center;
             border-radius: 22px;
-            background: linear-gradient(135deg, #2563eb, #7c3aed);
-            font-size: 32px;
-            font-weight: bold;
-            box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+            background: #ffffff;
+            padding: 12px;
+            box-shadow: 0 12px 30px rgba(91, 92, 240, 0.35);
         }
+
+        .logo img { width: 100%; height: 100%; display: block; }
 
         h1 {
             margin: 0;
@@ -179,7 +183,7 @@
     <div class="login-card">
 
         <div class="logo">
-            آ
+            <img src="{{ asset('branding/amvalyar-mark-original.svg') }}" alt="نشان اموال‌یار">
         </div>
 
         <h1>اموال‌یار</h1>

@@ -1,2 +1,18 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /login
+Disallow: /dashboard
+Disallow: /companies
+Disallow: /users
+Disallow: /employees
+Disallow: /departments
+Disallow: /locations
+Disallow: /sites
+Disallow: /assets
+Disallow: /inventory
+Disallow: /reports
+Disallow: /settings
+Disallow: /workflows
+Disallow: /stocktakes
+
+Sitemap: https://amvalyar.ir/sitemap.xml
