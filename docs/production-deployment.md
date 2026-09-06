@@ -81,3 +81,6 @@ This setup is for demonstration only:
 Before real production use, select paid persistent services, configure object
 storage for uploaded files, enable a queue worker and scheduler, configure an
 HTTPS mail provider, and verify database backups and restoration.
+
+Use [`docs/demo-launch-checklist.md`](demo-launch-checklist.md) as the acceptance
+gate for the temporary public demo and before every public redeployment.

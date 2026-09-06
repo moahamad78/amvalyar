@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Modules\Core\Application\Security\Contracts\AuthenticationServiceInterface;
@@ -17,15 +17,12 @@ final class LoginController extends Controller
 {
     public function __construct(
         private AuthenticationServiceInterface $authenticationService
-    ) {
-    }
-
+    ) {}
 
     public function show(): View
     {
         return view('auth.login');
     }
-
 
     public function login(Request $request): RedirectResponse
     {
@@ -41,7 +38,6 @@ final class LoginController extends Controller
             ],
         ]);
 
-
         try {
 
             $loginSession = $this->authenticationService->authenticate(
@@ -55,29 +51,25 @@ final class LoginController extends Controller
                 ),
             );
 
+            $request->session()->regenerate();
 
             Session::put(
                 'domain_session_id',
                 $loginSession->sessionId()->value()
             );
 
-
             Session::put(
                 'domain_user_id',
                 $loginSession->userId()->value()
             );
 
-
             Auth::loginUsingId(
                 $loginSession->userId()->value()
             );
 
-
             return redirect('/dashboard');
 
-
         } catch (InvalidArgumentException $exception) {
-
 
             return back()
                 ->withInput(

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>ورود به سیستم مدیریت اموال</title>
+    <title>ورود به اموال‌یار</title>
 
     <style>
         * {
@@ -22,6 +22,11 @@
                 radial-gradient(circle at top right, #1e3a8a, transparent 35%),
                 linear-gradient(135deg, #0f172a, #111827);
             color: #ffffff;
+        }
+
+        button,
+        input {
+            font-family: inherit;
         }
 
         .login-wrapper {
@@ -116,17 +121,36 @@
             box-shadow: 0 12px 25px rgba(37, 99, 235, 0.3);
         }
 
-        .forgot-password {
-            display: block;
-            margin-top: 20px;
+        .login-button:focus-visible,
+        input:focus-visible {
+            outline: 3px solid rgba(147, 197, 253, 0.75);
+            outline-offset: 2px;
+        }
+
+        .support-note {
+            margin: 20px 0 0;
             text-align: center;
-            color: #93c5fd;
-            text-decoration: none;
+            color: #cbd5e1;
             font-size: 13px;
         }
 
-        .forgot-password:hover {
-            color: #bfdbfe;
+        .alert {
+            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fecaca;
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #bbf7d0;
         }
 
         .footer {
@@ -134,6 +158,17 @@
             text-align: center;
             color: #64748b;
             font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .login-wrapper {
+                padding: 16px;
+            }
+
+            .login-card {
+                padding: 30px 20px;
+                border-radius: 18px;
+            }
         }
     </style>
 </head>
@@ -144,10 +179,10 @@
     <div class="login-card">
 
         <div class="logo">
-            K
+            آ
         </div>
 
-        <h1>سیستم مدیریت اموال</h1>
+        <h1>اموال‌یار</h1>
 
         <p class="subtitle">
             برای ورود به سامانه، اطلاعات کاربری خود را وارد کنید
@@ -155,16 +190,13 @@
 
         <form method="POST" action="{{ route('login.authenticate') }}">
 @if ($errors->any())
-    <div style="
-        margin-bottom: 20px;
-        padding: 12px;
-        border-radius: 10px;
-        background: rgba(239, 68, 68, 0.15);
-        border: 1px solid rgba(239, 68, 68, 0.4);
-        color: #fecaca;
-        font-size: 13px;
-    ">
+    <div class="alert alert-error" role="alert">
         {{ $errors->first() }}
+    </div>
+@endif
+@if (session('status'))
+    <div class="alert alert-success" role="status">
+        {{ session('status') }}
     </div>
 @endif
             @csrf
@@ -200,12 +232,12 @@
             </button>
         </form>
 
-        <a href="#" class="forgot-password">
-            رمز عبور خود را فراموش کرده‌اید؟
-        </a>
+        <p class="support-note">
+            برای بازیابی دسترسی با مدیر سامانه سازمان خود تماس بگیرید.
+        </p>
 
         <div class="footer">
-            سامانه مدیریت اموال شرکت کیمیا پلی‌استر
+            مدیریت یکپارچه دارایی‌ها و گردش اموال سازمانی
         </div>
 
     </div>

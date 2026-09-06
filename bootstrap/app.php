@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureActiveLoginSession;
 use App\Http\Middleware\EnsureCompanySubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -15,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(at: '*');
+
+        $middleware->append(AddSecurityHeaders::class);
 
         $middleware->appendToGroup(
             'web',

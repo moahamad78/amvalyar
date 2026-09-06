@@ -80,6 +80,7 @@ Route::post('/login', [
     LoginController::class,
     'login',
 ])
+    ->middleware('throttle:5,1')
     ->name('login.authenticate');
 
 Route::post('/logout', [
