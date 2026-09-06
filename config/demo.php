@@ -7,4 +7,7 @@ return [
         'email' => env('DEMO_ADMIN_EMAIL'),
         'password' => env('DEMO_ADMIN_PASSWORD'),
     ],
+    'kimia' => [
+        'password' => env('KIMIA_DEMO_PASSWORD'),
+    ],
 ];

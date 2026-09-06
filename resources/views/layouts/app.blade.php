@@ -4,6 +4,17 @@
 
 <head>
 
+    @php
+        $brandCompany = auth()->user()?->company;
+        $safeBrandColor = static fn (?string $value, string $fallback): string =>
+            preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $value) === 1 ? (string) $value : $fallback;
+        $brandPrimary = $safeBrandColor($brandCompany?->brand_primary_color, '#111827');
+        $brandSecondary = $safeBrandColor($brandCompany?->brand_secondary_color, '#1f2937');
+        $brandAccent = $safeBrandColor($brandCompany?->brand_accent_color, '#2563eb');
+        $brandSurface = $safeBrandColor($brandCompany?->brand_surface_color, '#f8fafc');
+        $brandLogo = $brandCompany?->brand_logo_path;
+    @endphp
+
     <meta
         name="csrf-token"
         content="{{ csrf_token() }}"
@@ -16,8 +27,8 @@
         content="width=device-width, initial-scale=1.0"
     >
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#12141a">
-    <link rel="icon" type="image/svg+xml" href="{{ asset('branding/amvalyar-mark-original.svg') }}">
+    <meta name="theme-color" content="{{ $brandPrimary }}">
+    <link rel="icon" href="{{ asset($brandLogo ?: 'branding/amvalyar-mark-original.svg') }}">
 
     <title>
         @yield('title', 'سامانه مدیریت اموال')
@@ -40,9 +51,16 @@
             font-display: swap;
         }
 
+        :root {
+            --tenant-primary: {{ $brandPrimary }};
+            --tenant-secondary: {{ $brandSecondary }};
+            --tenant-accent: {{ $brandAccent }};
+            --tenant-surface: {{ $brandSurface }};
+        }
+
         body {
             margin: 0;
-            background: #f8fafc;
+            background: var(--tenant-surface);
             color: #0f172a;
             font-family: "Vazirmatn", Tahoma, Arial, sans-serif;
             font-feature-settings: "ss01";
@@ -50,7 +68,7 @@
 
 
         .main-navbar {
-            background: #111827;
+            background: linear-gradient(105deg, var(--tenant-primary), var(--tenant-secondary));
             color: #ffffff;
             box-shadow: 0 2px 12px rgba(0,0,0,.08);
 
@@ -92,6 +110,27 @@
             display: block;
             width: 174px;
             height: auto;
+        }
+
+        .navbar-brand img.tenant-logo {
+            width: 58px;
+            max-height: 48px;
+            object-fit: contain;
+        }
+
+        .tenant-brand-copy {
+            color: #fff;
+            line-height: 1.35;
+        }
+
+        .tenant-brand-copy strong,
+        .tenant-brand-copy small {
+            display: block;
+        }
+
+        .tenant-brand-copy small {
+            color: rgba(255, 255, 255, .72);
+            font-size: 11px;
         }
 
 
@@ -318,7 +357,8 @@
     }
 
     .app-sidebar-link.active {
-        background: #eef2ff;
+        background: color-mix(in srgb, var(--tenant-accent) 13%, white);
+        color: var(--tenant-primary);
         font-weight: 800;
     }
 
@@ -431,7 +471,15 @@
                     href="{{ route('dashboard') }}"
                     class="navbar-brand"
                 >
-                    <img src="{{ asset('branding/amvalyar-logo-original.svg') }}" alt="اموال‌یار">
+                    @if($brandLogo)
+                        <img class="tenant-logo" src="{{ asset($brandLogo) }}" alt="{{ $brandCompany->name }}">
+                        <span class="tenant-brand-copy">
+                            <strong>{{ $brandCompany->name }}</strong>
+                            <small>مدیریت اموال با اموال‌یار</small>
+                        </span>
+                    @else
+                        <img src="{{ asset('branding/amvalyar-logo-original.svg') }}" alt="اموال‌یار">
+                    @endif
                 </a>
 <button
     type="button"

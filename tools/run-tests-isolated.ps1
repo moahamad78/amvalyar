@@ -37,6 +37,13 @@ try {
     Write-Host "Disposable DB : $TestDb"
     Write-Host ""
 
+    # Keep the disposable clone aligned with migrations added on the current
+    # branch without ever touching the developer's working database.
+    & php artisan migrate --force --no-interaction
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to migrate the isolated test database."
+    }
+
     & php artisan test @TestArguments
     $Exit = $LASTEXITCODE
 }

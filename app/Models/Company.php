@@ -24,6 +24,11 @@ final class Company extends Model
         'max_assets',
         'plan',
         'status',
+        'brand_logo_path',
+        'brand_primary_color',
+        'brand_secondary_color',
+        'brand_accent_color',
+        'brand_surface_color',
     ];
 
     protected function casts(): array
@@ -43,6 +48,7 @@ final class Company extends Model
     {
         return $this->hasMany(CompanyStorageProfile::class);
     }
+
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
