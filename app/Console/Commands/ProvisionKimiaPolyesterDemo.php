@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Company;
 use App\Services\Company\KimiaPolyesterDemoProvisioner;
 use Illuminate\Console\Command;
 use RuntimeException;
@@ -18,6 +19,12 @@ final class ProvisionKimiaPolyesterDemo extends Command
     {
         if (app()->isProduction() && ! $this->option('force')) {
             throw new RuntimeException('Use --force to provision demo data in production.');
+        }
+
+        if (Company::query()->where('code', 'KIMIA-DEMO')->exists()) {
+            $this->components->info('Kimia demo company already exists; no data or passwords changed.');
+
+            return self::SUCCESS;
         }
 
         $password = (string) ($this->option('password') ?: config('demo.kimia.password', ''));

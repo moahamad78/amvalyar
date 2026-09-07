@@ -22,6 +22,9 @@ php artisan package:discover --ansi
 php artisan config:clear
 php artisan migrate --force
 php artisan app:bootstrap-demo-admin
+if [ "${KIMIA_DEMO_ENABLED:-false}" = "true" ]; then
+    php artisan demo:provision-kimia --force --no-interaction
+fi
 php artisan storage:link --force || true
 php artisan config:cache
 php artisan route:cache

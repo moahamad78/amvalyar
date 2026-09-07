@@ -32,6 +32,10 @@ final class KimiaPolyesterDemoProvisioner
     public function provision(string $password): array
     {
         return DB::transaction(function () use ($password): array {
+            $existing = Company::query()->where('code', self::COMPANY_CODE)->first();
+            if ($existing) {
+                return $this->summary($existing);
+            }
             app(PermissionRegistryService::class)->sync();
 
             $company = $this->company();
@@ -50,15 +54,20 @@ final class KimiaPolyesterDemoProvisioner
             $this->approvalRoutes($company, $categories, $roles);
             $this->assets($company, $categories, $types, $sites, $locations, $employees, $users);
 
-            return [
-                'company_id' => (int) $company->id,
-                'company_code' => $company->code,
-                'roles' => count($roles),
-                'users' => User::withoutGlobalScopes()->where('company_id', $company->id)->count(),
-                'employees' => Employee::withoutGlobalScopes()->where('company_id', $company->id)->count(),
-                'assets' => DB::table('assets')->where('company_id', $company->id)->count(),
-            ];
+            return $this->summary($company);
         }, 3);
+    }
+
+    private function summary(Company $company): array
+    {
+        return [
+            'company_id' => (int) $company->id,
+            'company_code' => $company->code,
+            'roles' => Role::withoutGlobalScopes()->where('company_id', $company->id)->count(),
+            'users' => User::withoutGlobalScopes()->where('company_id', $company->id)->count(),
+            'employees' => Employee::withoutGlobalScopes()->where('company_id', $company->id)->count(),
+            'assets' => DB::table('assets')->where('company_id', $company->id)->count(),
+        ];
     }
 
     private function company(): Company
@@ -101,7 +110,7 @@ final class KimiaPolyesterDemoProvisioner
 
         $result = [];
         foreach ($definitions as $index => [$code, $name, $codingCode]) {
-            $category = AssetCategory::query()->updateOrCreate(
+            $category = AssetCategory::query()->firstOrCreate(
                 ['code' => $code],
                 ['name' => $name, 'description' => 'ماهیت اصلی اموال مطابق KPQ-FI-WI-001', 'sort_order' => ($index + 1) * 10, 'is_active' => true]
             );
@@ -219,6 +228,9 @@ final class KimiaPolyesterDemoProvisioner
         $result = [];
         foreach ($roles as $roleName => $role) {
             $username = 'kimia.'.str_replace('_', '.', $roleName);
+            if (User::withoutGlobalScopes()->where('username', $username)->exists()) {
+                throw new \RuntimeException('Demo username already exists; no existing account will be reassigned.');
+            }
             $result[$roleName] = User::withoutGlobalScopes()->updateOrCreate(
                 ['username' => $username],
                 [
@@ -401,13 +413,20 @@ final class KimiaPolyesterDemoProvisioner
         $now = now();
         $rows = [];
 
-        for ($i = 1; $i <= 1000; $i++) {
+        $personalCategories = ['FURNITURE', 'TECHNICAL', 'LABORATORY'];
+        for ($i = 1; $i <= 1100; $i++) {
+            $organizational = $i > 1000;
             $employee = $employees[($i - 1) % 50];
-            $categoryCode = $categoryCodes[($i - 1) % count($categoryCodes)];
+            $categoryCode = $organizational
+                ? $categoryCodes[($i - 1001) % count($categoryCodes)]
+                : $personalCategories[($i - 1) % count($personalCategories)];
             $category = $categories[$categoryCode];
             $categoryTypes = $typesByCategory[(int) $category->id]->values();
             $type = $categoryTypes[(int) floor(($i - 1) / count($categoryCodes)) % $categoryTypes->count()];
-            $site = $sites[$siteCodes[($i - 1) % count($siteCodes)]];
+            $site = $organizational
+                ? $sites[$siteCodes[(int) floor(($i - 1001) / count($categoryCodes)) % count($siteCodes)]]
+                : collect($sites)->firstWhere('id', $employee->site_id);
+            $locationId = $organizational ? $locations[$site->code.'-02']->id : $employee->location_id;
             $key = $site->code.'-'.$category->id.'-'.$type->id;
             $serial = ($serials[$key] ?? 0) + 1;
             $serials[$key] = $serial;
@@ -425,9 +444,9 @@ final class KimiaPolyesterDemoProvisioner
                 'manufacturer' => 'تأمین‌کننده نمونه', 'country' => $i % 4 === 0 ? 'آلمان' : 'ایران',
                 'purchase_date' => now()->subDays(30 + ($i % 1800))->toDateString(), 'purchase_price' => 10000000 + (($i % 97) * 2500000),
                 'description' => 'دارایی ساختگی دمو؛ وضعیت: '.$health.'؛ ثبت‌شده مطابق KPQ-FI-LI-003.',
-                'is_active' => true, 'status' => 'assigned', 'custody_type' => 'employee', 'custody_user_id' => $employee->user_id,
-                'custody_employee_id' => $employee->id, 'custody_department_id' => $employee->department_id,
-                'current_site_id' => $employee->site_id, 'current_location_id' => $employee->location_id,
+                'is_active' => true, 'status' => 'assigned', 'custody_type' => $organizational ? 'organization' : 'employee', 'custody_user_id' => $organizational ? null : $employee->user_id,
+                'custody_employee_id' => $organizational ? null : $employee->id, 'custody_department_id' => $employee->department_id,
+                'current_site_id' => $site->id, 'current_location_id' => $locationId,
                 'created_at' => $now, 'updated_at' => $now,
             ];
         }
@@ -445,8 +464,8 @@ final class KimiaPolyesterDemoProvisioner
             }
             $transactions[] = [
                 'company_id' => $company->id, 'asset_id' => $asset->id, 'from_user_id' => null, 'to_user_id' => $asset->custody_user_id,
-                'type' => 'delivery', 'plate_number' => $asset->asset_code, 'description' => 'تحویل اولیه دمو طبق KPQ-FI-FO-005 و ثبت در کاردکس پرسنل.',
-                'created_by' => $users['chief_asset_keeper']->id, 'from_custody_type' => 'warehouse', 'to_custody_type' => 'employee',
+                'type' => 'delivery', 'plate_number' => $asset->asset_code, 'description' => $asset->custody_type === 'organization' ? 'استقرار اولیه اموال سازمانی دمو در سایت و واحد.' : 'تحویل اولیه دمو طبق KPQ-FI-FO-005 و ثبت در کاردکس پرسنل.',
+                'created_by' => $users['chief_asset_keeper']->id, 'from_custody_type' => 'warehouse', 'to_custody_type' => $asset->custody_type,
                 'from_employee_id' => null, 'to_employee_id' => $asset->custody_employee_id, 'from_department_id' => null,
                 'to_department_id' => $asset->custody_department_id, 'from_site_id' => null, 'to_site_id' => $asset->current_site_id,
                 'from_location_id' => null, 'to_location_id' => $asset->current_location_id, 'created_at' => $now, 'updated_at' => $now,
