@@ -130,6 +130,52 @@ final class AssetMovementLifecycleEndToEndTest extends TestCase
         $this->assertNull($transaction->to_user_id);
     }
 
+    public function test_transfer_can_finalize_to_active_employee_without_login_account(): void
+    {
+        [$company, $holder, $holderEmployee] = $this->movementActors();
+
+        $recipient = Employee::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'user_id' => null,
+            'personnel_code' => 'MNL-' . strtoupper(substr(uniqid(), -8)),
+            'display_name' => 'No Login Recipient',
+            'is_active' => true,
+        ]);
+
+        $asset = $this->asset($company, 'assigned', 'E2E-MOVE-NL-001');
+        $asset->forceFill([
+            'custody_type' => 'employee',
+            'custody_user_id' => $holder->id,
+            'custody_employee_id' => $holderEmployee->id,
+        ])->save();
+        $this->delivery($asset, $holder);
+
+        [$request, $instance] = $this->completedMovement(
+            $asset,
+            AssetMovementRequest::TYPE_TRANSFER,
+            $holder,
+            $holderEmployee,
+            null,
+            $recipient
+        );
+
+        app(AssetMovementFinalizer::class)->finalizeCompleted(
+            $instance,
+            $holderEmployee,
+            $holder
+        );
+
+        $asset->refresh();
+        $transaction = AssetTransaction::withoutGlobalScopes()
+            ->where('asset_movement_request_id', $request->id)
+            ->firstOrFail();
+
+        $this->assertSame((int) $recipient->id, (int) $asset->custody_employee_id);
+        $this->assertNull($asset->custody_user_id);
+        $this->assertSame((int) $recipient->id, (int) $transaction->to_employee_id);
+        $this->assertNull($transaction->to_user_id);
+    }
+
     public function test_disposal_finalization_destroys_only_warehouse_asset_and_records_destroy_transaction(): void
     {
         [$company, $requester, $requesterEmployee] =
@@ -329,13 +375,16 @@ final class AssetMovementLifecycleEndToEndTest extends TestCase
         string $type,
         User $requester,
         Employee $requesterEmployee,
-        ?User $target = null
+        ?User $target = null,
+        ?Employee $targetEmployee = null
     ): array {
         $request = AssetMovementRequest::withoutGlobalScopes()->create([
             'company_id' => $asset->company_id,
             'asset_id' => $asset->id,
             'movement_type' => $type,
             'target_user_id' => $target?->id,
+            'target_custody_type' => $targetEmployee !== null ? 'employee' : null,
+            'target_employee_id' => $targetEmployee?->id,
             'requested_by_user_id' => $requester->id,
             'requested_by_employee_id' => $requesterEmployee->id,
             'status' => AssetMovementRequest::STATUS_SUBMITTED,

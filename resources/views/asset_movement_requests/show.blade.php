@@ -92,6 +92,27 @@
                     </div>
                 </div>
 
+                @if($assetMovementRequest->movement_type === 'transfer')
+                    <div class="col-md-6">
+                        <div class="text-muted small">
+                            تحویل‌گیرنده جدید
+                        </div>
+
+                        <div>
+                            {{ $assetMovementRequest->targetEmployee?->display_name
+                                ?? $assetMovementRequest->targetUser?->name
+                                ?? $assetMovementRequest->targetUser?->username
+                                ?? '—' }}
+
+                            @if($assetMovementRequest->targetEmployee?->personnel_code)
+                                <span class="text-muted small">
+                                    ({{ $assetMovementRequest->targetEmployee->personnel_code }})
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
 
                 <div class="col-12">
                     <hr>

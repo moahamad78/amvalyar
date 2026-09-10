@@ -15,6 +15,11 @@ use Illuminate\Validation\ValidationException;
 
 final class AssetMovementFinalizer
 {
+    public function __construct(
+        private readonly AssetCustodyService $custodyService
+    ) {
+    }
+
     public function finalizeCompleted(
         WorkflowInstance $instance,
         ?Employee $actorEmployee = null,
@@ -276,6 +281,8 @@ final class AssetMovementFinalizer
                         $asset
                     );
 
+                $beforeCustody = $this->custodyService->snapshot($asset);
+
 
                 $transactionData = [
 
@@ -292,6 +299,36 @@ final class AssetMovementFinalizer
                         null,
 
                     'to_user_id' =>
+                        null,
+
+                    'from_custody_type' =>
+                        $beforeCustody['custody_type'] ?? null,
+
+                    'to_custody_type' =>
+                        null,
+
+                    'from_employee_id' =>
+                        $beforeCustody['custody_employee_id'] ?? null,
+
+                    'to_employee_id' =>
+                        null,
+
+                    'from_department_id' =>
+                        $beforeCustody['custody_department_id'] ?? null,
+
+                    'to_department_id' =>
+                        null,
+
+                    'from_site_id' =>
+                        $beforeCustody['site_id'] ?? null,
+
+                    'to_site_id' =>
+                        null,
+
+                    'from_location_id' =>
+                        $beforeCustody['location_id'] ?? null,
+
+                    'to_location_id' =>
                         null,
 
                     'type' =>
@@ -349,59 +386,52 @@ final class AssetMovementFinalizer
 
 
                     if (
-                        $movementRequest->target_user_id
-                        ===
-                        null
+                        $movementRequest->target_employee_id === null
+                        && $movementRequest->target_user_id === null
                     ) {
 
                         throw ValidationException::withMessages([
-                            'target_user_id' =>
+                            'target_employee_id' =>
                                 'گیرنده انتقال مشخص نشده است.',
                         ]);
                     }
 
+                    $targetEmployee = Employee::withoutGlobalScopes()
+                        ->with('user')
+                        ->when(
+                            $movementRequest->target_employee_id !== null,
+                            fn ($query) => $query->whereKey($movementRequest->target_employee_id)
+                        )
+                        ->when(
+                            $movementRequest->target_employee_id === null,
+                            fn ($query) => $query->where('user_id', $movementRequest->target_user_id)
+                        )
+                        ->where('company_id', $asset->company_id)
+                        ->where('is_active', true)
+                        ->whereDoesntHave('user', fn ($query) => $query->where('is_super_admin', true))
+                        ->first();
 
-                    $targetUser =
-                        User::withoutGlobalScopes()
-                            ->whereKey(
-                                $movementRequest->target_user_id
-                            )
-                            ->where(
-                                'company_id',
-                                $asset->company_id
-                            )
-                            ->where(
-                                'is_super_admin',
-                                false
-                            )
-                            ->where(
-                                'is_active',
-                                true
-                            )
-                            ->first();
-
-
-                    if (
-                        $targetUser
-                        ===
-                        null
-                    ) {
+                    if ($targetEmployee === null) {
 
                         throw ValidationException::withMessages([
-                            'target_user_id' =>
+                            'target_employee_id' =>
                                 'گیرنده انتقال معتبر یا فعال نیست.',
                         ]);
                     }
 
+                    $targetUserId = $targetEmployee->user_id !== null
+                        ? (int) $targetEmployee->user_id
+                        : null;
 
                     if (
-                        (int) $targetUser->id
-                        ===
-                        (int) $currentHolderId
+                        ($targetUserId !== null
+                            && $targetUserId === (int) $currentHolderId)
+                        || ($beforeCustody['custody_employee_id'] !== null
+                            && (int) $beforeCustody['custody_employee_id'] === (int) $targetEmployee->id)
                     ) {
 
                         throw ValidationException::withMessages([
-                            'target_user_id' =>
+                            'target_employee_id' =>
                                 'دارایی هم‌اکنون در اختیار گیرنده انتخاب‌شده است.',
                         ]);
                     }
@@ -414,7 +444,27 @@ final class AssetMovementFinalizer
                         $currentHolderId;
 
                     $transactionData['to_user_id'] =
-                        $targetUser->id;
+                        $targetUserId;
+
+                    $transactionData['to_custody_type'] =
+                        AssetCustodyService::TYPE_EMPLOYEE;
+
+                    $transactionData['to_employee_id'] =
+                        $targetEmployee->id;
+
+                    $transactionData['to_department_id'] =
+                        $targetEmployee->department_id;
+
+                    $transactionData['to_site_id'] =
+                        $targetEmployee->site_id;
+
+                    $transactionData['to_location_id'] =
+                        $targetEmployee->location_id;
+
+                    $this->custodyService->applyEmployee(
+                        $asset,
+                        $targetEmployee
+                    );
                 }
 
 
@@ -462,11 +512,10 @@ final class AssetMovementFinalizer
                     $transactionData['from_user_id'] =
                         $currentHolderId;
 
+                    $transactionData['to_custody_type'] =
+                        AssetCustodyService::TYPE_WAREHOUSE;
 
-                    $asset->status =
-                        'warehouse';
-
-                    $asset->save();
+                    $this->custodyService->applyWarehouse($asset);
                 }
 
 

@@ -47,7 +47,12 @@ final class AssetMovementRequest extends Model
         'company_id',
         'asset_id',
         'movement_type',
+        'target_custody_type',
         'target_user_id',
+        'target_employee_id',
+        'target_department_id',
+        'target_site_id',
+        'target_location_id',
 
         'requested_by_user_id',
         'requested_by_employee_id',
@@ -91,6 +96,14 @@ final class AssetMovementRequest extends Model
         return $this->belongsTo(
             User::class,
             'target_user_id'
+        );
+    }
+
+    public function targetEmployee(): BelongsTo
+    {
+        return $this->belongsTo(
+            Employee::class,
+            'target_employee_id'
         );
     }
 

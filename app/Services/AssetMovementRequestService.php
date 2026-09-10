@@ -28,7 +28,8 @@ final class AssetMovementRequestService
         ?Employee $requesterEmployee = null,
         ?int $targetUserId = null,
         ?string $reason = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $targetEmployeeId = null
     ): AssetMovementRequest {
 
         $this->validateRequester(
@@ -47,17 +48,22 @@ final class AssetMovementRequestService
         );
 
 
-        $targetUser =
-            $this->resolveTargetUser(
+        $targetEmployee =
+            $this->resolveTargetEmployee(
                 asset:
                     $asset,
 
                 movementType:
                     $movementType,
 
+                targetEmployeeId:
+                    $targetEmployeeId,
+
                 targetUserId:
                     $targetUserId
             );
+
+        $targetUser = $targetEmployee?->user;
 
 
         $this->ensureNoOpenRequest(
@@ -77,8 +83,14 @@ final class AssetMovementRequestService
                 'movement_type' =>
                     $movementType,
 
+                'target_custody_type' =>
+                    $targetEmployee !== null ? 'employee' : null,
+
                 'target_user_id' =>
                     $targetUser?->id,
+
+                'target_employee_id' =>
+                    $targetEmployee?->id,
 
                 'requested_by_user_id' =>
                     $requesterUser->id,
@@ -251,6 +263,9 @@ final class AssetMovementRequestService
                                 'target_user_id' =>
                                     $locked->target_user_id,
 
+                                'target_employee_id' =>
+                                    $locked->target_employee_id,
+
                                 'reason' =>
                                     $locked->reason,
                             ]
@@ -273,6 +288,7 @@ final class AssetMovementRequestService
                 return $locked->fresh([
                     'asset',
                     'targetUser',
+                    'targetEmployee',
                     'requesterUser',
                     'requesterEmployee',
                     'workflowInstance',
@@ -422,11 +438,12 @@ final class AssetMovementRequestService
     }
 
 
-    private function resolveTargetUser(
+    private function resolveTargetEmployee(
         Asset $asset,
         string $movementType,
+        ?int $targetEmployeeId,
         ?int $targetUserId
-    ): ?User {
+    ): ?Employee {
 
         if (
             $movementType
@@ -434,14 +451,10 @@ final class AssetMovementRequestService
             AssetMovementRequest::TYPE_TRANSFER
         ) {
 
-            if (
-                $targetUserId
-                !==
-                null
-            ) {
+            if ($targetEmployeeId !== null || $targetUserId !== null) {
 
                 throw ValidationException::withMessages([
-                    'target_user_id' =>
+                    'target_employee_id' =>
                         'گیرنده فقط برای انتقال دارایی قابل انتخاب است.',
                 ]);
             }
@@ -451,31 +464,23 @@ final class AssetMovementRequestService
         }
 
 
-        if (
-            $targetUserId
-            ===
-            null
-        ) {
+        if ($targetEmployeeId === null && $targetUserId === null) {
 
             throw ValidationException::withMessages([
-                'target_user_id' =>
+                'target_employee_id' =>
                     'انتخاب گیرنده برای انتقال دارایی الزامی است.',
             ]);
         }
 
-
-        $targetUser =
-            User::withoutGlobalScopes()
-                ->whereKey(
-                    $targetUserId
-                )
+        $targetEmployee = Employee::withoutGlobalScopes()
+                ->with('user')
+                ->when($targetEmployeeId !== null, fn ($query) => $query->whereKey($targetEmployeeId))
+                ->when($targetEmployeeId === null, function ($query) use ($targetUserId): void {
+                    $query->where('user_id', $targetUserId);
+                })
                 ->where(
                     'company_id',
                     $asset->company_id
-                )
-                ->where(
-                    'is_super_admin',
-                    false
                 )
                 ->where(
                     'is_active',
@@ -483,44 +488,49 @@ final class AssetMovementRequestService
                 )
                 ->first();
 
-
-        if (
-            $targetUser
-            ===
-            null
-        ) {
+        if ($targetEmployee === null) {
 
             throw ValidationException::withMessages([
-                'target_user_id' =>
+                'target_employee_id' =>
                     'گیرنده معتبر و فعال از شرکت دارایی انتخاب نشده است.',
             ]);
         }
 
+        $currentHolderId = $this->currentHolderId($asset);
+        $currentHolderEmployeeId = $this->currentHolderEmployeeId($asset);
 
-        $currentHolderId =
-            $this->currentHolderId(
-                $asset
-            );
-
-
-        if (
-            $currentHolderId
-            !==
-            null
-            &&
-            (int) $currentHolderId
-            ===
-            (int) $targetUser->id
-        ) {
+        if (($currentHolderId !== null && $targetEmployee->user_id !== null
+                && (int) $currentHolderId === (int) $targetEmployee->user_id)
+            || ($currentHolderEmployeeId !== null
+                && (int) $currentHolderEmployeeId === (int) $targetEmployee->id)) {
 
             throw ValidationException::withMessages([
-                'target_user_id' =>
-                    'دارایی هم‌اکنون در اختیار همین کاربر است.',
+                'target_employee_id' =>
+                    'دارایی هم‌اکنون در اختیار همین پرسنل است.',
             ]);
         }
 
+        return $targetEmployee;
+    }
 
-        return $targetUser;
+    private function currentHolderEmployeeId(Asset $asset): ?int
+    {
+        if ($asset->status !== 'assigned') {
+            return null;
+        }
+
+        $lastAssignment = AssetTransaction::withoutGlobalScopes()
+            ->where('asset_id', $asset->id)
+            ->whereIn('type', ['delivery', 'transfer'])
+            ->whereNotNull('to_employee_id')
+            ->latest('id')
+            ->first();
+
+        return $lastAssignment?->to_employee_id !== null
+            ? (int) $lastAssignment->to_employee_id
+            : ($asset->custody_employee_id !== null
+                ? (int) $asset->custody_employee_id
+                : null);
     }
 
 

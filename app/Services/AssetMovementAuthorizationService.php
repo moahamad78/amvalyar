@@ -293,6 +293,64 @@ final class AssetMovementAuthorizationService
             ->get();
     }
 
+    /**
+     * Every active personnel record in the tenant is a valid custody target.
+     * A login account is optional for holding an asset.
+     */
+    public function eligibleTargetEmployees(
+        User $user
+    ): Collection {
+        if ($user->company_id === null) {
+            return collect();
+        }
+
+        $requesterEmployeeId = Employee::withoutGlobalScopes()
+            ->where('company_id', $user->company_id)
+            ->where('user_id', $user->id)
+            ->value('id');
+
+        return Employee::withoutGlobalScopes()
+            ->where('company_id', $user->company_id)
+            ->where('is_active', true)
+            ->when($requesterEmployeeId !== null, fn ($query) => $query->whereKeyNot($requesterEmployeeId))
+            ->whereDoesntHave('user', fn ($query) => $query->where('is_super_admin', true))
+            ->with('user')
+            ->orderBy('display_name')
+            ->orderBy('personnel_code')
+            ->get();
+    }
+
+    public function ensureTargetEmployeeAllowed(
+        User $requester,
+        ?int $targetEmployeeId,
+        string $movementType
+    ): void {
+        if ($movementType !== AssetMovementRequest::TYPE_TRANSFER) {
+            if ($targetEmployeeId !== null) {
+                throw ValidationException::withMessages([
+                    'target_employee_id' => 'گیرنده فقط برای انتقال دارایی قابل انتخاب است.',
+                ]);
+            }
+
+            return;
+        }
+
+        if ($targetEmployeeId === null) {
+            throw ValidationException::withMessages([
+                'target_employee_id' => 'انتخاب تحویل‌گیرنده برای انتقال دارایی الزامی است.',
+            ]);
+        }
+
+        $allowed = $this->eligibleTargetEmployees($requester)
+            ->contains(fn (Employee $employee): bool => (int) $employee->id === $targetEmployeeId);
+
+        if (!$allowed) {
+            throw ValidationException::withMessages([
+                'target_employee_id' => 'تحویل‌گیرنده باید پرسنل فعال همین شرکت باشد.',
+            ]);
+        }
+    }
+
     public function ensureTargetUserAllowed(
         User $requester,
         ?int $targetUserId,

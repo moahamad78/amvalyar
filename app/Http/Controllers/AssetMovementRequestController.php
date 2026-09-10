@@ -31,6 +31,7 @@ final class AssetMovementRequestController extends Controller
                 ->with([
                     'asset',
                     'targetUser',
+                    'targetEmployee',
                     'requesterUser',
                 ]);
 
@@ -105,9 +106,9 @@ final class AssetMovementRequestController extends Controller
                     $user
                 );
 
-        $users =
+        $employees =
             $authorization
-                ->eligibleTargetUsers(
+                ->eligibleTargetEmployees(
                     $user
                 );
 
@@ -115,7 +116,7 @@ final class AssetMovementRequestController extends Controller
             'asset_movement_requests.create',
             compact(
                 'assets',
-                'users',
+                'employees',
                 'allowedMovementTypes'
             )
         );
@@ -138,6 +139,11 @@ final class AssetMovementRequestController extends Controller
             ],
 
             'target_user_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'target_employee_id' => [
                 'nullable',
                 'integer',
             ],
@@ -236,13 +242,29 @@ final class AssetMovementRequestController extends Controller
 
                 : null;
 
+        $targetEmployeeId =
+            $movementType === 'transfer'
+            &&
+            !empty($validated['target_employee_id'])
+                ? (int) $validated['target_employee_id']
+                : null;
+
+        if ($targetEmployeeId === null && $targetUserId !== null) {
+            $targetEmployeeId = Employee::withoutGlobalScopes()
+                ->where('company_id', $user->company_id)
+                ->where('user_id', $targetUserId)
+                ->where('is_active', true)
+                ->value('id');
+            $targetEmployeeId = $targetEmployeeId !== null ? (int) $targetEmployeeId : null;
+        }
+
         $authorization
-            ->ensureTargetUserAllowed(
+            ->ensureTargetEmployeeAllowed(
                 requester:
                     $user,
 
-                targetUserId:
-                    $targetUserId,
+                targetEmployeeId:
+                    $targetEmployeeId,
 
                 movementType:
                     $movementType
@@ -264,6 +286,9 @@ final class AssetMovementRequestController extends Controller
 
                 targetUserId:
                     $targetUserId,
+
+                targetEmployeeId:
+                    $targetEmployeeId,
 
                 reason:
                     $validated['reason']
@@ -326,6 +351,7 @@ final class AssetMovementRequestController extends Controller
         $assetMovementRequest->load([
             'asset',
             'targetUser',
+            'targetEmployee',
             'workflowInstance',
         ]);
 

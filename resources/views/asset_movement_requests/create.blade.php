@@ -173,7 +173,7 @@
 
                     <div
                         class="mb-3"
-                        id="target-user-wrapper"
+                        id="target-employee-wrapper"
                     >
 
                         <label class="form-label">
@@ -181,8 +181,8 @@
                         </label>
 
                         <select
-                            name="target_user_id"
-                            id="target_user_id"
+                            name="target_employee_id"
+                            id="target_employee_id"
                             class="form-select"
                         >
 
@@ -190,16 +190,20 @@
                                 انتخاب کنید
                             </option>
 
-                            @foreach($users as $user)
+                            @foreach($employees as $employee)
 
                                 <option
-                                    value="{{ $user->id }}"
+                                    value="{{ $employee->id }}"
                                     @selected(
-                                        old('target_user_id')
-                                        == $user->id
+                                        old('target_employee_id')
+                                        == $employee->id
                                     )
                                 >
-                                    {{ $user->name ?? $user->username }}
+                                    {{ $employee->display_name }}
+                                    — {{ $employee->personnel_code }}
+                                    @if($employee->user)
+                                        ({{ $employee->user->username }})
+                                    @endif
                                 </option>
 
                             @endforeach
@@ -207,10 +211,10 @@
                         </select>
 
                         <div class="form-text">
-                            فقط پرسنل فعال همین شرکت قابل انتخاب هستند.
+                            همهٔ پرسنل فعال همین شرکت قابل انتخاب هستند؛ داشتن حساب ورود برای تحویل گرفتن مال الزامی نیست.
                         </div>
 
-                        @error('target_user_id')
+                        @error('target_employee_id')
                             <div class="text-danger small mt-1">
                                 {{ $message }}
                             </div>
@@ -302,12 +306,12 @@ document.addEventListener(
 
         const targetWrapper =
             document.getElementById(
-                'target-user-wrapper'
+                'target-employee-wrapper'
             );
 
         const targetSelect =
             document.getElementById(
-                'target_user_id'
+                'target_employee_id'
             );
 
 
