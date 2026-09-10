@@ -310,6 +310,15 @@ $this->push(
                 'bulk-import.index',
                 'bulk-import.*'
             );
+
+            $this->push(
+                $assets,
+                $user,
+                'راه‌اندازی اولیه و اطلاعات پایه',
+                'initial-setup.index',
+                'initial-setup.*',
+                'assets.create'
+            );
         }
 
         if (!empty($assets)) {

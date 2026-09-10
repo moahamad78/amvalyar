@@ -56,6 +56,20 @@
         </div>
     </div>
 
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h4 class="mb-2">راه‌اندازی اولیه و اطلاعات پایه</h4>
+                    <div class="text-muted">ثبت Excel موجودی قبلی، اتصال هم‌زمان به پرسنل یا واحد سازمانی و صدور خودکار کد دائمی اموال.</div>
+                </div>
+                @if(auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('assets.create'))
+                    <a href="{{ route('initial-setup.index') }}" class="btn btn-primary">شروع راه‌اندازی اولیه</a>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">

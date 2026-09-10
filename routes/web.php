@@ -32,6 +32,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FinalWarehouseDeliveryController;
 use App\Http\Controllers\FinalWarehousePlatePrintController;
 use App\Http\Controllers\InventoryRequestController;
+use App\Http\Controllers\InitialAssetSetupController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyApprovalController;
 use App\Http\Controllers\OperationalAlertController;
@@ -1839,6 +1840,26 @@ Route::middleware('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function (): void {
+    Route::get(
+        '/initial-setup',
+        [InitialAssetSetupController::class, 'index']
+    )->name('initial-setup.index');
+
+    Route::get(
+        '/initial-setup/template',
+        [InitialAssetSetupController::class, 'template']
+    )->name('initial-setup.template');
+
+    Route::post(
+        '/initial-setup/preview',
+        [InitialAssetSetupController::class, 'preview']
+    )->name('initial-setup.preview');
+
+    Route::post(
+        '/initial-setup/commit',
+        [InitialAssetSetupController::class, 'commit']
+    )->name('initial-setup.commit');
+
     Route::get(
         '/bulk-import',
         [BulkImportController::class, 'index']
