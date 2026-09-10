@@ -262,14 +262,19 @@
                                                     @case('date')
 
                                                         <input
-                                                            type="date"
-                                                            name="dynamic_attributes[{{ $definition->id }}]"
-                                                            class="form-control"
+                                                            type="text"
+                                                            name="dynamic_dates_jalali[{{ $definition->id }}]"
+                                                            class="form-control jalali-date-input"
+                                                            data-jdp
+                                                            autocomplete="off"
+                                                            aria-label="{{ $definition->name }} (شمسی)"
+                                                            placeholder="۱۴۰۵/۰۶/۱۶"
                                                             value="{{ old(
-                                                                $oldKey,
-                                                                $savedValue?->value_date?->format('Y-m-d')
+                                                                'dynamic_dates_jalali.'.$definition->id,
+                                                                \App\Support\JalaliDate::input($savedValue?->value_date)
                                                             ) }}"
                                                         >
+                                                        @include('partials.jalali-datepicker')
 
                                                         @break
 

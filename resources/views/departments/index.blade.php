@@ -258,6 +258,8 @@
 
                             <div class="d-flex gap-1 flex-wrap">
 
+                                <a href="{{ route('organizational-assets.index', ['department_id' => $department->id]) }}" class="btn btn-sm btn-outline-success">اموال سازمانی</a>
+
                                 @if(
                                     $user->isSuperAdmin()
                                     ||

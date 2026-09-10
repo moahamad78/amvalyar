@@ -33,7 +33,7 @@ final class AssetRepairRequestController extends Controller
             'priority' => ['nullable', 'in:low,normal,high,critical'],
             'asset_id' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'to' => ['nullable', 'date', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
             'sla' => ['nullable', 'in:overdue,critical,due_soon'],
         ]);
 

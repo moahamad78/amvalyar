@@ -5,6 +5,25 @@
 @section('content')
 
 <div class="container">
+    @if($currentUser->isSuperAdmin() || $currentUser->hasPermission('employees.view'))
+    <div class="alert alert-primary d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div><strong>دنبال اموال یک شخص هستید؟</strong><div>همهٔ پرسنل الزاماً حساب ورود ندارند. فهرست کامل افراد و اموالشان در «پرسنل و اموال تحویلی» است.</div></div>
+        <a href="{{ route('employees.index', request()->only('company_id')) }}" class="btn btn-primary">پرسنل و اموال تحویلی</a>
+    </div>
+    @endif
+    <form method="get" class="row g-2 mb-4 align-items-end">
+        <div class="col-md-3"><label class="form-label" for="user-search">جست‌وجوی نام، نام کاربری یا ایمیل</label><input id="user-search" name="q" value="{{ request('q') }}" class="form-control"></div>
+        @if($currentUser->isSuperAdmin())
+        <div class="col-md-2"><label class="form-label">شرکت</label><select name="company_id" class="form-select"><option value="">همه شرکت‌ها</option>@foreach($companies as $company)<option value="{{ $company->id }}" @selected(request('company_id') == $company->id)>{{ $company->name }}</option>@endforeach</select></div>
+        @endif
+        <div class="col-md-2"><label class="form-label">نقش</label><select name="role_id" class="form-select"><option value="">همه نقش‌ها</option>@foreach($roles as $role)<option value="{{ $role->id }}" @selected(request('role_id') == $role->id)>{{ $role->display_name }}</option>@endforeach</select></div>
+        <div class="col-md-2"><label class="form-label">وضعیت</label><select name="active" class="form-select"><option value="">همه</option><option value="1" @selected(request('active') === '1')>فعال</option><option value="0" @selected(request('active') === '0')>غیرفعال</option></select></div>
+        <div class="col-md-2"><label class="form-label">مرتب‌سازی</label><select name="sort" class="form-select">@foreach(['created_at'=>'زمان ایجاد','name'=>'نام','username'=>'نام کاربری'] as $key=>$label)<option value="{{ $key }}" @selected(request('sort','created_at') === $key)>{{ $label }}</option>@endforeach</select></div>
+        <div class="col-md-2"><label class="form-label">ترتیب</label><select name="direction" class="form-select"><option value="desc" @selected(request('direction','desc')==='desc')>نزولی</option><option value="asc" @selected(request('direction')==='asc')>صعودی</option></select></div>
+        <div class="col-md-2"><label class="form-label">تعداد ردیف</label><select name="per_page" class="form-select">@foreach([15,25,50,100] as $size)<option @selected(request('per_page',15)==$size)>{{ $size }}</option>@endforeach</select></div>
+        <div class="col-auto"><button class="btn btn-primary">اعمال فیلتر</button> <a class="btn btn-outline-secondary" href="{{ route('users.index') }}">پاک‌کردن</a>
+        @if($currentUser->isSuperAdmin() || $currentUser->hasPermission('reports.export'))<a class="btn btn-outline-success" href="{{ route('users.export', request()->query()) }}">خروجی اکسل</a>@endif</div>
+    </form>
 
     <div class="d-flex
                 justify-content-between
@@ -203,6 +222,12 @@
                             <td>
 
                                 <div class="d-flex gap-2">
+
+                                    @if($currentUser->isSuperAdmin() || $currentUser->hasPermission('assets.view'))
+                                        @foreach($user->employeeProfiles->where('company_id', $user->company_id) as $profile)
+                                        <a class="btn btn-outline-success btn-sm" href="{{ route('assets.index', ['employee_id'=>$profile->id,'custody_type'=>'employee']) }}">اموال تحویلی {{ $user->employeeProfiles->count() > 1 ? $profile->display_name : '' }}</a>
+                                        @endforeach
+                                    @endif
 
                                     <a
                                         href="{{ route('users.edit', $user) }}"

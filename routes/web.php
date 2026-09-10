@@ -17,6 +17,7 @@ use App\Http\Controllers\AssetPlateTemplateController;
 use App\Http\Controllers\AssetReferenceController;
 use App\Http\Controllers\AssetRepairReportController;
 use App\Http\Controllers\AssetRepairRequestController;
+use App\Http\Controllers\AssetScannerController;
 use App\Http\Controllers\AssetTransactionController;
 use App\Http\Controllers\AssetTypeSettingsController;
 use App\Http\Controllers\Auth\LoginController;
@@ -144,6 +145,20 @@ Route::get('/users/create', [
         'permission:users.create',
     ])
     ->name('users.create');
+
+Route::get('/users-export', [UserController::class, 'export'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:users.view', 'throttle:10,1'])->name('users.export');
+
+Route::middleware(EnsureActiveLoginSession::class)->group(function () {
+    Route::get('/workspace/preferences', [\App\Http\Controllers\WorkspaceController::class, 'preferences'])->name('workspace.preferences');
+    Route::post('/workspace/preferences', [\App\Http\Controllers\WorkspaceController::class, 'saveTheme'])->name('workspace.theme');
+    Route::get('/workspace/history', [\App\Http\Controllers\WorkspaceController::class, 'history'])->name('workspace.history');
+    Route::middleware('permission:reports.view')->group(function () {
+        Route::get('/workspace/charts', [\App\Http\Controllers\WorkspaceController::class, 'charts'])->name('workspace.charts');
+        Route::post('/workspace/charts', [\App\Http\Controllers\WorkspaceController::class, 'saveChart'])->name('workspace.charts.store');
+        Route::delete('/workspace/charts/{id}', [\App\Http\Controllers\WorkspaceController::class, 'deleteChart'])->name('workspace.charts.destroy');
+    });
+});
 
 Route::post('/users', [
     UserController::class,
@@ -275,6 +290,21 @@ Route::get('/inventory-assets', [
         'permission:assets.view',
     ])
     ->name('assets.index');
+
+Route::get('/asset-scanner', [AssetScannerController::class, 'index'])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:assets.view',
+    ])
+    ->name('asset-scanner.index');
+
+Route::post('/asset-scanner/lookup', [AssetScannerController::class, 'lookup'])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:assets.view',
+        'throttle:30,1',
+    ])
+    ->name('asset-scanner.lookup');
 
 Route::get('/inventory-assets/create', [
     AssetController::class,
@@ -1757,6 +1787,10 @@ Route::middleware([
     'web',
     EnsureActiveLoginSession::class,
 ])->group(function () {
+
+    Route::get('/reports/print', [ReportController::class, 'printReport'])
+        ->middleware('permission:reports.view')
+        ->name('reports.print');
 
     Route::get(
         '/task-center',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Security\Contracts\AuthenticationServiceInterface;
 use Modules\Core\Application\Security\Contracts\LoginSessionStarterInterface;
@@ -34,6 +35,9 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Paginator::defaultView('components.pagination');
+        Paginator::defaultSimpleView('components.pagination');
+
         if ($this->app->environment('production')) {
             if (
                 (string) config('database.default')

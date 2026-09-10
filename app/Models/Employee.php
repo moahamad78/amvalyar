@@ -61,6 +61,11 @@ final class Employee extends Model
         );
     }
 
+    public function heldAssets(): HasMany
+    {
+        return $this->hasMany(Asset::class, 'custody_employee_id')->where('custody_type', 'employee');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(

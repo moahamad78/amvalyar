@@ -521,6 +521,34 @@ final class AssetRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $dates = $this->input('dynamic_dates_jalali', []);
+        if (! is_array($dates)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['dynamic_dates_jalali' => 'تاریخ‌ها معتبر نیستند.']);
+        }
+        if ($dates === [] || ! is_scalar($this->input('asset_type_id'))) {
+            return;
+        }
+        $values = $this->input('dynamic_attributes', []);
+        if (! is_array($values)) {
+            return; // The existing array validation reports the malformed input.
+        }
+        $dateIds = AssetAttributeDefinition::query()
+            ->where('asset_type_id', $this->input('asset_type_id'))
+            ->where('data_type', 'date')->pluck('id')->all();
+        foreach ($dates as $id => $value) {
+            if (! in_array((int) $id, $dateIds, true)) {
+                continue;
+            }
+            try {
+                if (! is_string($value) && $value !== null) {
+                    throw new \InvalidArgumentException;
+                }
+                $values[$id] = JalaliDate::toGregorianDate($value);
+            } catch (\Throwable) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['dynamic_dates_jalali.'.$id => 'تاریخ شمسی معتبر وارد کنید.']);
+            }
+        }
+        $this->merge(['dynamic_attributes' => $values]);
         /*
          * Checkbox/Booleanهای Dynamic اگر ارسال نشده باشند null باقی
          * می‌مانند. این رفتار برای Optional مناسب است.

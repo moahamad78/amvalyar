@@ -72,12 +72,12 @@
 
                 <div class="col-md-2">
                     <label class="form-label">از تاریخ</label>
-                    <input class="form-control" type="date" name="from" value="{{ request('from') }}">
+                    <x-workspace-date name="from" :value="request('from')" />
                 </div>
 
                 <div class="col-md-2">
                     <label class="form-label">تا تاریخ</label>
-                    <input class="form-control" type="date" name="to" value="{{ request('to') }}">
+                    <x-workspace-date name="to" :value="request('to')" />
                 </div>
 
                 <div class="col-md-2">

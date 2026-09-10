@@ -92,7 +92,7 @@ $this->push(
 
         if (!empty($main)) {
             $groups[] = [
-                'label' => 'اصلی',
+                'label' => 'درخواست‌ها و عملیات',
                 'items' => $main,
             ];
         }
@@ -226,6 +226,15 @@ $this->push(
         $this->push(
             $assets,
             $user,
+            'اسکن پلاک با موبایل',
+            'asset-scanner.index',
+            'asset-scanner.*',
+            'assets.view'
+        );
+
+        $this->push(
+            $assets,
+            $user,
             'اموال سازمانی',
             'organizational-assets.index',
             'organizational-assets.*',
@@ -316,7 +325,7 @@ $this->push(
         $this->push(
             $organization,
             $user,
-            'کارکنان',
+            'پرسنل و اموال تحویلی',
             'employees.index',
             'employees.*',
             'employees.view'
@@ -413,6 +422,15 @@ $this->push(
         }
 
 
+        $workspace = [];
+        $this->push($workspace, $user, 'مرکز گزارش‌ها', 'reports.index', 'reports.index', 'reports.view');
+        $this->push($workspace, $user, 'گزارش تعمیر و نگهداری', 'reports.repairs', 'reports.repairs', 'reports.view');
+        $this->push($workspace, $user, 'نمودارهای من', 'workspace.charts', 'workspace.charts*', 'reports.view');
+        if ($user->isSuperAdmin() || $user->hasRole('company_admin')) {
+            $this->push($workspace, $user, 'سابقه ورود و فعالیت', 'workspace.history', 'workspace.history');
+        }
+        $this->push($workspace, $user, 'ظاهر شخصی', 'workspace.preferences', 'workspace.preferences');
+        $groups[] = ['label'=>'گزارش و تنظیمات شخصی', 'items'=>$workspace];
         return $groups;
     }
 

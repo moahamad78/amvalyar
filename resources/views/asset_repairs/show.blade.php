@@ -67,7 +67,7 @@
                     <div class="mb-3"><label class="form-label">نوع تعمیر</label><select class="form-select" name="repair_type" required><option value="internal" @selected(old('repair_type') === 'internal')>داخلی</option><option value="external" @selected(old('repair_type') === 'external')>خارجی</option></select></div>
                     <div class="mb-3"><label class="form-label">تکنسین داخلی</label><select class="form-select" name="assigned_employee_id"><option value="">—</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected((string)old('assigned_employee_id') === (string)$employee->id)>{{ $employee->display_name }} ({{ $employee->personnel_code }})</option>@endforeach</select></div>
                     <div class="mb-3"><label class="form-label">نام تعمیرکار خارجی</label><input class="form-control" name="external_provider_name" value="{{ old('external_provider_name') }}" maxlength="255"></div>
-                    <div class="mb-3"><label class="form-label">موعد بازگشت</label><input class="form-control" type="date" name="expected_return_at" value="{{ old('expected_return_at') }}"></div>
+                    <div class="mb-3"><label class="form-label">موعد بازگشت</label><x-workspace-date name="expected_return_at" :value="old('expected_return_at')" /></div>
                     <div class="mb-3"><label class="form-label">یادداشت دستور کار</label><textarea class="form-control" name="work_order_notes" rows="3">{{ old('work_order_notes') }}</textarea></div>
                     <button class="btn btn-warning w-100">ثبت دستور کار و شروع تعمیر</button>
                 </form>

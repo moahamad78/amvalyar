@@ -36,6 +36,9 @@
                 خروجی Excel از همین فیلتر
             </a>
         @endif
+        @if($currentUser->isSuperAdmin() || $currentUser->hasPermission('reports.view'))
+            <a href="{{ route('reports.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary">چاپ / ذخیره PDF</a>
+        @endif
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
@@ -76,6 +79,8 @@
                             @endforeach
                         </select>
                     </div>
+
+                    @include('reports.partials.custody-filters')
 
                     <div class="col-lg-3 col-md-6">
                         <label class="form-label">دسته‌بندی</label>
@@ -165,6 +170,22 @@
     </div>
 
     <h2 class="h5 mb-3">خلاصه دارایی‌ها</h2>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <strong>نمودار توزیع اموال</strong>
+            <form method="get" action="{{ route('reports.index') }}" class="d-flex gap-2 flex-wrap">
+                @foreach(request()->except(['group','metric','kind','assets_page','transactions_page']) as $key => $value)
+                    @if(is_scalar($value))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
+                @endforeach
+                <select name="group" class="form-select form-select-sm" aria-label="گروه نمودار">@foreach(\App\Services\AssetAnalytics::GROUPS as $value=>$label)<option value="{{ $value }}" @selected(($chart['definition']['group'] ?? '') === $value)>{{ $label }}</option>@endforeach</select>
+                <select name="metric" class="form-select form-select-sm" aria-label="شاخص نمودار"><option value="count" @selected(($chart['definition']['metric'] ?? '') === 'count')>تعداد</option><option value="value" @selected(($chart['definition']['metric'] ?? '') === 'value')>ارزش خرید</option></select>
+                <select name="kind" class="form-select form-select-sm" aria-label="نوع نمودار"><option value="bar" @selected(($chart['definition']['kind'] ?? '') === 'bar')>میله‌ای</option><option value="donut" @selected(($chart['definition']['kind'] ?? '') === 'donut')>حلقه‌ای</option><option value="table" @selected(($chart['definition']['kind'] ?? '') === 'table')>جدول</option></select>
+                <button class="btn btn-sm btn-primary">به‌روزرسانی</button>
+            </form>
+        </div>
+        <div class="card-body">@include('reports.partials.chart', ['chart' => $chart])</div>
+    </div>
 
     <div class="row g-3 mb-4">
         @foreach([

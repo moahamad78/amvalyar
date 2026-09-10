@@ -24,6 +24,13 @@ final class ReportController extends Controller
             403
         );
 
+        $filterService = app(\App\Services\AssetReportFilters::class);
+        $filters = $filterService->validate($request);
+        $request->validate([
+            'group' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(\App\Services\AssetAnalytics::GROUPS))],
+            'metric' => ['nullable', 'in:count,value'],
+            'kind' => ['nullable', 'in:bar,donut,table'],
+        ]);
         $companyId = $user->isSuperAdmin() && $request->filled('company_id')
             ? (int) $request->input('company_id')
             : null;
@@ -36,7 +43,7 @@ final class ReportController extends Controller
             $assetsQuery->where('company_id', $companyId);
         }
 
-        $this->applyAssetFilters($assetsQuery, $request);
+        $filterService->apply($assetsQuery, $filters);
 
         $stats = [
             'total' => (clone $assetsQuery)->count(),
@@ -47,9 +54,9 @@ final class ReportController extends Controller
         ];
 
         $assets = (clone $assetsQuery)
-            ->with('category')
-            ->latest('id')
-            ->paginate(20, ['*'], 'assets_page')
+            ->with(['category', 'custodyEmployee', 'custodyDepartment', 'currentSite'])
+            ->orderBy($filters['sort'] ?? 'id', $filters['direction'] ?? 'desc')->orderBy('id')
+            ->paginate((int) ($filters['per_page'] ?? 20), ['*'], 'assets_page')
             ->withQueryString();
 
         $transactionsQuery = $user->isSuperAdmin()
@@ -60,8 +67,7 @@ final class ReportController extends Controller
             $transactionsQuery->where('company_id', $companyId);
         }
 
-        $this->applyTransactionFilters($transactionsQuery, $request);
-        $this->applyTransactionAssetFilters($transactionsQuery, $request);
+        $filterService->transactions($transactionsQuery, $filters);
 
         $transactionStats = [
             'total' => (clone $transactionsQuery)->count(),
@@ -74,103 +80,47 @@ final class ReportController extends Controller
         $transactions = (clone $transactionsQuery)
             ->with(['asset', 'fromUser', 'toUser', 'creator'])
             ->latest('id')
-            ->paginate(20, ['*'], 'transactions_page')
+            ->paginate((int) ($filters['per_page'] ?? 20), ['*'], 'transactions_page')
             ->withQueryString();
 
-        $categories = AssetCategory::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        $companies = $user->isSuperAdmin()
-            ? Company::query()->orderBy('name')->get()
-            : collect();
+        $chart = app(\App\Services\AssetAnalytics::class)->chart([
+            'title' => 'توزیع اموال',
+            'group' => $request->input('group') ?: 'category',
+            'metric' => $request->input('metric') ?: 'count',
+            'kind' => $request->input('kind') ?: 'bar',
+        ], $filters);
 
         return view('reports.index', [
             'stats' => $stats,
             'transactionStats' => $transactionStats,
             'assets' => $assets,
             'transactions' => $transactions,
-            'categories' => $categories,
-            'companies' => $companies,
+            ...$filterService->options($request),
+            'chart' => $chart,
             'selectedCompanyId' => $companyId,
             'currentUser' => $user,
         ]);
     }
 
-    private function applyAssetFilters(Builder $query, Request $request): void
+    public function printReport(Request $request): View
     {
-        if ($request->filled('status')) {
-            $query->where('status', (string) $request->input('status'));
-        }
+        $user = $request->user();
+        abort_if($user === null, 401);
+        abort_unless($user->isSuperAdmin() || $user->hasPermission('reports.view'), 403);
 
-        if ($request->filled('category_id')) {
-            $query->where(
-                'asset_category_id',
-                (int) $request->input('category_id')
-            );
+        $filterService = app(\App\Services\AssetReportFilters::class);
+        $filters = $filterService->validate($request);
+        $query = $user->isSuperAdmin() ? Asset::withoutGlobalScopes() : Asset::query();
+        if ($user->isSuperAdmin() && $request->filled('company_id')) {
+            $query->where('company_id', $request->integer('company_id'));
         }
+        $filterService->apply($query, $filters);
+        $assets = $query->with(['category', 'custodyEmployee', 'custodyDepartment', 'currentSite', 'currentLocation'])
+            ->orderBy($filters['sort'] ?? 'id', $filters['direction'] ?? 'desc')
+            ->limit(500)
+            ->get();
 
-        if ($request->filled('search')) {
-            $search = trim((string) $request->input('search'));
-
-            $query->where(function (Builder $q) use ($search): void {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('asset_code', 'like', "%{$search}%")
-                    ->orWhere('inventory_code', 'like', "%{$search}%")
-                    ->orWhere('serial_number', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('asset_code', 'like', "%{$search}%");
-            });
-        }
+        return view('reports.print', ['assets' => $assets, 'filters' => $filters, 'generatedAt' => now()]);
     }
 
-    private function applyTransactionFilters(
-        Builder $query,
-        Request $request
-    ): void {
-        if ($request->filled('transaction_type')) {
-            $query->where(
-                'type',
-                (string) $request->input('transaction_type')
-            );
-        }
-
-        if ($request->filled('date_from')) {
-            $date = JalaliDate::toGregorianDate(
-                (string) $request->input('date_from')
-            );
-
-            if ($date !== null) {
-                $query->whereDate('created_at', '>=', $date);
-            }
-        }
-
-        if ($request->filled('date_to')) {
-            $date = JalaliDate::toGregorianDate(
-                (string) $request->input('date_to')
-            );
-
-            if ($date !== null) {
-                $query->whereDate('created_at', '<=', $date);
-            }
-        }
-    }
-
-    private function applyTransactionAssetFilters(
-        Builder $query,
-        Request $request
-    ): void {
-        if (
-            !$request->filled('status')
-            && !$request->filled('category_id')
-            && !$request->filled('search')
-        ) {
-            return;
-        }
-
-        $query->whereHas('asset', function (Builder $assetQuery) use ($request): void {
-            $this->applyAssetFilters($assetQuery, $request);
-        });
-    }
 }

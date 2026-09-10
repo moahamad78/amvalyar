@@ -21,6 +21,14 @@
         </a>
     </div>
 
+    <div class="card shadow-sm mb-3"><div class="card-body"><form method="get" class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label">واحد</label><select name="department_id" class="form-select"><option value="">همه واحدها</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected((string) request('department_id') === (string) $department->id)>{{ $department->name }}</option>@endforeach</select></div>
+        <div class="col-md-3"><label class="form-label">سایت</label><select name="site_id" class="form-select"><option value="">همه سایت‌ها</option>@foreach($sites as $site)<option value="{{ $site->id }}" @selected((string) request('site_id') === (string) $site->id)>{{ $site->name }}</option>@endforeach</select></div>
+        <div class="col-md-2"><label class="form-label">محل</label><select name="location_id" class="form-select"><option value="">همه محل‌ها</option>@foreach($locations as $location)<option value="{{ $location->id }}" @selected((string) request('location_id') === (string) $location->id)>{{ $location->name }}</option>@endforeach</select></div>
+        <div class="col-md-3"><label class="form-label">جست‌وجو</label><input name="q" class="form-control" value="{{ request('q') }}" placeholder="نام یا کد اموال"></div>
+        <div class="col-md-1 d-flex gap-1"><button class="btn btn-primary">فیلتر</button><a href="{{ route('organizational-assets.index') }}" class="btn btn-outline-secondary" aria-label="پاک‌کردن فیلترها">×</a></div>
+    </form></div></div>
+
     <div class="card shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">

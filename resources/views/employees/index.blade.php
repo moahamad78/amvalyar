@@ -369,6 +369,10 @@
 
                             <div class="d-flex gap-1 flex-wrap">
 
+                                @if($currentUser->isSuperAdmin() || $currentUser->hasPermission('assets.view'))
+                                <a href="{{ route('assets.index', ['employee_id' => $employee->id, 'custody_type' => 'employee']) }}" class="btn btn-sm btn-outline-success">اموال تحویلی <span class="badge text-bg-success">{{ number_format($employee->held_assets_count) }}</span></a>
+                                @endif
+
                                 @if(
                                     $currentUser->isSuperAdmin()
                                     ||

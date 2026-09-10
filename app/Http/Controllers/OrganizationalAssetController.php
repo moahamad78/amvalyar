@@ -28,24 +28,47 @@ final class OrganizationalAssetController extends Controller
 
         $this->ensureViewPermission($user);
 
-        $assets =
-            Asset::query()
-                ->where(
-                    'custody_type',
-                    AssetCustodyService::TYPE_ORGANIZATION
-                )
-                ->with([
-                    'custodyDepartment',
-                    'currentSite',
-                    'currentLocation',
-                ])
-                ->orderBy('title')
-                ->paginate(25)
-                ->withQueryString();
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'department_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
+            'location_id' => ['nullable', 'integer'],
+        ]);
+
+        $assets = Asset::query()
+            ->where('custody_type', AssetCustodyService::TYPE_ORGANIZATION)
+            ->with(['custodyDepartment', 'currentSite', 'currentLocation'])
+            ->when($filters['q'] ?? null, function (Builder $query, string $q): void {
+                $query->where(function (Builder $search) use ($q): void {
+                    $search->where('title', 'like', '%'.$q.'%')
+                        ->orWhere('asset_code', 'like', '%'.$q.'%')
+                        ->orWhere('inventory_code', 'like', '%'.$q.'%');
+                });
+            })
+            ->when($filters['department_id'] ?? null, function (Builder $query, $id): void {
+                $id = (int) $id;
+                abort_unless(Department::query()->whereKey($id)->exists(), 404);
+                $query->where('custody_department_id', $id);
+            })
+            ->when($filters['site_id'] ?? null, function (Builder $query, $id): void {
+                $id = (int) $id;
+                abort_unless(Site::query()->whereKey($id)->exists(), 404);
+                $query->where('current_site_id', $id);
+            })
+            ->when($filters['location_id'] ?? null, function (Builder $query, $id): void {
+                $id = (int) $id;
+                abort_unless(Location::query()->whereKey($id)->exists(), 404);
+                $query->where('current_location_id', $id);
+            })
+            ->orderBy('title')->paginate(25)->withQueryString();
+
+        $departments = Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $locations = Location::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         return view(
             'organizational_assets.index',
-            compact('assets')
+            compact('assets', 'departments', 'sites', 'locations')
         );
     }
 

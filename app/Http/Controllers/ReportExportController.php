@@ -39,6 +39,8 @@ final class ReportExportController extends Controller
             403
         );
 
+        $filterService = app(\App\Services\AssetReportFilters::class);
+        $filters = $filterService->validate($request);
         $selectedCompanyId =
             $user->isSuperAdmin()
             && $request->filled(
@@ -63,10 +65,8 @@ final class ReportExportController extends Controller
             );
         }
 
-        $this->applyAssetFilters(
-            $assetsQuery,
-            $request
-        );
+        $filterService->apply($assetsQuery, $filters);
+        abort_if((clone $assetsQuery)->count() > 10000, 422, 'برای خروجی بیش از ۱۰ هزار مال، فیلترها را محدود کنید.');
 
         $assetStats = [
             'total' =>
@@ -109,7 +109,7 @@ final class ReportExportController extends Controller
         $assets =
             $assetsQuery
                 ->with([
-                    'category',
+                    'category', 'custodyEmployee', 'custodyDepartment', 'currentSite', 'currentLocation',
 
                     'transactions' =>
                         function ($query) {
@@ -139,15 +139,8 @@ final class ReportExportController extends Controller
             );
         }
 
-        $this->applyTransactionFilters(
-            $transactionsQuery,
-            $request
-        );
-
-        $this->applyTransactionAssetFilters(
-            $transactionsQuery,
-            $request
-        );
+        $filterService->transactions($transactionsQuery, $filters);
+        abort_if((clone $transactionsQuery)->count() > 20000, 422, 'برای خروجی بیش از ۲۰ هزار گردش، بازهٔ تاریخ را محدود کنید.');
 
         $transactionStats = [
             'total' =>
@@ -657,6 +650,7 @@ final class ReportExportController extends Controller
             'دارنده فعلی',
             'تاریخ خرید',
             'مبلغ خرید',
+            'نوع تحویل', 'واحد سازمانی', 'سایت', 'موقعیت',
         ];
 
         $statusLabels = [
@@ -729,6 +723,12 @@ final class ReportExportController extends Controller
                     '-';
             }
 
+            $currentHolder = match ($asset->custody_type) {
+                'employee' => $asset->custodyEmployee?->display_name ?? $currentHolder,
+                'organization' => $asset->custodyDepartment?->name ?? $currentHolder,
+                default => $currentHolder,
+            };
+
             $sheet->fromArray(
                 [
                     $index + 1,
@@ -782,6 +782,8 @@ final class ReportExportController extends Controller
                     ),
 
                     (float) $asset->purchase_price,
+                    ['employee'=>'پرسنلی','organization'=>'سازمانی','user'=>'کاربری'][$asset->custody_type] ?? '-',
+                    $asset->custodyDepartment?->name ?? '-', $asset->currentSite?->name ?? '-', $asset->currentLocation?->name ?? '-',
                 ],
                 null,
                 "A{$row}"
@@ -811,7 +813,7 @@ final class ReportExportController extends Controller
             sheet:
                 $sheet,
             headerRange:
-                'A1:N1'
+                'A1:R1'
         );
     }
 
@@ -1116,186 +1118,4 @@ final class ReportExportController extends Controller
         }
     }
 
-    private function applyAssetFilters(
-        Builder $query,
-        Request $request
-    ): void {
-        if (
-            $request->filled(
-                'status'
-            )
-        ) {
-            $query->where(
-                'status',
-                (string) $request->input(
-                    'status'
-                )
-            );
-        }
-
-        if (
-            $request->filled(
-                'category_id'
-            )
-        ) {
-            $query->where(
-                'asset_category_id',
-                (int) $request->input(
-                    'category_id'
-                )
-            );
-        }
-
-        if (
-            $request->filled(
-                'search'
-            )
-        ) {
-            $search =
-                trim(
-                    (string) $request->input(
-                        'search'
-                    )
-                );
-
-            $query->where(
-                function (
-                    Builder $subQuery
-                ) use (
-                    $search
-                ): void {
-                    $subQuery
-                        ->where(
-                            'title',
-                            'like',
-                            "%{$search}%"
-                        )
-                        ->orWhere(
-                            'asset_code',
-                            'like',
-                            "%{$search}%"
-                        )
-                        ->orWhere(
-                            'inventory_code',
-                            'like',
-                            "%{$search}%"
-                        )
-                        ->orWhere(
-                            'serial_number',
-                            'like',
-                            "%{$search}%"
-                        )
-                        ->orWhere(
-                            'brand',
-                            'like',
-                            "%{$search}%"
-                        )
-                        ->orWhere(
-                            'asset_code',
-                            'like',
-                            "%{$search}%"
-                        );
-                }
-            );
-        }
-    }
-
-    private function applyTransactionFilters(
-        Builder $query,
-        Request $request
-    ): void {
-        if (
-            $request->filled(
-                'transaction_type'
-            )
-        ) {
-            $query->where(
-                'type',
-                (string) $request->input(
-                    'transaction_type'
-                )
-            );
-        }
-
-        if (
-            $request->filled(
-                'date_from'
-            )
-        ) {
-            $date =
-                JalaliDate::toGregorianDate(
-                    (string) $request->input(
-                        'date_from'
-                    )
-                );
-
-            if (
-                $date !== null
-            ) {
-                $query->whereDate(
-                    'created_at',
-                    '>=',
-                    $date
-                );
-            }
-        }
-
-        if (
-            $request->filled(
-                'date_to'
-            )
-        ) {
-            $date =
-                JalaliDate::toGregorianDate(
-                    (string) $request->input(
-                        'date_to'
-                    )
-                );
-
-            if (
-                $date !== null
-            ) {
-                $query->whereDate(
-                    'created_at',
-                    '<=',
-                    $date
-                );
-            }
-        }
-    }
-
-    private function applyTransactionAssetFilters(
-        Builder $query,
-        Request $request
-    ): void {
-        if (
-            !$request->filled(
-                'status'
-            )
-            &&
-            !$request->filled(
-                'category_id'
-            )
-            &&
-            !$request->filled(
-                'search'
-            )
-        ) {
-            return;
-        }
-
-        $query->whereHas(
-            'asset',
-            function (
-                Builder $assetQuery
-            ) use (
-                $request
-            ): void {
-                $this->applyAssetFilters(
-                    $assetQuery,
-                    $request
-                );
-            }
-        );
-    }
 }

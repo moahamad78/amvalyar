@@ -33,6 +33,7 @@ final class EmployeeController extends Controller
                 ])
                 ->withCount([
                     'subordinates',
+                    'heldAssets',
                 ])
                 ->orderBy('display_name');
 

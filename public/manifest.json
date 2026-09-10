@@ -1,0 +1,15 @@
+{
+  "name": "اموال‌یار | مدیریت اموال",
+  "short_name": "اموال‌یار",
+  "description": "سامانهٔ مدیریت و رهگیری اموال سازمانی",
+  "lang": "fa-IR",
+  "dir": "rtl",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/branding/amvalyar-mark-original.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

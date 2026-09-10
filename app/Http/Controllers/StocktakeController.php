@@ -103,7 +103,7 @@ final class StocktakeController extends Controller
             'notes'=>['nullable','string','max:4000'],
         ]);
         $asset=Asset::withoutGlobalScopes()->where('company_id',$stocktake->company_id)
-            ->where(function($q)use($data){$q->where('asset_code',$data['asset_code'])->orWhere('inventory_code',$data['asset_code']);})
+            ->where(function($q)use($data){$q->where('asset_code',$data['asset_code'])->orWhere('inventory_code',$data['asset_code'])->orWhere('serial_number',$data['asset_code']);})
             ->firstOrFail();
         $item=$service->observe($stocktake,$asset,$request->user(),[
             'damaged'=>(bool)($data['damaged']??false),'notes'=>$data['notes']??null,

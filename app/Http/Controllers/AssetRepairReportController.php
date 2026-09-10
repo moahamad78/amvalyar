@@ -24,7 +24,7 @@ final class AssetRepairReportController extends Controller
             'provider' => ['nullable', 'string', 'max:255'],
             'asset_id' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'to' => ['nullable', 'date', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
         ]);
 
         $query = AssetRepairRequest::withoutGlobalScopes()

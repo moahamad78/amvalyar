@@ -39,6 +39,8 @@
 
 
     <nav class="app-sidebar-nav">
+        <label for="sidebarSearch" class="visually-hidden">جست‌وجوی منو</label>
+        <input id="sidebarSearch" class="form-control mb-3" type="search" placeholder="جست‌وجوی منو…">
 
         <a
             href="{{ route('dashboard') }}"

@@ -65,6 +65,7 @@ final class EnsureActiveLoginSession
 
         $this->sessionRepository->save($session);
 
+        $request->attributes->set('active_login_session_verified', true);
         return $next($request);
     }
 }

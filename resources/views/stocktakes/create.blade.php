@@ -7,7 +7,7 @@
 <form method="POST" action="{{ route('stocktakes.store') }}">@csrf
 <div class="row g-3">
 <div class="col-md-8"><label class="form-label">عنوان</label><input name="title" value="{{ old('title') }}" class="form-control" required></div>
-<div class="col-md-4"><label class="form-label">تاریخ برنامه</label><input type="date" name="planned_date" value="{{ old('planned_date') }}" class="form-control"></div>
+<div class="col-md-4"><label class="form-label">تاریخ برنامه</label><x-workspace-date name="planned_date" :value="old('planned_date')" /></div>
 <div class="col-md-4"><label class="form-label">نوع محدوده</label><select name="scope_type" id="scope_type" class="form-select" required>
 <option value="company">کل شرکت</option><option value="site">سایت</option><option value="department">واحد سازمانی</option><option value="location">محل</option>
 </select></div>

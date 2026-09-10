@@ -28,6 +28,10 @@
     >
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="{{ $brandPrimary }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
     <link rel="icon" href="{{ asset($brandLogo ?: 'branding/amvalyar-mark-original.svg') }}">
 
     <title>
@@ -52,6 +56,9 @@
         }
 
         :root {
+            --company-primary: {{ $brandPrimary }};
+            --company-secondary: {{ $brandSecondary }};
+            --company-accent: {{ $brandAccent }};
             --tenant-primary: {{ $brandPrimary }};
             --tenant-secondary: {{ $brandSecondary }};
             --tenant-accent: {{ $brandAccent }};
@@ -213,12 +220,13 @@
 
 
         .flash-wrapper {
-            max-width: 1250px;
-            margin: 0 auto 18px;
+            margin: 0 calc(var(--app-sidebar-width) + 16px) 18px 16px;
         }
 
 
         @media (max-width: 900px) {
+
+            .flash-wrapper { margin: 0 auto 18px; }
 
             .navbar-inner {
                 align-items: flex-start;
@@ -448,10 +456,20 @@
 
 </style>
 
+@include('partials.workspace-theme')
 </head>
 
 
 <body>
+<script>
+window.addEventListener('pageshow', function (event) {
+    if (event.persisted) window.location.reload();
+});
+window.addEventListener('pagehide', function () { document.documentElement.style.visibility = 'hidden'; });
+window.addEventListener('pageshow', function (event) {
+    if (!event.persisted) document.documentElement.style.visibility = '';
+});
+</script>
 
 
 @if(auth()->check())
@@ -611,6 +629,19 @@
 
 <script id="app-sidebar-script">
 document.addEventListener('DOMContentLoaded', function () {
+    const sidebarSearch = document.getElementById('sidebarSearch');
+    const normalizedMenuText = value => value.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[\s\u200c]+/g, '').toLowerCase();
+    sidebarSearch?.addEventListener('input', function () {
+        const term = normalizedMenuText(this.value.trim());
+        document.querySelectorAll('.app-sidebar-link').forEach(link => { link.hidden = term !== '' && !normalizedMenuText(link.textContent).includes(term); link.style.display = link.hidden ? 'none' : ''; });
+        document.querySelectorAll('[data-sidebar-group]').forEach(group => {
+            if (!group.dataset.originalOpen) group.dataset.originalOpen = group.classList.contains('open') ? 'yes' : 'no';
+            const visible = [...group.querySelectorAll('.app-sidebar-link')].some(link => !link.hidden);
+            group.hidden = !visible;
+            group.classList.toggle('open', term ? visible : group.dataset.originalOpen === 'yes');
+            group.querySelector('[data-sidebar-toggle]')?.setAttribute('aria-expanded', group.classList.contains('open') ? 'true' : 'false');
+        });
+    });
 
     document
         .querySelectorAll('[data-sidebar-toggle]')
@@ -705,6 +736,12 @@ document.addEventListener('DOMContentLoaded', function () {
     );
 
 });
+</script>
+
+<script id="pwa-registration">
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('{{ asset('sw.js') }}').catch(() => {}));
+}
 </script>
 
 </body>

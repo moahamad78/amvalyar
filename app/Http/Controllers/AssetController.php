@@ -9,6 +9,9 @@ use App\Models\Asset;
 use App\Models\AssetAttributeDefinition;
 use App\Models\AssetCategory;
 use App\Models\AssetType;
+use App\Models\Department;
+use App\Models\Employee;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AssetAttributeValueService;
 use App\Services\AssetPhotoService;
@@ -24,21 +27,53 @@ final class AssetController extends Controller
     public function index(
         Request $request
     ): View {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'employee_id' => ['nullable', 'integer'],
+            'custody_type' => ['nullable', 'in:employee,organization,user'],
+            'department_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
+        ]);
 
-        $assets =
-            Asset::query()
-                ->with([
-                    'category',
-                    'assetType',
-                ])
-                ->latest()
-                ->paginate(15);
+        $assets = Asset::query()
+            ->with(['category', 'assetType', 'custodyEmployee', 'custodyDepartment', 'currentSite'])
+            ->when($filters['q'] ?? null, function ($query, string $q): void {
+                $query->where(function ($search) use ($q): void {
+                    $search->where('title', 'like', '%'.$q.'%')
+                        ->orWhere('inventory_code', 'like', '%'.$q.'%')
+                        ->orWhere('asset_code', 'like', '%'.$q.'%')
+                        ->orWhere('serial_number', 'like', '%'.$q.'%');
+                });
+            })
+            ->when($filters['employee_id'] ?? null, function ($query, $employeeId): void {
+                $employeeId = (int) $employeeId;
+                abort_unless(Employee::query()->whereKey($employeeId)->exists(), 404);
+                $query->where('custody_employee_id', $employeeId);
+            })
+            ->when($filters['custody_type'] ?? null, fn ($query, string $type) => $query->where('custody_type', $type))
+            ->when($filters['department_id'] ?? null, function ($query, $departmentId): void {
+                $departmentId = (int) $departmentId;
+                abort_unless(Department::query()->whereKey($departmentId)->exists(), 404);
+                $query->where('custody_department_id', $departmentId);
+            })
+            ->when($filters['site_id'] ?? null, function ($query, $siteId): void {
+                $siteId = (int) $siteId;
+                abort_unless(Site::query()->whereKey($siteId)->exists(), 404);
+                $query->where('current_site_id', $siteId);
+            })
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        $employees = Employee::query()->where('is_active', true)->orderBy('display_name')->get(['id', 'display_name', 'personnel_code']);
+        $departments = Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
 
         return view(
             'assets.index',
             compact(
-                'assets'
+                'assets', 'employees', 'departments', 'sites'
             )
         );
     }

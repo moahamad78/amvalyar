@@ -349,6 +349,7 @@ final class KimiaPolyesterDemoProvisioner
                 ['DIRECT-MANAGER', 'تأیید مدیر مستقیم', 'direct_manager', null],
                 ['ASSET-MANAGER', 'کنترل سرجمع‌دار اموال', 'employee', $assetManager->id],
                 ['WAREHOUSE', 'تحویل فیزیکی انبار', 'employee', $warehouse->id],
+                ['FINAL-WAREHOUSE-DELIVERY', 'تحویل نهایی انبار و ثبت رسید', 'employee', $warehouse->id],
                 ['REQUESTER-RECEIPT', 'تأیید دریافت متقاضی', 'requester', null],
             ]],
             'KIMIA-TRANSFER-01' => ['جابجایی اموال', 'asset_transfer', [
