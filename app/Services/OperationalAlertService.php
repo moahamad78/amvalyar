@@ -607,7 +607,17 @@ final class OperationalAlertService
                 'company_id',
                 $user->company_id
             )
-            ->get(['id', 'title', 'status', 'updated_at']);
+                ->get([
+                    'id',
+                    'title',
+                    'status',
+                    'custody_type',
+                    'custody_user_id',
+                    'custody_employee_id',
+                    'custody_department_id',
+                    'current_site_id',
+                    'updated_at',
+                ]);
 
         $assetIds = $assets
             ->pluck('id');
@@ -620,7 +630,15 @@ final class OperationalAlertService
                     AssetTransaction::withoutGlobalScopes()
                         ->whereIn('asset_id', $assetIdChunk)
                         ->orderByDesc('id')
-                        ->get(['id', 'asset_id', 'type', 'to_user_id'])
+                        ->get([
+                            'id',
+                            'asset_id',
+                            'type',
+                            'to_user_id',
+                            'to_employee_id',
+                            'to_department_id',
+                            'to_site_id',
+                        ])
                 );
         }
 
@@ -636,6 +654,14 @@ final class OperationalAlertService
 
                     $last =
                         $latestTransactions->get($asset->id);
+
+                    $hasDestination = $last !== null
+                        && collect([
+                            $last->to_user_id,
+                            $last->to_employee_id,
+                            $last->to_department_id,
+                            $last->to_site_id,
+                        ])->contains(fn ($value): bool => $value !== null);
 
                     $route =
                         Route::has(
@@ -660,11 +686,7 @@ final class OperationalAlertService
                         ===
                         'assigned'
                         &&
-                        (
-                            $last === null
-                            ||
-                            $last->to_user_id === null
-                        )
+                        ! $hasDestination
                     ) {
                         return $this->alert(
                             key: 'asset-assigned-no-holder-'
@@ -711,7 +733,7 @@ final class OperationalAlertService
                             true
                         )
                         &&
-                        $last->to_user_id !== null
+                        $hasDestination
                     ) {
                         return $this->alert(
                             key: 'asset-warehouse-last-assigned-'
