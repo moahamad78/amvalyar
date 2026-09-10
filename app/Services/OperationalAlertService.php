@@ -22,7 +22,8 @@ final class OperationalAlertService
     ) {}
 
     public function alertsFor(
-        User $user
+        User $user,
+        ?Collection $tasks = null
     ): Collection {
         if ($user->company_id === null) {
             return collect();
@@ -32,7 +33,8 @@ final class OperationalAlertService
 
         $alerts = $alerts->concat(
             $this->personalTaskAlerts(
-                $user
+                $user,
+                $tasks
             )
         );
 
@@ -148,7 +150,8 @@ final class OperationalAlertService
     }
 
     private function personalTaskAlerts(
-        User $user
+        User $user,
+        ?Collection $tasks = null
     ): Collection {
         $now =
             now();
@@ -160,10 +163,7 @@ final class OperationalAlertService
                     self::STALE_TASK_HOURS
                 );
 
-        return $this->taskCenter
-            ->tasksFor(
-                $user
-            )
+        return ($tasks ?? $this->taskCenter->tasksFor($user))
             ->map(
                 function (
                     array $task
@@ -377,7 +377,7 @@ final class OperationalAlertService
     private function movementHealthAlerts(
         User $user
     ): Collection {
-        return AssetMovementRequest::withoutGlobalScopes()
+        $requests = AssetMovementRequest::withoutGlobalScopes()
             ->where(
                 'company_id',
                 $user->company_id
@@ -386,11 +386,24 @@ final class OperationalAlertService
                 'asset',
                 'workflowInstance',
             ])
-            ->get()
+            ->get();
+
+        $completedRequestIds = $requests
+            ->where('status', AssetMovementRequest::STATUS_COMPLETED)
+            ->pluck('id');
+
+        $transactionRequestIds = $completedRequestIds->isEmpty()
+            ? collect()
+            : AssetTransaction::withoutGlobalScopes()
+                ->whereIn('asset_movement_request_id', $completedRequestIds)
+                ->pluck('asset_movement_request_id')
+                ->flip();
+
+        return $requests
             ->flatMap(
                 function (
                     AssetMovementRequest $request
-                ): array {
+                ) use ($transactionRequestIds): array {
 
                     $alerts = [];
 
@@ -482,13 +495,7 @@ final class OperationalAlertService
                                 );
                         }
 
-                        $transactionExists =
-                            AssetTransaction::withoutGlobalScopes()
-                                ->where(
-                                    'asset_movement_request_id',
-                                    $request->id
-                                )
-                                ->exists();
+                        $transactionExists = $transactionRequestIds->has($request->id);
 
                         if (
                             ! $transactionExists
@@ -595,25 +602,40 @@ final class OperationalAlertService
     private function assetHealthAlerts(
         User $user
     ): Collection {
-        return Asset::withoutGlobalScopes()
+        $assets = Asset::withoutGlobalScopes()
             ->where(
                 'company_id',
                 $user->company_id
             )
-            ->get()
+            ->get(['id', 'title', 'status', 'updated_at']);
+
+        $assetIds = $assets
+            ->pluck('id');
+
+        $latestTransactions = collect();
+
+        foreach ($assetIds->chunk(500) as $assetIdChunk) {
+            $latestTransactions = $latestTransactions
+                ->merge(
+                    AssetTransaction::withoutGlobalScopes()
+                        ->whereIn('asset_id', $assetIdChunk)
+                        ->orderByDesc('id')
+                        ->get(['id', 'asset_id', 'type', 'to_user_id'])
+                );
+        }
+
+        $latestTransactions = $latestTransactions
+            ->groupBy('asset_id')
+            ->map(fn (Collection $transactions): ?AssetTransaction => $transactions->first());
+
+        return $assets
             ->map(
                 function (
                     Asset $asset
-                ): ?array {
+                ) use ($latestTransactions): ?array {
 
                     $last =
-                        AssetTransaction::withoutGlobalScopes()
-                            ->where(
-                                'asset_id',
-                                $asset->id
-                            )
-                            ->latest('id')
-                            ->first();
+                        $latestTransactions->get($asset->id);
 
                     $route =
                         Route::has(

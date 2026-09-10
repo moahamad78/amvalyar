@@ -18,6 +18,7 @@ final class RoleDashboardService
     public function forUser(User $user): array
     {
         $tasks = $this->taskCenter->tasksFor($user);
+        $alerts = $this->operationalAlerts->alertsFor($user, $tasks);
 
         return [
             'role_name' => $user->role?->name,
@@ -29,19 +30,14 @@ final class RoleDashboardService
             'task_preview' => $tasks->take(5)->values(),
             'actions' => $this->actionsFor($user),
 
-            'alert_summary' =>
-                $this->operationalAlerts
-                    ->summaryFor(
-                        $user
-                    ),
+            'alert_summary' => [
+                'total' => $alerts->count(),
+                'critical' => $alerts->where('severity', 'critical')->count(),
+                'warning' => $alerts->where('severity', 'warning')->count(),
+                'info' => $alerts->where('severity', 'info')->count(),
+            ],
 
-            'alert_preview' =>
-                $this->operationalAlerts
-                    ->alertsFor(
-                        $user
-                    )
-                    ->take(3)
-                    ->values(),
+            'alert_preview' => $alerts->take(3)->values(),
         ];
     }
 
