@@ -454,6 +454,35 @@
         }
     }
 
+    .select-search-wrap {
+        display: grid;
+        gap: 6px;
+    }
+
+    .select-search-input {
+        width: 100%;
+        min-height: 36px;
+        padding: 7px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        background: #fff;
+        color: #0f172a;
+        font: inherit;
+        font-size: 13px;
+    }
+
+    .select-search-input:focus {
+        border-color: var(--tenant-accent);
+        outline: 2px solid color-mix(in srgb, var(--tenant-accent) 20%, transparent);
+        outline-offset: 1px;
+    }
+
+    .select-search-empty {
+        color: #64748b;
+        font-size: 12px;
+        min-height: 16px;
+    }
+
 </style>
 
 @include('partials.workspace-theme')
@@ -735,6 +764,58 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     );
 
+});
+</script>
+
+<script id="select-search-script">
+document.addEventListener('DOMContentLoaded', function () {
+    const minimumOptions = 12;
+    const normalize = value => String(value ?? '')
+        .replace(/[يى]/g, 'ی')
+        .replace(/ك/g, 'ک')
+        .replace(/[\u200c\s]+/g, '')
+        .toLocaleLowerCase('fa');
+
+    document.querySelectorAll('select').forEach(function (select) {
+        if (
+            select.multiple
+            || select.dataset.search === 'off'
+            || select.options.length < minimumOptions
+            || select.closest('.select-search-wrap')
+        ) {
+            return;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'select-search-wrap';
+        select.parentNode.insertBefore(wrapper, select);
+        wrapper.appendChild(select);
+
+        const input = document.createElement('input');
+        input.type = 'search';
+        input.className = 'select-search-input';
+        input.placeholder = select.dataset.searchPlaceholder || 'جست‌وجو در فهرست…';
+        input.setAttribute('aria-label', input.placeholder);
+        input.autocomplete = 'off';
+        wrapper.insertBefore(input, select);
+
+        const empty = document.createElement('div');
+        empty.className = 'select-search-empty';
+        empty.hidden = true;
+        empty.textContent = 'موردی با این عبارت پیدا نشد.';
+        wrapper.appendChild(empty);
+
+        input.addEventListener('input', function () {
+            const term = normalize(input.value.trim());
+            let visible = 0;
+            Array.from(select.options).forEach(function (option) {
+                const matches = term === '' || normalize(option.textContent).includes(term);
+                option.hidden = !matches;
+                if (matches) visible++;
+            });
+            empty.hidden = visible > 0;
+        });
+    });
 });
 </script>
 
