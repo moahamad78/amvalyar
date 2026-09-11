@@ -32,7 +32,7 @@ final class WorkflowStudioTest extends TestCase
         $html = $response->render();
 
         self::assertStringContainsString('WORKFLOW STUDIO', $html);
-        self::assertStringContainsString('تغییرات این صفحه فقط برای درخواست‌های جدید اعمال می‌شود', $html);
+        self::assertStringContainsString('درخواست‌های در حال اجرا از تغییرات جدید تأثیر نمی‌گیرند', $html);
         self::assertStringContainsString('اجزای فرآیند', $html);
         self::assertStringContainsString('آخرین اجراها', $html);
         self::assertStringContainsString('data-reorder-url=', $html);
