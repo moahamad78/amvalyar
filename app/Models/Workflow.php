@@ -65,8 +65,20 @@ final class Workflow extends Model
         return $this->steps()
             ->where(
                 'is_active',
-                true
-            );
+            true
+        );
+    }
+
+
+    /**
+     * Workflow instances keep their own step snapshot, so historical and
+     * in-flight requests remain stable even when the designer changes.
+     */
+    public function instances(): HasMany
+    {
+        return $this->hasMany(
+            WorkflowInstance::class
+        );
     }
 
 

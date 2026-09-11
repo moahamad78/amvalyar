@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workflow;
+use App\Models\WorkflowInstance;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -226,6 +227,32 @@ final class WorkflowController extends Controller
         ]);
 
 
+        $instanceSummary =
+            WorkflowInstance::withoutGlobalScopes()
+                ->where('workflow_id', $workflow->id)
+                ->selectRaw("count(*) as total")
+                ->selectRaw("sum(case when status = 'pending' then 1 else 0 end) as pending")
+                ->selectRaw("sum(case when status = 'completed' then 1 else 0 end) as completed")
+                ->selectRaw("sum(case when status = 'rejected' then 1 else 0 end) as rejected")
+                ->first();
+
+        $recentInstances =
+            WorkflowInstance::withoutGlobalScopes()
+                ->where('workflow_id', $workflow->id)
+                ->with('currentStep')
+                ->latest('started_at')
+                ->limit(5)
+                ->get([
+                    'id',
+                    'workflow_id',
+                    'status',
+                    'current_step_id',
+                    'started_at',
+                    'completed_at',
+                    'rejected_at',
+                ]);
+
+
         $employees =
             Employee::withoutGlobalScopes()
                 ->where(
@@ -265,7 +292,9 @@ final class WorkflowController extends Controller
             compact(
                 'workflow',
                 'employees',
-                'roles'
+                'roles',
+                'instanceSummary',
+                'recentInstances'
             )
         );
     }
@@ -342,9 +371,9 @@ final class WorkflowController extends Controller
                 }
 
 
-                $workflow->update(
-                    $data
-                );
+                $workflow->update(array_merge($data, [
+                    'version' => ((int) $workflow->version) + 1,
+                ]));
             }
         );
 

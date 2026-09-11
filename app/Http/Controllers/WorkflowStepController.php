@@ -11,6 +11,7 @@ use App\Models\WorkflowStep;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class WorkflowStepController extends Controller
@@ -84,9 +85,12 @@ final class WorkflowStepController extends Controller
         }
 
 
-        $step =
-            WorkflowStep::query()
-                ->create($data);
+        $step = DB::transaction(function () use ($workflow, $data): WorkflowStep {
+            $step = WorkflowStep::query()->create($data);
+            $workflow->increment('version');
+
+            return $step;
+        });
 
 
         $auditLogService->log(
@@ -217,7 +221,10 @@ final class WorkflowStepController extends Controller
         }
 
 
-        $step->update($data);
+        DB::transaction(function () use ($workflow, $step, $data): void {
+            $step->update($data);
+            $workflow->increment('version');
+        });
 
         $step->refresh();
 
@@ -290,7 +297,10 @@ final class WorkflowStepController extends Controller
             $step->name;
 
 
-        $step->delete();
+        DB::transaction(function () use ($workflow, $step): void {
+            $step->delete();
+            $workflow->increment('version');
+        });
 
 
         $auditLogService->log(
@@ -387,7 +397,7 @@ final class WorkflowStepController extends Controller
         }
 
 
-        \Illuminate\Support\Facades\DB::transaction(
+        DB::transaction(
             function () use (
                 $workflow,
                 $stepIds
@@ -407,6 +417,8 @@ final class WorkflowStepController extends Controller
                                 ($index + 1) * 10,
                         ]);
                 }
+
+                $workflow->increment('version');
             }
         );
 
