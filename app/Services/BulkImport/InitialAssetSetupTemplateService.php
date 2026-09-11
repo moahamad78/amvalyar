@@ -123,6 +123,9 @@ final class InitialAssetSetupTemplateService
             $validation->setType(DataValidation::TYPE_LIST);
             $validation->setErrorStyle(DataValidation::STYLE_STOP);
             $validation->setAllowBlank(true);
+            // PhpSpreadsheet serializes this flag inversely to OOXML's
+            // showDropDown attribute. `true` keeps Excel's list arrow visible.
+            $validation->setShowDropDown(true);
             $validation->setShowInputMessage(true);
             $validation->setShowErrorMessage(true);
             $validation->setFormula1($formula);

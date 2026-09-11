@@ -35,6 +35,7 @@ final class InitialAssetSetupTest extends TestCase
         self::assertSame('نوع استقرار *', $spreadsheet->getSheet(0)->getCell('L1')->getValue());
         self::assertSame('کد سایت کدگذاری *', $spreadsheet->getSheet(0)->getCell('Q1')->getValue());
         self::assertSame('=BI_INITIAL_SETUP_EMPLOYEES', $spreadsheet->getSheet(0)->getCell('M2')->getDataValidation()->getFormula1());
+        self::assertTrue($spreadsheet->getSheet(0)->getCell('M2')->getDataValidation()->getShowDropDown());
         self::assertSame('=BI_INITIAL_SETUP_LOCATIONS', $spreadsheet->getSheet(0)->getCell('P2')->getDataValidation()->getFormula1());
         self::assertSame(InitialAssetSetupTemplateService::TEMPLATE_TYPE, $spreadsheet->getSheetByName('_meta')->getCell('B2')->getValue());
         self::assertSame((int) $company->id, (int) $spreadsheet->getSheetByName('_meta')->getCell('B4')->getValue());
