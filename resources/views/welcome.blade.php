@@ -12,6 +12,7 @@
     <meta property="og:type" content="website"><meta property="og:locale" content="fa_IR"><meta property="og:site_name" content="اموال‌یار">
     <meta property="og:title" content="اموال‌یار | نرم‌افزار مدیریت اموال سازمانی"><meta property="og:description" content="مدیریت یکپارچه چرخه عمر دارایی؛ از ثبت و پلاک‌گذاری تا تحویل، انتقال، تعمیرات و انبارگردانی."><meta property="og:url" content="https://amvalyar.ir/">
     <script type="application/ld+json">{"\u0040context":"https://schema.org","\u0040type":"WebSite","name":"اموال‌یار","alternateName":"AmvalYar","url":"https://amvalyar.ir/"}</script>
+    <script type="application/ld+json">{"\u0040context":"https://schema.org","\u0040type":"Organization","name":"اموال‌یار","url":"https://amvalyar.ir/","logo":"https://amvalyar.ir/branding/amvalyar-mark-original.svg"}</script>
     <style>
         @font-face{font-family:"Vazirmatn";src:url("{{ asset('fonts/Vazirmatn-variable.woff2') }}") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
         :root{--night:#090b14;--night-2:#111526;--paper:#f7f8fc;--white:#fff;--ink:#141722;--muted:#667085;--line:#e5e8f0;--violet:#6466f1;--violet-2:#8b7cf6;--coral:#ff654f;--mint:#4ed6aa;--radius:24px}
@@ -31,7 +32,7 @@
 </head>
 <body>
 <a class="skip" href="#main">رفتن به محتوای اصلی</a>
-<header><nav class="shell" aria-label="منوی اصلی"><a class="brand" href="/" aria-label="اموال‌یار، صفحه اصلی"><img src="{{ asset('branding/amvalyar-logo-original.svg') }}" alt="اموال‌یار"></a><div class="nav-links"><a href="#capabilities">راهکار</a><a href="#process">چرخه دارایی</a><a href="#security">امنیت</a><a href="#contact">ارتباط با ما</a><a class="nav-cta" href="{{ route('login') }}">ورود به سامانه <span>←</span></a></div></nav></header>
+<header><nav class="shell" aria-label="منوی اصلی"><a class="brand" href="/" aria-label="اموال‌یار، صفحه اصلی"><img src="{{ asset('branding/amvalyar-logo-original.svg') }}" alt="اموال‌یار"></a><div class="nav-links"><a href="{{ route('public.features') }}">راهکارها</a><a href="{{ route('public.barcode-stocktake') }}">انبارگردانی</a><a href="{{ route('public.guides') }}">راهنما</a><a href="#contact">ارتباط با ما</a><a class="nav-cta" href="{{ route('login') }}">ورود به سامانه <span>←</span></a></div></nav></header>
 <main id="main">
     <section class="hero"><div class="shell hero-grid">
         <div class="hero-copy"><span class="kicker"><i></i> زیرساخت یکپارچه مدیریت دارایی</span><h1>از «داریم یا نداریم؟»<br><span class="accent">تا دید کامل سازمانی.</span></h1><p>اموال‌یار عملیات پراکنده ثبت اموال را به یک سیستم دقیق و قابل اتکا تبدیل می‌کند؛ هر دارایی، مسئول، محل، گردش و رویداد مهم در یک مسیر شفاف.</p><div class="hero-actions"><a class="primary-cta" href="{{ route('login') }}">ورود به پنل اموال‌یار <span>←</span></a><a class="secondary-cta" href="#capabilities">کشف قابلیت‌ها <span>↓</span></a></div><div class="trust-row"><span>ساختار چندسازمانی</span><span>کنترل دسترسی مبتنی بر نقش</span><span>تاریخچه عملیاتی قابل پیگیری</span></div></div>

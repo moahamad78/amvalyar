@@ -68,6 +68,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::view('/features', 'public.features')->name('public.features');
+Route::view('/asset-management', 'public.asset-management')->name('public.asset-management');
+Route::view('/barcode-stocktake', 'public.barcode-stocktake')->name('public.barcode-stocktake');
+Route::view('/personnel-assets', 'public.personnel-assets')->name('public.personnel-assets');
+Route::view('/guides', 'public.guides')->name('public.guides');
+
 Route::post('/support/requests', [PublicSupportTicketController::class, 'store'])
     ->middleware('throttle:4,10')
     ->name('support-tickets.store');

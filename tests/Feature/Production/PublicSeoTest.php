@@ -21,6 +21,23 @@ class PublicSeoTest extends TestCase
             ->assertSee('"name":"اموال‌یار"', false);
     }
 
+    public function test_public_solution_pages_are_indexable_and_describe_the_product(): void
+    {
+        foreach ([
+            '/features' => 'راهکارهای مدیریت دارایی سازمانی',
+            '/asset-management' => 'نرم‌افزار مدیریت اموال سازمانی',
+            '/barcode-stocktake' => 'انبارگردانی بارکدی اموال',
+            '/personnel-assets' => 'مدیریت اموال پرسنلی',
+            '/guides' => 'راهنمای مدیریت اموال سازمانی',
+        ] as $path => $title) {
+            $this->get($path)
+                ->assertOk()
+                ->assertSee($title)
+                ->assertSee('name="robots" content="index, follow, max-image-preview:large"', false)
+                ->assertSee('"@type":"SoftwareApplication"', false);
+        }
+    }
+
     public function test_login_is_not_indexable_and_uses_the_original_brand_mark(): void
     {
         $this->get('/login')
@@ -41,6 +58,8 @@ class PublicSeoTest extends TestCase
 
         $this->assertIsString($sitemap);
         $this->assertStringContainsString('<loc>https://amvalyar.ir/</loc>', $sitemap);
+        $this->assertStringContainsString('<loc>https://amvalyar.ir/asset-management</loc>', $sitemap);
+        $this->assertStringContainsString('<loc>https://amvalyar.ir/barcode-stocktake</loc>', $sitemap);
         $this->assertNotFalse(simplexml_load_string($sitemap));
     }
 }
