@@ -35,6 +35,7 @@ It does not qualify the free Render stack for storage of real customer data.
 ## Monitoring and rollback
 
 - Render health check for `/up` remains green and application warnings/errors are visible on stderr.
+- GitHub Actions workflow `Production uptime check` probes `https://amvalyar.ir/up` every 30 minutes. Turn on GitHub Actions failure notifications for the repository owner; this detects availability failures but is intentionally not used to keep a free Render instance awake.
 - Record the deployed commit SHA and keep the previous successful Render deploy available for rollback.
 - Review failed requests, HTTP 5xx responses, and database errors after each deployment.
 - Run `tools/release-preflight.ps1 -SkipEnvironmentChecks` before push and the readiness commands on a production-capable host.

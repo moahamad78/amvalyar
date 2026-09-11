@@ -44,6 +44,12 @@ services:
         value: sync
       - key: FILESYSTEM_DISK
         value: local
+      # The free demo has no durable object-storage credentials. Keep backups
+      # explicitly disabled rather than writing misleading local copies.
+      - key: BACKUP_ENABLED
+        value: "false"
+      - key: SCHEDULER_ENABLED
+        value: "true"
       - key: PRODUCTION_REQUIRE_HTTPS
         value: "true"
       - key: PRODUCTION_REQUIRE_SECURE_SESSION_COOKIE

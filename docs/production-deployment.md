@@ -42,8 +42,26 @@ Use Supervisor/systemd or the hosting platform process manager. Restart workers 
 `php artisan queue:restart`
 
 ## Database backups
-The application schedules `app:scheduled-database-backup` daily at 02:00 and retention pruning is part of that workflow.
-Production PostgreSQL/MySQL backups must use native database dump tooling before this scheduled workflow can be considered production-complete.
+The application schedules `app:scheduled-database-backup` daily at 02:00 and retention pruning is part of that workflow. PostgreSQL backups are created with `pg_dump` in custom format, checksum-verified, and then uploaded to the configured backup disk. The runtime image includes the PostgreSQL client.
+
+Set the following only after creating a private, off-platform S3-compatible bucket:
+
+```dotenv
+BACKUP_ENABLED=true
+BACKUP_DISK=s3
+BACKUP_PATH=backups/database
+BACKUP_RETENTION_DAYS=30
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_BUCKET=...
+AWS_DEFAULT_REGION=auto
+AWS_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+AWS_USE_PATH_STYLE_ENDPOINT=true
+```
+
+Run `php artisan app:backup-database` once and record the checksum before treating a deployment as backed up. Test restoration into an isolated non-production database using the platform's native `pg_restore` process. Never put database or object-storage credentials in command arguments, source control, screenshots, or logs.
+
+`BACKUP_ENABLED` is deliberately false on the temporary Render demo: its local disk is ephemeral, so a local copy is not a valid backup.
 Keep backup storage credentials and database credentials outside source control.
 Test restore procedures periodically in an isolated non-production environment.
 
@@ -55,6 +73,8 @@ Do not expose `.env`, storage credentials, logs, database files, or backup direc
 ## Company-owned asset storage
 Company BYOS/S3 originals are not part of the platform database backup. Database backups contain their metadata and encrypted credentials only.
 The platform `APP_KEY` must be protected and recoverable.
+
+For platform-managed uploads, use the same durable bucket by setting `FILESYSTEM_DISK=s3`. Confirm one disposable upload/download/delete cycle after changing it; old files on the Render local filesystem cannot be considered durable.
 # Temporary Render Demo
 
 The repository includes `Dockerfile`, `render.yaml`, and the files under

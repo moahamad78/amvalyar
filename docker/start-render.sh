@@ -30,4 +30,16 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Render Web Services have no system cron. This lets scheduled work run while
+# an instance is alive. Durable backups remain opt-in via BACKUP_ENABLED and an
+# off-platform backup disk; a free instance can still sleep between requests.
+if [ "${SCHEDULER_ENABLED:-false}" = "true" ]; then
+    (
+        while true; do
+            php artisan schedule:run --no-interaction || true
+            sleep 60
+        done
+    ) &
+fi
+
 exec apache2-foreground

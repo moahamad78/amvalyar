@@ -1,0 +1,23 @@
+name: Production uptime check
+
+on:
+  schedule:
+    # Monitoring only: this is deliberately not a keep-awake workaround for a
+    # free Render instance. A failed run is visible in GitHub Actions.
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check the public health endpoint
+        run: |
+          curl --fail --silent --show-error --location \
+            --connect-timeout 15 --max-time 60 --retry 1 --retry-all-errors \
+            --write-out '\nHTTP %{http_code} in %{time_total}s\n' \
+            https://amvalyar.ir/up
