@@ -26,6 +26,11 @@ final class AssetRepairRequestController extends Controller
 
         if (! $user->isSuperAdmin()) {
             $query->where('company_id', $user->company_id);
+            if (app(\App\Services\RoleAccessService::class)->scope($user) === 'self') {
+                $query->where('requested_by_user_id', $user->id);
+            } elseif (app(\App\Services\RoleAccessService::class)->scope($user) === 'department') {
+                $query->whereHas('asset');
+            }
         }
 
         $filters = $request->validate([
@@ -49,7 +54,7 @@ final class AssetRepairRequestController extends Controller
             ->when(
                 isset($filters['asset_id']),
                 function ($builder) use ($filters, $user) {
-                    $assetQuery = Asset::withoutGlobalScopes()
+                    $assetQuery = Asset::query()
                         ->whereKey((int) $filters['asset_id']);
 
                     if (! $user->isSuperAdmin()) {
@@ -94,7 +99,7 @@ final class AssetRepairRequestController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $assets = Asset::withoutGlobalScopes()
+        $assets = Asset::query()
             ->when(
                 ! $user->isSuperAdmin(),
                 fn ($builder) => $builder->where('company_id', $user->company_id)
@@ -123,7 +128,7 @@ final class AssetRepairRequestController extends Controller
             AssetRepairRequest::STATUS_IN_REPAIR,
         ];
 
-        $assets = Asset::withoutGlobalScopes()
+        $assets = Asset::query()
             ->where('company_id', $user->company_id)
             ->where('is_active', true)
             ->where('status', '!=', 'destroyed')
@@ -141,21 +146,24 @@ final class AssetRepairRequestController extends Controller
         Request $request,
         AssetRepairRequestService $service
     ): RedirectResponse {
+        $user = $request->user();
+        $maySetFinancialValues = app(\App\Services\RoleAccessService::class)->financial($user)
+            || $user->hasPermission('asset_repairs.manage');
         $validated = $request->validate([
             'asset_id' => ['required', 'integer'],
             'title' => ['required', 'string', 'max:255'],
             'problem_description' => ['required', 'string', 'max:4000'],
             'priority' => ['required', 'in:low,normal,high,critical'],
-            'estimated_cost' => ['nullable', 'numeric', 'min:0'],
+            'estimated_cost' => $maySetFinancialValues
+                ? ['nullable', 'numeric', 'min:0']
+                : ['prohibited'],
         ]);
-
-        $user = $request->user();
 
         if ($user->company_id === null) {
             abort(403);
         }
 
-        $asset = Asset::withoutGlobalScopes()
+        $asset = Asset::query()
             ->where('company_id', $user->company_id)
             ->whereKey((int) $validated['asset_id'])
             ->firstOrFail();
@@ -315,6 +323,11 @@ final class AssetRepairRequestController extends Controller
 
         if (! $request->user()->isSuperAdmin()) {
             $query->where('company_id', $request->user()->company_id);
+            if (app(\App\Services\RoleAccessService::class)->scope($request->user()) === 'self') {
+                $query->where('requested_by_user_id', $request->user()->id);
+            } elseif (app(\App\Services\RoleAccessService::class)->scope($request->user()) === 'department') {
+                $query->whereHas('asset');
+            }
         }
 
         return $query->firstOrFail();

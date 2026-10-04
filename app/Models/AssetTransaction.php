@@ -13,6 +13,15 @@ class AssetTransaction extends Model
 {
     use BelongsToCompany;
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('role-visibility', function (\Illuminate\Database\Eloquent\Builder $query): void {
+            if (($user = auth()->user()) && app(\App\Services\RoleAccessService::class)->scope($user) !== 'company') {
+                $query->whereHas('asset');
+            }
+        });
+    }
+
     protected $fillable = [
                 'company_id',
 'asset_id',

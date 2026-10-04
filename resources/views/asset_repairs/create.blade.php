@@ -56,10 +56,12 @@
                             <option value="critical" @selected(old('priority') === 'critical')>بحرانی</option>
                         </select>
                     </div>
+                    @if(app(\App\Services\RoleAccessService::class)->financial(auth()->user()) || auth()->user()->hasPermission('asset_repairs.manage'))
                     <div class="col-md-6 mb-3">
                         <label class="form-label" for="estimated_cost">هزینه برآوردی</label>
                         <input class="form-control" type="number" min="0" step="0.01" id="estimated_cost" name="estimated_cost" value="{{ old('estimated_cost') }}">
                     </div>
+                    @endif
                 </div>
 
                 <button class="btn btn-primary" type="submit" @disabled($assets->isEmpty())>ثبت پیش‌نویس</button>

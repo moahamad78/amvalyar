@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class AssetRepairWorkOrder extends Model
 {
+    use \App\Models\Concerns\HidesFinancialValues;
     use BelongsToCompany;
 
     public const TYPE_INTERNAL = 'internal';

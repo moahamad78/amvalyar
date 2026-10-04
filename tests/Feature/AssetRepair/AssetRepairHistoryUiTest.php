@@ -22,7 +22,7 @@ final class AssetRepairHistoryUiTest extends TestCase
     public function test_asset_show_contains_repair_history_and_summary_for_same_tenant(): void
     {
         [$company, $user, $asset] = $this->fixture('HISTORY');
-        $this->grant($user, 'assets.view', 'asset_repairs.view');
+        $this->grant($user, 'assets.view', 'assets.view_all', 'assets.financial', 'asset_repairs.view');
 
         AssetRepairRequest::withoutGlobalScopes()->create([
             'company_id' => $company->id,
@@ -67,7 +67,7 @@ final class AssetRepairHistoryUiTest extends TestCase
     public function test_repair_workspace_filters_by_asset_status_and_priority(): void
     {
         [$company, $user, $assetA] = $this->fixture('FILTER');
-        $this->grant($user, 'asset_repairs.view');
+        $this->grant($user, 'assets.view_all', 'asset_repairs.view');
 
         $category = AssetCategory::query()->firstOrCreate(
             ['name' => 'Repair V5 Filter Category B'],

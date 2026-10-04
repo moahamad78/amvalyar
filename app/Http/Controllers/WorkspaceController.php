@@ -91,6 +91,9 @@ final class WorkspaceController extends Controller
         }
         $charts = [];
         foreach ($definitions as $definition) {
+            if ($definition['metric'] === 'value' && !app(\App\Services\RoleAccessService::class)->financial($request->user())) {
+                continue;
+            }
             $savedFilters = $definition['filters'] ?? [];
             if (($definition['status'] ?? 'all') !== 'all') {
                 $savedFilters['status'] = $definition['status'];
@@ -113,6 +116,7 @@ final class WorkspaceController extends Controller
             'status' => ['required', Rule::in(['all', 'warehouse', 'assigned', 'destroyed'])],
         ]);
         $request->validate(['report_filters' => ['nullable', 'array']]);
+        abort_if($definition['metric'] === 'value' && !app(\App\Services\RoleAccessService::class)->financial($request->user()), 403);
         $filterRequest = clone $request;
         $filterRequest->replace($request->input('report_filters', []));
         $definition['filters'] = app(\App\Services\AssetReportFilters::class)->validate($filterRequest);

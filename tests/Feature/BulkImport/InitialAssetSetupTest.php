@@ -45,25 +45,28 @@ final class InitialAssetSetupTest extends TestCase
 
     public function test_initial_setup_commit_issues_code_and_records_existing_employee_custody(): void
     {
-        $company = Company::query()->findOrFail(4);
-        $actor = User::query()->findOrFail(12);
-        $assetBefore = Asset::withoutGlobalScopes()->where('company_id', 4)->count();
+        $company = Company::query()->where('code', 'KIMIA-DEMO')->firstOrFail();
+        $actor = User::query()->where('company_id', $company->id)->where('username', 'kimia.company.admin')->firstOrFail();
+        $employee = \App\Models\Employee::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $type = \App\Models\AssetType::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $site = \App\Models\Site::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $assetBefore = Asset::withoutGlobalScopes()->where('company_id', $company->id)->count();
         $request = Request::create('/initial-setup/commit', 'POST');
         $request->setUserResolver(static fn () => $actor);
 
         $created = app(InitialAssetSetupCommitService::class)->commit($company, [[
             'valid' => true,
             'data' => [
-                'asset_category_id' => 9,
-                'asset_type_id' => 7,
+                'asset_category_id' => $type->asset_category_id,
+                'asset_type_id' => $type->id,
                 'inventory_code' => 'OPENING-SETUP-TEST-'.uniqid(),
                 'title' => 'دارایی افتتاحیه آزمون',
                 'brand' => null, 'model' => null, 'serial_number' => null,
                 'manufacturer' => null, 'country' => null, 'purchase_date' => null,
                 'purchase_price' => 0, 'description' => null,
-                'custody_type' => 'employee', 'employee_id' => 10,
+                'custody_type' => 'employee', 'employee_id' => $employee->id,
                 'department_id' => null, 'site_id' => null, 'location_id' => null,
-                'coding_site_id' => 10,
+                'coding_site_id' => $site->id,
             ],
         ]], $request);
 
@@ -71,8 +74,8 @@ final class InitialAssetSetupTest extends TestCase
         $asset = $created->first();
         self::assertNotEmpty($asset->asset_code);
         self::assertSame('employee', $asset->custody_type);
-        self::assertSame(10, (int) $asset->custody_employee_id);
-        self::assertSame($assetBefore + 1, Asset::withoutGlobalScopes()->where('company_id', 4)->count());
+        self::assertSame((int) $employee->id, (int) $asset->custody_employee_id);
+        self::assertSame($assetBefore + 1, Asset::withoutGlobalScopes()->where('company_id', $company->id)->count());
         self::assertTrue(AssetTransaction::withoutGlobalScopes()->where('asset_id', $asset->id)->where('description', 'like', 'ثبت موجودی اولیه%')->exists());
     }
 }

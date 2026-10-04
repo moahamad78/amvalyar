@@ -10,6 +10,9 @@ final class AssetAnalytics
 
     public function chart(array $definition, array $filters = []): array
     {
+        if ($definition['metric'] === 'value' && auth()->user()) {
+            abort_unless(app(RoleAccessService::class)->financial(auth()->user()), 403);
+        }
         $group = $definition['group'];
         $columns = ['status' => 'status', 'custody' => 'custody_type', 'category' => 'asset_category_id', 'site' => 'current_site_id', 'department' => 'custody_department_id', 'employee' => 'custody_employee_id'];
         $filterKeys = ['status' => 'status', 'custody' => 'custody_type', 'category' => 'category_id', 'site' => 'site_id', 'department' => 'department_id', 'employee' => 'employee_id'];

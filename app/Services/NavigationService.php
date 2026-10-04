@@ -454,6 +454,10 @@ $this->push(
         ?int $badge = null
     ): void {
 
+        if ($routeName === 'organizational-assets.index' && app(RoleAccessService::class)->scope($user) === 'self') {
+            return;
+        }
+
         if (
             !Route::has(
                 $routeName

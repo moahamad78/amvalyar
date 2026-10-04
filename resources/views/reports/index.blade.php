@@ -3,7 +3,7 @@
 @section('title', 'گزارش‌های اموال')
 
 @section('content')
-<div class="container-fluid mb-3"><a class="btn btn-outline-primary" href="{{ route('reports.repairs') }}">گزارش تعمیر و نگهداری</a></div>
+@if($canViewFinancial)<div class="container-fluid mb-3"><a class="btn btn-outline-primary" href="{{ route('reports.repairs') }}">گزارش تعمیر و نگهداری</a></div>@endif
 @php
     $statusLabels = [
         'warehouse' => 'موجود در انبار',
@@ -24,7 +24,7 @@
         <div>
             <h1 class="h3 mb-1">مرکز گزارش‌های اموال</h1>
             <div class="text-muted">
-                گزارش وضعیت دارایی‌ها، ارزش خرید و گردش اموال
+                گزارش وضعیت و گردش اموال{{ $canViewFinancial ? ' و ارزش خرید' : '' }}
             </div>
         </div>
 
@@ -179,7 +179,7 @@
                     @if(is_scalar($value))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
                 @endforeach
                 <select name="group" class="form-select form-select-sm" aria-label="گروه نمودار">@foreach(\App\Services\AssetAnalytics::GROUPS as $value=>$label)<option value="{{ $value }}" @selected(($chart['definition']['group'] ?? '') === $value)>{{ $label }}</option>@endforeach</select>
-                <select name="metric" class="form-select form-select-sm" aria-label="شاخص نمودار"><option value="count" @selected(($chart['definition']['metric'] ?? '') === 'count')>تعداد</option><option value="value" @selected(($chart['definition']['metric'] ?? '') === 'value')>ارزش خرید</option></select>
+                <select name="metric" class="form-select form-select-sm" aria-label="شاخص نمودار"><option value="count" @selected(($chart['definition']['metric'] ?? '') === 'count')>تعداد</option>@if($canViewFinancial)<option value="value" @selected(($chart['definition']['metric'] ?? '') === 'value')>ارزش خرید</option>@endif</select>
                 <select name="kind" class="form-select form-select-sm" aria-label="نوع نمودار"><option value="bar" @selected(($chart['definition']['kind'] ?? '') === 'bar')>میله‌ای</option><option value="donut" @selected(($chart['definition']['kind'] ?? '') === 'donut')>حلقه‌ای</option><option value="table" @selected(($chart['definition']['kind'] ?? '') === 'table')>جدول</option></select>
                 <button class="btn btn-sm btn-primary">به‌روزرسانی</button>
             </form>
@@ -206,7 +206,7 @@
             </div>
         @endforeach
 
-        <div class="col-12">
+        @if($canViewFinancial)<div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <span class="text-muted">ارزش خرید دارایی‌های فیلترشده</span>
@@ -215,7 +215,7 @@
                     </strong>
                 </div>
             </div>
-        </div>
+        </div>@endif
     </div>
 
     <h2 class="h5 mb-3">خلاصه گردش اموال</h2>
@@ -253,7 +253,7 @@
                             <th>دسته‌بندی</th>
                             <th>پلاک</th>
                             <th>وضعیت</th>
-                            <th>ارزش خرید</th>
+                            @if($canViewFinancial)<th>ارزش خرید</th>@endif
                             <th>جزئیات</th>
                         </tr>
                     </thead>
@@ -265,7 +265,7 @@
                                 <td>{{ $asset->category?->name ?? '-' }}</td>
                                 <td>{{ $asset->asset_code ?? '-' }}</td>
                                 <td>{{ $statusLabels[$asset->status] ?? $asset->status }}</td>
-                                <td>{{ number_format((float) $asset->purchase_price) }}</td>
+                                @if($canViewFinancial)<td>{{ number_format((float) $asset->purchase_price) }}</td>@endif
                                 <td>
                                     <a
                                         href="{{ route('assets.show', $asset) }}"

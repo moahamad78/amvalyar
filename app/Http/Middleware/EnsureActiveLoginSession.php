@@ -48,11 +48,16 @@ final class EnsureActiveLoginSession
         if (
             $session === null
             || !$session->isActive()
+            || !$request->user()?->isActive()
+            || $session->userId()->value() !== (int) $request->user()?->id
         ) {
+            \Illuminate\Support\Facades\Auth::logout();
             $request->session()->forget([
                 'domain_session_id',
                 'domain_user_id',
             ]);
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             return redirect()
                 ->route('login')

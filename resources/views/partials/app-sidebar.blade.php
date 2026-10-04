@@ -4,7 +4,7 @@
     )->forUser($currentUser);
 
     $operationalAlertCount =
-        \Illuminate\Support\Facades\Route::has(
+        app(\App\Services\RoleAccessService::class)->scope($currentUser) !== 'self' && \Illuminate\Support\Facades\Route::has(
             'operational-alerts.index'
         )
             ? app(
@@ -58,6 +58,7 @@
 
 
         @if(
+            app(\App\Services\RoleAccessService::class)->scope($currentUser) !== 'self' &&
             \Illuminate\Support\Facades\Route::has(
                 'operational-alerts.index'
             )

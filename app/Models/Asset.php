@@ -21,6 +21,11 @@ class Asset extends Model
      */
     protected static function booted(): void
     {
+        static::addGlobalScope('role-visibility', function (\Illuminate\Database\Eloquent\Builder $query): void {
+            if ($user = auth()->user()) {
+                app(\App\Services\RoleAccessService::class)->constrainAssets($query, $user);
+            }
+        });
         /*
          * Permanent Asset Code lifecycle:
          *
@@ -92,6 +97,12 @@ class Asset extends Model
 
     use BelongsToCompany, EnforcesCompanyAssetLimit;
     use HasFactory;
+
+    public function getPurchasePriceAttribute($value)
+    {
+        $user = auth()->user();
+        return $user && !app(\App\Services\RoleAccessService::class)->financial($user) ? null : $value;
+    }
 
     protected $fillable = [
                 'company_id',

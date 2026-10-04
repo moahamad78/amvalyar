@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 final class AssetRepairRequest extends Model
 {
     use BelongsToCompany;
+    use \App\Models\Concerns\HidesFinancialValues;
 
     public const STATUS_DRAFT = 'draft';
 

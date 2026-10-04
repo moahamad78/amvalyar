@@ -28,7 +28,7 @@ final class AssetRepairProductionEndToEndTest extends TestCase
     public function test_external_repair_runs_through_real_http_lifecycle_with_audit_and_reporting(): void
     {
         [$company, $user, $employee, $asset] = $this->fixture('EXTERNAL');
-        $this->grant($user, 'asset_repairs.view', 'asset_repairs.create', 'approvals.view', 'approvals.act', 'reports.view');
+        $this->grant($user, 'assets.view_all', 'assets.financial', 'asset_repairs.view', 'asset_repairs.create', 'approvals.view', 'approvals.act', 'reports.view');
         $this->loginAs($user);
 
         $this->post(route('asset-repairs.store'), [
@@ -81,7 +81,7 @@ final class AssetRepairProductionEndToEndTest extends TestCase
     public function test_invalid_http_completion_preserves_in_progress_work_order_and_costs(): void
     {
         [$company, $user, $employee, $asset] = $this->fixture('ROLLBACK');
-        $this->grant($user, 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage');
+        $this->grant($user, 'assets.view_all', 'assets.financial', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage');
         $this->loginAs($user);
 
         $repair = $this->approvedRepairViaHttp($company, $user, $employee, $asset);

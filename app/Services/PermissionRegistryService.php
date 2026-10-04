@@ -34,6 +34,8 @@ final class PermissionRegistryService
 
         'assets' => [
             'view',
+            'view_all',
+            'financial',
             'create',
             'edit',
             'delete',

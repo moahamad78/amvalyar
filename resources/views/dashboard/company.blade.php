@@ -488,15 +488,13 @@
         <div class="dash-card">
 
             <div class="label">
-                ارزش خرید اموال
+                {{ app(\App\Services\RoleAccessService::class)->financial(auth()->user()) ? 'ارزش خرید اموال' : 'اطلاعات مالی' }}
             </div>
 
             <div class="value"
                  style="font-size:22px;">
 
-                {{ number_format(
-                    $stats['purchase_value']
-                ) }}
+                {{ app(\App\Services\RoleAccessService::class)->financial(auth()->user()) ? number_format($stats['purchase_value'] ?? 0) : 'دسترسی ندارید' }}
 
             </div>
 

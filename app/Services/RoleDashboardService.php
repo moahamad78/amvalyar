@@ -18,7 +18,7 @@ final class RoleDashboardService
     public function forUser(User $user): array
     {
         $tasks = $this->taskCenter->tasksFor($user);
-        $alerts = $this->operationalAlerts->alertsFor($user, $tasks);
+        $alerts = app(RoleAccessService::class)->scope($user) === 'self' ? collect() : $this->operationalAlerts->alertsFor($user, $tasks);
 
         return [
             'role_name' => $user->role?->name,
@@ -85,7 +85,7 @@ final class RoleDashboardService
 
         $this->push(
             $actions,
-            $this->can($user, 'assets.view') && Route::has('organizational-assets.index'),
+            $this->can($user, 'assets.view') && app(RoleAccessService::class)->scope($user) !== 'self' && Route::has('organizational-assets.index'),
             'اموال سازمانی',
             'organizational-assets.index',
             'اموال مستقر در واحدها و محل‌های سازمانی'

@@ -13,6 +13,9 @@ final class AssetReportFilters
 {
     public function validate(Request $request): array
     {
+        if (($user = $request->user()) && !app(RoleAccessService::class)->financial($user)) {
+            abort_if($request->filled('min_value') || $request->filled('max_value') || $request->input('sort') === 'purchase_price' || $request->input('metric') === 'value', 403);
+        }
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(['warehouse', 'assigned', 'destroyed'])],

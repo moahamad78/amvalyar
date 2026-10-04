@@ -146,9 +146,9 @@ final class AssetRepairSlaOperationalTest extends TestCase
         $user->setAttribute('plain_test_password', $password);
 
         $permissions = Permission::query()
-            ->whereIn('name', ['asset_repairs.view', 'asset_repairs.manage', 'reports.view'])
+            ->whereIn('name', ['asset_repairs.view', 'asset_repairs.manage', 'reports.view', 'assets.financial'])
             ->get();
-        self::assertCount(3, $permissions);
+        self::assertCount(4, $permissions);
         $role->permissions()->syncWithoutDetaching($permissions->pluck('id')->all());
         $user->unsetRelation('role');
 

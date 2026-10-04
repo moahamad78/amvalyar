@@ -16,6 +16,7 @@ final class AssetRepairReportController extends Controller
     {
         $user = $request->user();
         abort_if($user === null, 401);
+        abort_unless(app(\App\Services\RoleAccessService::class)->financial($user), 403);
 
         $filters = $request->validate([
             'status' => ['nullable', 'in:draft,submitted,in_review,approved,in_repair,completed,rejected,cancelled'],

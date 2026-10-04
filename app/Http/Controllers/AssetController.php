@@ -65,7 +65,9 @@ final class AssetController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $employees = Employee::query()->where('is_active', true)->orderBy('display_name')->get(['id', 'display_name', 'personnel_code']);
+        $employees = Employee::query()->where('is_active', true)
+            ->when(app(\App\Services\RoleAccessService::class)->scope($request->user()) === 'self', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->orderBy('display_name')->get(['id', 'display_name', 'personnel_code']);
         $departments = Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 

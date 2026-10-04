@@ -191,11 +191,11 @@ final class KimiaPolyesterDemoProvisioner
         $all = Permission::query()->where('is_active', true)->pluck('id', 'name');
         $definitions = [
             'company_admin' => ['مدیر سامانه شرکت', $all->keys()->all()],
-            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'stocktakes.finalize', 'stocktakes.reconcile', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage']],
-            'finance_manager' => ['مدیر مالی', ['assets.view', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'workflows.view', 'stocktakes.view', 'stocktakes.finalize', 'stocktakes.reconcile']],
-            'accounting_head' => ['رئیس حسابداری', ['assets.view', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'asset_transactions.view']],
-            'inspection_head' => ['رئیس بازرسی و نظارت', ['assets.view', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'stocktakes.view', 'stocktakes.count', 'stocktakes.reconcile']],
-            'ceo' => ['مدیرعامل', ['assets.view', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act']],
+            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.view_all', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'stocktakes.finalize', 'stocktakes.reconcile', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage']],
+            'finance_manager' => ['مدیر مالی', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'workflows.view', 'stocktakes.view', 'stocktakes.finalize', 'stocktakes.reconcile']],
+            'accounting_head' => ['رئیس حسابداری', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'asset_transactions.view']],
+            'inspection_head' => ['رئیس بازرسی و نظارت', ['assets.view', 'assets.view_all', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'stocktakes.view', 'stocktakes.count', 'stocktakes.reconcile']],
+            'ceo' => ['مدیرعامل', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act']],
             'engineering_head' => ['رئیس مهندسی و خدمات فنی', ['assets.view', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'asset_repairs.view', 'asset_repairs.manage']],
             'hr_manager' => ['مدیر منابع انسانی', ['assets.view', 'employees.view', 'approvals.view', 'approvals.act']],
             'systems_manager' => ['مدیر سیستم‌ها و روش‌ها', ['assets.view', 'approvals.view', 'approvals.act', 'asset_types.manage', 'asset_attributes.manage']],
@@ -205,7 +205,7 @@ final class KimiaPolyesterDemoProvisioner
             'administrative_head' => ['رئیس امور اداری', ['assets.view', 'approvals.view', 'approvals.act']],
             'factory_manager' => ['مدیر امور کارخانه', ['assets.view', 'assets.transfer', 'approvals.view', 'approvals.act', 'asset_repairs.view']],
             'commercial_manager' => ['مدیر امور بازرگانی', ['assets.view', 'approvals.view', 'approvals.act']],
-            'warehouse_supervisor' => ['سرپرست انبارها', ['assets.view', 'assets.delivery', 'assets.return', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'final_warehouse_deliveries.view', 'warehouse_recoveries.view']],
+            'warehouse_supervisor' => ['سرپرست انبارها', ['assets.view', 'assets.view_all', 'assets.delivery', 'assets.return', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'final_warehouse_deliveries.view', 'warehouse_recoveries.view']],
             'unit_manager' => ['مدیر واحد', ['assets.view', 'asset_movement_requests.view', 'asset_movement_requests.create', 'approvals.view', 'approvals.act', 'reports.view']],
             'employee' => ['پرسنل', ['assets.view', 'inventory_requests.view', 'inventory_requests.create', 'inventory_requests.edit', 'inventory_requests.submit', 'asset_movement_requests.view', 'asset_movement_requests.create', 'asset_repairs.view', 'asset_repairs.create']],
         ];

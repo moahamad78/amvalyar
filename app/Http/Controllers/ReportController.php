@@ -23,6 +23,7 @@ final class ReportController extends Controller
             $user->isSuperAdmin() || $user->hasPermission('reports.view'),
             403
         );
+        $canViewFinancial = app(\App\Services\RoleAccessService::class)->financial($user);
 
         $filterService = app(\App\Services\AssetReportFilters::class);
         $filters = $filterService->validate($request);
@@ -50,7 +51,7 @@ final class ReportController extends Controller
             'warehouse' => (clone $assetsQuery)->where('status', 'warehouse')->count(),
             'assigned' => (clone $assetsQuery)->where('status', 'assigned')->count(),
             'destroyed' => (clone $assetsQuery)->where('status', 'destroyed')->count(),
-            'purchase_value' => (float) (clone $assetsQuery)->sum('purchase_price'),
+            'purchase_value' => $canViewFinancial ? (float) (clone $assetsQuery)->sum('purchase_price') : null,
         ];
 
         $assets = (clone $assetsQuery)
@@ -99,6 +100,7 @@ final class ReportController extends Controller
             'chart' => $chart,
             'selectedCompanyId' => $companyId,
             'currentUser' => $user,
+            'canViewFinancial' => $canViewFinancial,
         ]);
     }
 
@@ -120,7 +122,10 @@ final class ReportController extends Controller
             ->limit(500)
             ->get();
 
-        return view('reports.print', ['assets' => $assets, 'filters' => $filters, 'generatedAt' => now()]);
+        return view('reports.print', [
+            'assets' => $assets, 'filters' => $filters, 'generatedAt' => now(),
+            'canViewFinancial' => app(\App\Services\RoleAccessService::class)->financial($user),
+        ]);
     }
 
 }

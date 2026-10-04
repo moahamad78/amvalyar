@@ -25,6 +25,7 @@ final class ReportExportController extends Controller
         Request $request
     ): StreamedResponse {
         $user = $request->user();
+        $canViewFinancial = app(\App\Services\RoleAccessService::class)->financial($user);
 
         abort_if(
             $user === null,
@@ -98,12 +99,12 @@ final class ReportExportController extends Controller
                     ->count(),
 
             'purchase_value' =>
-                (float) (
+                $canViewFinancial ? (float) (
                     (clone $assetsQuery)
                         ->sum(
                             'purchase_price'
                         )
-                ),
+                ) : null,
         ];
 
         $assets =
@@ -289,7 +290,9 @@ final class ReportExportController extends Controller
             assets:
                 $assets,
             companyNames:
-                $companyNames
+                $companyNames,
+            canViewFinancial:
+                $canViewFinancial
         );
 
         $transactionSheet =
@@ -557,9 +560,7 @@ final class ReportExportController extends Controller
                 ],
                 [
                     'ارزش خرید',
-                    $assetStats[
-                        'purchase_value'
-                    ],
+                    $assetStats['purchase_value'] ?? 'محرمانه',
                 ],
             ],
             null,
@@ -633,7 +634,8 @@ final class ReportExportController extends Controller
     private function buildAssetSheet(
         Worksheet $sheet,
         $assets,
-        $companyNames
+        $companyNames,
+        bool $canViewFinancial
     ): void {
         $headers = [
             'ردیف',
@@ -781,7 +783,7 @@ final class ReportExportController extends Controller
                         $asset->purchase_date
                     ),
 
-                    (float) $asset->purchase_price,
+                    $canViewFinancial ? (float) $asset->purchase_price : null,
                     ['employee'=>'پرسنلی','organization'=>'سازمانی','user'=>'کاربری'][$asset->custody_type] ?? '-',
                     $asset->custodyDepartment?->name ?? '-', $asset->currentSite?->name ?? '-', $asset->currentLocation?->name ?? '-',
                 ],

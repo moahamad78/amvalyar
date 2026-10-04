@@ -240,29 +240,15 @@ final class DashboardController extends Controller
 
         $companyUsage =
             Company::query()
+                ->withCount([
+                    'assets',
+                    'users as tenant_users_count' => fn ($query) => $query->where('is_super_admin', false),
+                ])
                 ->get()
                 ->map(
                     function (Company $company): array {
-
-                        $assets =
-                            Asset::withoutGlobalScopes()
-                                ->where(
-                                    'company_id',
-                                    $company->id
-                                )
-                                ->count();
-
-                        $users =
-                            User::withoutGlobalScopes()
-                                ->where(
-                                    'company_id',
-                                    $company->id
-                                )
-                                ->where(
-                                    'is_super_admin',
-                                    false
-                                )
-                                ->count();
+                        $assets = (int) $company->assets_count;
+                        $users = (int) $company->tenant_users_count;
 
 
                         return [
@@ -350,6 +336,13 @@ final class DashboardController extends Controller
             'کاربر به هیچ شرکتی متصل نیست.'
         );
 
+        $access = app(\App\Services\RoleAccessService::class);
+        if ($access->scope($user) !== 'company') {
+            $assets = Asset::query()->with(['category', 'currentSite', 'currentLocation'])->latest('id')->paginate(15);
+            $roleDashboard = app(RoleDashboardService::class)->forUser($user);
+            return view('dashboard.personal', compact('company', 'assets', 'roleDashboard'));
+        }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -418,10 +411,10 @@ final class DashboardController extends Controller
                     ->count(),
 
             'purchase_value' =>
-                (float) Asset::query()
+                $access->financial($user) ? (float) Asset::query()
                     ->sum(
                         'purchase_price'
-                    ),
+                    ) : null,
         ];
 
 

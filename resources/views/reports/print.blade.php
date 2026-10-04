@@ -15,10 +15,10 @@
 </head>
 <body>
     <div class="toolbar"><div><h1>گزارش اموال</h1><div class="muted">{{ $assets->count() }} رکورد — تولید شده در {{ $generatedAt->format('Y/m/d H:i') }}</div></div><div><button onclick="window.print()">چاپ / ذخیره PDF</button><a href="{{ route('reports.index', request()->query()) }}">بازگشت</a></div></div>
-    <table><thead><tr><th>کد اموال</th><th>عنوان</th><th>دسته‌بندی</th><th>وضعیت</th><th>دارنده / واحد</th><th>سایت</th><th>ارزش خرید</th></tr></thead><tbody>
+    <table><thead><tr><th>کد اموال</th><th>عنوان</th><th>دسته‌بندی</th><th>وضعیت</th><th>دارنده / واحد</th><th>سایت</th>@if($canViewFinancial)<th>ارزش خرید</th>@endif</tr></thead><tbody>
     @forelse($assets as $asset)
-        <tr><td>{{ $asset->asset_code ?: $asset->inventory_code ?: '-' }}</td><td>{{ $asset->title }}</td><td>{{ $asset->category?->name ?: '-' }}</td><td>{{ ['warehouse'=>'انبار','assigned'=>'تحویل‌شده','destroyed'=>'اسقاط‌شده'][$asset->status] ?? $asset->status }}</td><td>{{ $asset->custodyEmployee?->display_name ?: ($asset->custodyDepartment?->name ?: '-') }}</td><td>{{ $asset->currentSite?->name ?: '-' }}</td><td>{{ number_format((float) $asset->purchase_price) }}</td></tr>
-    @empty <tr><td colspan="7">رکوردی مطابق فیلتر پیدا نشد.</td></tr> @endforelse
+        <tr><td>{{ $asset->asset_code ?: $asset->inventory_code ?: '-' }}</td><td>{{ $asset->title }}</td><td>{{ $asset->category?->name ?: '-' }}</td><td>{{ ['warehouse'=>'انبار','assigned'=>'تحویل‌شده','destroyed'=>'اسقاط‌شده'][$asset->status] ?? $asset->status }}</td><td>{{ $asset->custodyEmployee?->display_name ?: ($asset->custodyDepartment?->name ?: '-') }}</td><td>{{ $asset->currentSite?->name ?: '-' }}</td>@if($canViewFinancial)<td>{{ number_format((float) $asset->purchase_price) }}</td>@endif</tr>
+    @empty <tr><td colspan="{{ $canViewFinancial ? 7 : 6 }}">رکوردی مطابق فیلتر پیدا نشد.</td></tr> @endforelse
     </tbody></table>
 </body>
 </html>

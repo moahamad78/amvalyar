@@ -84,8 +84,19 @@ class User extends Authenticatable
             return true;
         }
 
+        if (!$this->role?->is_active) {
+            return false;
+        }
         if ($this->hasRole('admin')) {
             return true;
+        }
+        if ($this->hasRole('employee') && !in_array($permissionName, [
+            'assets.view', 'inventory_requests.view', 'inventory_requests.create',
+            'inventory_requests.edit', 'inventory_requests.submit',
+            'asset_movement_requests.view', 'asset_movement_requests.create',
+            'asset_repairs.view', 'asset_repairs.create',
+        ], true)) {
+            return false;
         }
 
         return $this->role?->hasPermission(

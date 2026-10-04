@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureCompanySubscription::class
         );
         $middleware->appendToGroup('web', WorkspaceRequestSupport::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureWorkspaceAccess::class);
         $middleware->alias([
             'active.session' => EnsureActiveLoginSession::class,
             'permission' => EnsurePermission::class,
