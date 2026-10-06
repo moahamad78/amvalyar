@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 final class StocktakeStartService
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     public function start(Stocktake $stocktake, User $actor): Stocktake
     {
         return DB::transaction(function () use ($stocktake, $actor): Stocktake {
@@ -45,6 +47,15 @@ final class StocktakeStartService
                 'status' => Stocktake::STATUS_ACTIVE,
                 'started_at' => now(),
             ])->save();
+
+            $this->auditLog->log(
+                'stocktake.started',
+                $locked,
+                ['status' => Stocktake::STATUS_DRAFT],
+                ['status' => Stocktake::STATUS_ACTIVE, 'frozen_item_count' => $assets->count()],
+                'تصویر مبنای انبارگردانی تثبیت و دوره شروع شد.',
+                actor: $actor
+            );
 
             return $locked->fresh([
                 'items',

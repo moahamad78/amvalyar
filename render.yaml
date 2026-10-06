@@ -50,6 +50,12 @@ services:
         value: "false"
       - key: SCHEDULER_ENABLED
         value: "true"
+      - key: MONITORING_ENABLED
+        value: "true"
+      - key: MONITORING_STORAGE_DISK
+        value: local
+      - key: MONITORING_HEARTBEAT_URL
+        sync: false
       - key: PRODUCTION_REQUIRE_HTTPS
         value: "true"
       - key: PRODUCTION_REQUIRE_SECURE_SESSION_COOKIE

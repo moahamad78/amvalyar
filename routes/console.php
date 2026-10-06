@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('app:scheduled-database-backup')
     ->dailyAt('02:00')
     ->withoutOverlapping(180);
+
+Schedule::command('app:operational-health-check')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10);

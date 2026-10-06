@@ -29,6 +29,11 @@ final class OperationalAlertService
             return collect();
         }
 
+        $cacheKey = 'amvalyar.operational-alerts.user.'.$user->id;
+        if (request()->attributes->has($cacheKey)) {
+            return request()->attributes->get($cacheKey);
+        }
+
         $alerts = collect();
 
         $alerts = $alerts->concat(
@@ -66,7 +71,7 @@ final class OperationalAlertService
                 );
         }
 
-        return $alerts
+        $alerts = $alerts
             ->unique('key')
             ->sort(
                 function (
@@ -104,6 +109,10 @@ final class OperationalAlertService
                 }
             )
             ->values();
+
+        request()->attributes->set($cacheKey, $alerts);
+
+        return $alerts;
     }
 
     public function countFor(
@@ -607,44 +616,35 @@ final class OperationalAlertService
                 'company_id',
                 $user->company_id
             )
-                ->get([
-                    'id',
-                    'title',
-                    'status',
-                    'custody_type',
-                    'custody_user_id',
-                    'custody_employee_id',
-                    'custody_department_id',
-                    'current_site_id',
-                    'updated_at',
-                ]);
+            ->get([
+                'id',
+                'title',
+                'status',
+                'custody_type',
+                'custody_user_id',
+                'custody_employee_id',
+                'custody_department_id',
+                'current_site_id',
+                'updated_at',
+            ]);
 
-        $assetIds = $assets
-            ->pluck('id');
+        $latestTransactionIds = AssetTransaction::withoutGlobalScopes()
+            ->selectRaw('MAX(id)')
+            ->where('company_id', $user->company_id)
+            ->groupBy('asset_id');
 
-        $latestTransactions = collect();
-
-        foreach ($assetIds->chunk(500) as $assetIdChunk) {
-            $latestTransactions = $latestTransactions
-                ->merge(
-                    AssetTransaction::withoutGlobalScopes()
-                        ->whereIn('asset_id', $assetIdChunk)
-                        ->orderByDesc('id')
-                        ->get([
-                            'id',
-                            'asset_id',
-                            'type',
-                            'to_user_id',
-                            'to_employee_id',
-                            'to_department_id',
-                            'to_site_id',
-                        ])
-                );
-        }
-
-        $latestTransactions = $latestTransactions
-            ->groupBy('asset_id')
-            ->map(fn (Collection $transactions): ?AssetTransaction => $transactions->first());
+        $latestTransactions = AssetTransaction::withoutGlobalScopes()
+            ->whereIn('id', $latestTransactionIds)
+            ->get([
+                'id',
+                'asset_id',
+                'type',
+                'to_user_id',
+                'to_employee_id',
+                'to_department_id',
+                'to_site_id',
+            ])
+            ->keyBy('asset_id');
 
         return $assets
             ->map(

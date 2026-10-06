@@ -41,6 +41,12 @@
 
         <div class="d-flex gap-2">
 
+            @if(app(\App\Services\RoleAccessService::class)->financialEdit(auth()->user()))
+                <a href="{{ route('assets.financial.edit', $asset) }}" class="btn btn-success">
+                    کنترل مالی
+                </a>
+            @endif
+
             @if(
                 auth()->user()->isSuperAdmin()
                 || auth()->user()->hasPermission('assets.edit')
@@ -63,6 +69,25 @@
         </div>
 
     </div>
+
+    @if(auth()->user() && app(\App\Services\RoleAccessService::class)->financial(auth()->user()))
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <strong>اطلاعات مالی و مستند تحصیل</strong>
+                @if(app(\App\Services\RoleAccessService::class)->financialEdit(auth()->user()))
+                    <a href="{{ route('assets.financial.edit', $asset) }}" class="btn btn-sm btn-outline-success">ویرایش کنترل‌شده</a>
+                @endif
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-3"><div class="text-muted small">تاریخ تحصیل</div><div>{{ \App\Support\JalaliDate::date($asset->purchase_date) }}</div></div>
+                    <div class="col-md-3"><div class="text-muted small">بهای تحصیل (ریال)</div><div class="fw-bold">{{ number_format((float) ($asset->purchase_price ?? 0)) }}</div></div>
+                    <div class="col-md-3"><div class="text-muted small">تأمین‌کننده</div><div>{{ $asset->supplier_name ?: '-' }}</div></div>
+                    <div class="col-md-3"><div class="text-muted small">شماره سند تحصیل</div><div>{{ $asset->acquisition_document_number ?: '-' }}</div></div>
+                </div>
+            </div>
+        </div>
+    @endif
 
 
     <div class="row g-3 mb-4">

@@ -14,8 +14,8 @@ use App\Models\Site;
 use App\Services\AssetCode\AssetCodeIssuanceService;
 use App\Services\AssetCustodyService;
 use App\Services\AuditLogService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 
 final class InitialAssetSetupCommitService
@@ -25,16 +25,18 @@ final class InitialAssetSetupCommitService
         private readonly AssetCustodyService $custody,
         private readonly AuditLogService $audit,
         private readonly DatabaseManager $db,
-    ) {
-    }
+    ) {}
 
     public function commit(Company $company, array $rows, Request $request): Collection
     {
         $actor = $request->user();
+
         return $this->db->transaction(function () use ($company, $rows, $actor, $request): Collection {
-            $created = new Collection();
+            $created = new Collection;
             foreach ($rows as $row) {
-                if (($row['valid'] ?? false) !== true) continue;
+                if (($row['valid'] ?? false) !== true) {
+                    continue;
+                }
                 $data = $row['data'];
                 $asset = Asset::withoutGlobalScopes()->create([
                     'company_id' => $company->id,
@@ -45,6 +47,8 @@ final class InitialAssetSetupCommitService
                     'brand' => $data['brand'], 'model' => $data['model'], 'serial_number' => $data['serial_number'],
                     'manufacturer' => $data['manufacturer'], 'country' => $data['country'],
                     'purchase_date' => $data['purchase_date'], 'purchase_price' => $data['purchase_price'],
+                    'supplier_name' => $data['supplier_name'] ?? null,
+                    'acquisition_document_number' => $data['acquisition_document_number'] ?? null,
                     'description' => $this->description($data['description']),
                     'is_active' => true, 'status' => 'warehouse', 'custody_type' => AssetCustodyService::TYPE_WAREHOUSE,
                     'custody_user_id' => null, 'custody_employee_id' => null, 'custody_department_id' => null,
@@ -83,6 +87,7 @@ final class InitialAssetSetupCommitService
                 ], 'ثبت موجودی اولیه از فایل Excel', $request, $actor);
                 $created->push($asset->refresh());
             }
+
             return $created;
         }, 3);
     }
@@ -102,6 +107,7 @@ final class InitialAssetSetupCommitService
     private function description(?string $description): ?string
     {
         $description = trim((string) $description);
+
         return $description === '' ? null : $description;
     }
 }

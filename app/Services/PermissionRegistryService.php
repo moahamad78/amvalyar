@@ -6,10 +6,10 @@ namespace App\Services;
 
 use App\Models\Permission;
 use App\Models\Role;
+use FilesystemIterator;
 use Illuminate\Support\Collection;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use FilesystemIterator;
 
 final class PermissionRegistryService
 {
@@ -36,6 +36,7 @@ final class PermissionRegistryService
             'view',
             'view_all',
             'financial',
+            'financial_edit',
             'create',
             'edit',
             'delete',
@@ -132,145 +133,100 @@ final class PermissionRegistryService
         ],
     ];
 
-
     private const MODULE_LABELS = [
-        'users' =>
-            'کاربران',
+        'users' => 'کاربران',
 
-        'roles' =>
-            'نقش‌ها',
+        'roles' => 'نقش‌ها',
 
-        'permissions' =>
-            'دسترسی‌ها',
+        'permissions' => 'دسترسی‌ها',
 
-        'assets' =>
-            'اموال',
+        'assets' => 'اموال',
 
-        'reports' =>
-            'گزارش‌ها',
+        'reports' => 'گزارش‌ها',
 
-        'sites' =>
-            'سایت‌ها',
+        'sites' => 'سایت‌ها',
 
-        'departments' =>
-            'واحدهای سازمانی',
+        'departments' => 'واحدهای سازمانی',
 
-        'locations' =>
-            'مکان‌ها',
+        'locations' => 'مکان‌ها',
 
-        'employees' =>
-            'پرسنل',
+        'employees' => 'پرسنل',
 
-        'workflows' =>
-            'گردش کار',
+        'workflows' => 'گردش کار',
 
-        'approvals' =>
-            'تأییدها',
+        'approvals' => 'تأییدها',
 
-        'inventory_requests' =>
-            'درخواست کالا',
+        'inventory_requests' => 'درخواست کالا',
 
-        'asset_types' =>
-            'انواع دارایی',
+        'asset_types' => 'انواع دارایی',
 
-        'asset_attributes' =>
-            'ویژگی‌های شناسنامه اموال',
+        'asset_attributes' => 'ویژگی‌های شناسنامه اموال',
 
-        'asset_completeness' =>
-            'نواقص شناسنامه اموال',
+        'asset_completeness' => 'نواقص شناسنامه اموال',
 
         'company_storage' => 'فضای ذخیره‌سازی شرکت',
 
-        'companies' =>
-            'شرکت‌ها',
+        'companies' => 'شرکت‌ها',
 
-        'bulk_import' =>
-            'ورود گروهی',
+        'bulk_import' => 'ورود گروهی',
 
-        'asset_repairs' =>
-            'تعمیر و نگهداری اموال',
+        'asset_repairs' => 'تعمیر و نگهداری اموال',
 
-        'asset_movement_requests' =>
-            'درخواست جابه‌جایی اموال',
+        'asset_movement_requests' => 'درخواست جابه‌جایی اموال',
 
-        'asset_manager_requests' =>
-            'درخواست‌های مدیر اموال',
+        'asset_manager_requests' => 'درخواست‌های مدیر اموال',
 
-        'asset_transactions' =>
-            'گردش اموال',
+        'asset_transactions' => 'گردش اموال',
 
-        'asset_reference' =>
-            'داده‌های مرجع اموال',
+        'asset_reference' => 'داده‌های مرجع اموال',
 
-        'asset_settings' =>
-            'تنظیمات اموال',
+        'asset_settings' => 'تنظیمات اموال',
 
-        'organizational_assets' =>
-            'اموال سازمانی',
+        'organizational_assets' => 'اموال سازمانی',
 
-        'final_warehouse_deliveries' =>
-            'تحویل نهایی انبار',
+        'final_warehouse_deliveries' => 'تحویل نهایی انبار',
 
-        'warehouse_recoveries' =>
-            'بازیابی انبار',
+        'warehouse_recoveries' => 'بازیابی انبار',
 
-        'specialist_approvals' =>
-            'تأیید تخصصی',
+        'specialist_approvals' => 'تأیید تخصصی',
 
-        'operational_alerts' =>
-            'هشدارهای عملیاتی',
+        'operational_alerts' => 'هشدارهای عملیاتی',
 
-        'task_center' =>
-            'مرکز کارها',
+        'task_center' => 'مرکز کارها',
     ];
-
 
     private const ACTION_LABELS = [
-        'view' =>
-            'مشاهده',
+        'view' => 'مشاهده',
 
-        'create' =>
-            'ایجاد',
+        'create' => 'ایجاد',
 
-        'edit' =>
-            'ویرایش',
+        'edit' => 'ویرایش',
 
-        'delete' =>
-            'حذف',
+        'delete' => 'حذف',
 
-        'manage' =>
-            'مدیریت',
+        'manage' => 'مدیریت',
 
-        'transfer' =>
-            'انتقال',
+        'transfer' => 'انتقال',
 
-        'delivery' =>
-            'تحویل',
+        'delivery' => 'تحویل',
 
-        'return' =>
-            'عودت',
+        'return' => 'عودت',
 
-        'export' =>
-            'خروجی گرفتن',
+        'export' => 'خروجی گرفتن',
 
-        'submit' =>
-            'ارسال برای تأیید',
+        'submit' => 'ارسال برای تأیید',
 
-        'start' =>
-            'شروع',
+        'start' => 'شروع',
 
-        'count' =>
-            'ثبت شمارش',
+        'count' => 'ثبت شمارش',
 
-        'finalize' =>
-            'نهایی‌سازی',
-                'reconcile' =>
-            'رسیدگی مغایرت انبارگردانی',
+        'finalize' => 'نهایی‌سازی',
+        'reconcile' => 'رسیدگی مغایرت انبارگردانی',
 
-'act' =>
-            'اقدام روی تأیید',
+        'financial_edit' => 'ویرایش اطلاعات مالی',
+
+        'act' => 'اقدام روی تأیید',
     ];
-
 
     private const DISCOVERABLE_ACTIONS = [
         'view',
@@ -285,7 +241,6 @@ final class PermissionRegistryService
         'submit',
         'act',
     ];
-
 
     public function sync(): array
     {
@@ -310,8 +265,8 @@ final class PermissionRegistryService
 
             $description =
                 'دسترسی «'
-                . $displayName
-                . '» در سامانه';
+                .$displayName
+                .'» در سامانه';
 
             $existing =
                 Permission::query()
@@ -325,17 +280,13 @@ final class PermissionRegistryService
                 $permission =
                     Permission::query()
                         ->create([
-                            'name' =>
-                                $name,
+                            'name' => $name,
 
-                            'display_name' =>
-                                $displayName,
+                            'display_name' => $displayName,
 
-                            'description' =>
-                                $description,
+                            'description' => $description,
 
-                            'is_active' =>
-                                true,
+                            'is_active' => true,
                         ]);
 
                 $created[] =
@@ -356,14 +307,11 @@ final class PermissionRegistryService
 
             if ($dirty) {
                 $existing->update([
-                    'display_name' =>
-                        $displayName,
+                    'display_name' => $displayName,
 
-                    'description' =>
-                        $description,
+                    'description' => $description,
 
-                    'is_active' =>
-                        true,
+                    'is_active' => true,
                 ]);
 
                 $updated[] =
@@ -384,8 +332,7 @@ final class PermissionRegistryService
                 )
                 ->pluck('id')
                 ->map(
-                    fn ($id) =>
-                        (int) $id
+                    fn ($id) => (int) $id
                 )
                 ->all();
 
@@ -411,37 +358,30 @@ final class PermissionRegistryService
             );
 
         return [
-            'registered_names' =>
-                count($names),
+            'registered_names' => count($names),
 
-            'created_count' =>
-                count($created),
+            'created_count' => count($created),
 
-            'updated_count' =>
-                count($updated),
+            'updated_count' => count($updated),
 
-            'created_ids' =>
-                $created,
+            'created_ids' => $created,
 
-            'updated_ids' =>
-                $updated,
+            'updated_ids' => $updated,
         ];
     }
-
 
     public function registeredNames(): array
     {
         $names = [];
 
         foreach (
-            self::CORE
-            as $module => $actions
+            self::CORE as $module => $actions
         ) {
             foreach ($actions as $action) {
                 $names[] =
                     $module
-                    . '.'
-                    . $action;
+                    .'.'
+                    .$action;
             }
         }
 
@@ -452,8 +392,7 @@ final class PermissionRegistryService
          * preventing fake controls that aren't enforced by code.
          */
         foreach (
-            $this->discoverPermissionNames()
-            as $name
+            $this->discoverPermissionNames() as $name
         ) {
             $names[] =
                 $name;
@@ -471,7 +410,6 @@ final class PermissionRegistryService
         return $names;
     }
 
-
     public function groups(): Collection
     {
         $this->sync();
@@ -484,15 +422,13 @@ final class PermissionRegistryService
             ->orderBy('name')
             ->get()
             ->groupBy(
-                fn (Permission $permission): string =>
-                    explode(
-                        '.',
-                        $permission->name,
-                        2
-                    )[0]
+                fn (Permission $permission): string => explode(
+                    '.',
+                    $permission->name,
+                    2
+                )[0]
             );
     }
-
 
     public function moduleLabel(
         string $module
@@ -505,7 +441,6 @@ final class PermissionRegistryService
                 $module
             );
     }
-
 
     public function permissionLabel(
         string $permissionName
@@ -532,10 +467,9 @@ final class PermissionRegistryService
 
         return
             $actionLabel
-            . ' '
-            . $moduleLabel;
+            .' '
+            .$moduleLabel;
     }
-
 
     private function discoverPermissionNames(): array
     {
@@ -556,7 +490,7 @@ final class PermissionRegistryService
         $names = [];
 
         foreach ($roots as $root) {
-            if (!is_dir($root)) {
+            if (! is_dir($root)) {
                 continue;
             }
 
@@ -569,7 +503,7 @@ final class PermissionRegistryService
                 );
 
             foreach ($iterator as $file) {
-                if (!$file->isFile()) {
+                if (! $file->isFile()) {
                     continue;
                 }
 
@@ -579,7 +513,7 @@ final class PermissionRegistryService
                     );
 
                 if (
-                    !in_array(
+                    ! in_array(
                         $extension,
                         ['php'],
                         true
@@ -602,15 +536,14 @@ final class PermissionRegistryService
                  */
                 preg_match_all(
                     '/hasPermission\s*\(\s*[\'"]([a-z][a-z0-9_]*\.(?:'
-                    . $allowedActions
-                    . '))[\'"]\s*\)/i',
+                    .$allowedActions
+                    .'))[\'"]\s*\)/i',
                     $content,
                     $matches
                 );
 
                 foreach (
-                    $matches[1] ?? []
-                    as $name
+                    $matches[1] ?? [] as $name
                 ) {
                     $names[] =
                         strtolower(
@@ -624,15 +557,14 @@ final class PermissionRegistryService
                  */
                 preg_match_all(
                     '/[\'"]permission[\'"]\s*=>\s*[\'"]([a-z][a-z0-9_]*\.(?:'
-                    . $allowedActions
-                    . '))[\'"]/i',
+                    .$allowedActions
+                    .'))[\'"]/i',
                     $content,
                     $matches
                 );
 
                 foreach (
-                    $matches[1] ?? []
-                    as $name
+                    $matches[1] ?? [] as $name
                 ) {
                     $names[] =
                         strtolower(
@@ -646,15 +578,14 @@ final class PermissionRegistryService
                  */
                 preg_match_all(
                     '/\$this->push\s*\((?:(?!\);)[\s\S]){0,800}?[\'"]([a-z][a-z0-9_]*\.(?:'
-                    . $allowedActions
-                    . '))[\'"]\s*\);/i',
+                    .$allowedActions
+                    .'))[\'"]\s*\);/i',
                     $content,
                     $matches
                 );
 
                 foreach (
-                    $matches[1] ?? []
-                    as $name
+                    $matches[1] ?? [] as $name
                 ) {
                     $names[] =
                         strtolower(

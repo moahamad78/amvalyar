@@ -8,8 +8,9 @@ use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\AssetTransaction;
 use App\Models\Company;
+use App\Services\AssetReportFilters;
+use App\Services\RoleAccessService;
 use App\Support\JalaliDate;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -25,7 +26,7 @@ final class ReportExportController extends Controller
         Request $request
     ): StreamedResponse {
         $user = $request->user();
-        $canViewFinancial = app(\App\Services\RoleAccessService::class)->financial($user);
+        $canViewFinancial = app(RoleAccessService::class)->financial($user);
 
         abort_if(
             $user === null,
@@ -40,7 +41,7 @@ final class ReportExportController extends Controller
             403
         );
 
-        $filterService = app(\App\Services\AssetReportFilters::class);
+        $filterService = app(AssetReportFilters::class);
         $filters = $filterService->validate($request);
         $selectedCompanyId =
             $user->isSuperAdmin()
@@ -70,41 +71,36 @@ final class ReportExportController extends Controller
         abort_if((clone $assetsQuery)->count() > 10000, 422, 'برای خروجی بیش از ۱۰ هزار مال، فیلترها را محدود کنید.');
 
         $assetStats = [
-            'total' =>
-                (clone $assetsQuery)
-                    ->count(),
+            'total' => (clone $assetsQuery)
+                ->count(),
 
-            'warehouse' =>
+            'warehouse' => (clone $assetsQuery)
+                ->where(
+                    'status',
+                    'warehouse'
+                )
+                ->count(),
+
+            'assigned' => (clone $assetsQuery)
+                ->where(
+                    'status',
+                    'assigned'
+                )
+                ->count(),
+
+            'destroyed' => (clone $assetsQuery)
+                ->where(
+                    'status',
+                    'destroyed'
+                )
+                ->count(),
+
+            'purchase_value' => $canViewFinancial ? (float) (
                 (clone $assetsQuery)
-                    ->where(
-                        'status',
-                        'warehouse'
+                    ->sum(
+                        'purchase_price'
                     )
-                    ->count(),
-
-            'assigned' =>
-                (clone $assetsQuery)
-                    ->where(
-                        'status',
-                        'assigned'
-                    )
-                    ->count(),
-
-            'destroyed' =>
-                (clone $assetsQuery)
-                    ->where(
-                        'status',
-                        'destroyed'
-                    )
-                    ->count(),
-
-            'purchase_value' =>
-                $canViewFinancial ? (float) (
-                    (clone $assetsQuery)
-                        ->sum(
-                            'purchase_price'
-                        )
-                ) : null,
+            ) : null,
         ];
 
         $assets =
@@ -112,12 +108,11 @@ final class ReportExportController extends Controller
                 ->with([
                     'category', 'custodyEmployee', 'custodyDepartment', 'currentSite', 'currentLocation',
 
-                    'transactions' =>
-                        function ($query) {
-                            $query->latest(
-                                'id'
-                            );
-                        },
+                    'transactions' => function ($query) {
+                        $query->latest(
+                            'id'
+                        );
+                    },
 
                     'transactions.toUser',
                 ])
@@ -144,41 +139,36 @@ final class ReportExportController extends Controller
         abort_if((clone $transactionsQuery)->count() > 20000, 422, 'برای خروجی بیش از ۲۰ هزار گردش، بازهٔ تاریخ را محدود کنید.');
 
         $transactionStats = [
-            'total' =>
-                (clone $transactionsQuery)
-                    ->count(),
+            'total' => (clone $transactionsQuery)
+                ->count(),
 
-            'delivery' =>
-                (clone $transactionsQuery)
-                    ->where(
-                        'type',
-                        'delivery'
-                    )
-                    ->count(),
+            'delivery' => (clone $transactionsQuery)
+                ->where(
+                    'type',
+                    'delivery'
+                )
+                ->count(),
 
-            'transfer' =>
-                (clone $transactionsQuery)
-                    ->where(
-                        'type',
-                        'transfer'
-                    )
-                    ->count(),
+            'transfer' => (clone $transactionsQuery)
+                ->where(
+                    'type',
+                    'transfer'
+                )
+                ->count(),
 
-            'return' =>
-                (clone $transactionsQuery)
-                    ->where(
-                        'type',
-                        'return'
-                    )
-                    ->count(),
+            'return' => (clone $transactionsQuery)
+                ->where(
+                    'type',
+                    'return'
+                )
+                ->count(),
 
-            'destroy' =>
-                (clone $transactionsQuery)
-                    ->where(
-                        'type',
-                        'destroy'
-                    )
-                    ->count(),
+            'destroy' => (clone $transactionsQuery)
+                ->where(
+                    'type',
+                    'destroy'
+                )
+                ->count(),
         ];
 
         $transactions =
@@ -208,7 +198,7 @@ final class ReportExportController extends Controller
                         $selectedCompanyId
                     ]
                     ??
-                    'شرکت #' . $selectedCompanyId
+                    'شرکت #'.$selectedCompanyId
                 )
                 : (
                     $user->isSuperAdmin()
@@ -238,7 +228,7 @@ final class ReportExportController extends Controller
                 : null;
 
         $spreadsheet =
-            new Spreadsheet();
+            new Spreadsheet;
 
         $spreadsheet
             ->getProperties()
@@ -266,14 +256,10 @@ final class ReportExportController extends Controller
             userName: $user->name
                 ?? $user->username
                 ?? 'کاربر',
-            selectedCompanyName:
-                $selectedCompanyName,
-            categoryName:
-                $categoryName,
-            assetStats:
-                $assetStats,
-            transactionStats:
-                $transactionStats
+            selectedCompanyName: $selectedCompanyName,
+            categoryName: $categoryName,
+            assetStats: $assetStats,
+            transactionStats: $transactionStats
         );
 
         $assetSheet =
@@ -285,14 +271,10 @@ final class ReportExportController extends Controller
         );
 
         $this->buildAssetSheet(
-            sheet:
-                $assetSheet,
-            assets:
-                $assets,
-            companyNames:
-                $companyNames,
-            canViewFinancial:
-                $canViewFinancial
+            sheet: $assetSheet,
+            assets: $assets,
+            companyNames: $companyNames,
+            canViewFinancial: $canViewFinancial
         );
 
         $transactionSheet =
@@ -304,12 +286,9 @@ final class ReportExportController extends Controller
         );
 
         $this->buildTransactionSheet(
-            sheet:
-                $transactionSheet,
-            transactions:
-                $transactions,
-            companyNames:
-                $companyNames
+            sheet: $transactionSheet,
+            transactions: $transactions,
+            companyNames: $companyNames
         );
 
         $spreadsheet->setActiveSheetIndex(
@@ -346,11 +325,9 @@ final class ReportExportController extends Controller
             },
             $filename,
             [
-                'Content-Type' =>
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 
-                'Cache-Control' =>
-                    'max-age=0, no-cache, must-revalidate',
+                'Cache-Control' => 'max-age=0, no-cache, must-revalidate',
             ]
         );
     }
@@ -365,28 +342,21 @@ final class ReportExportController extends Controller
         array $transactionStats
     ): void {
         $statusLabels = [
-            'warehouse' =>
-                'موجود در انبار',
+            'warehouse' => 'موجود در انبار',
 
-            'assigned' =>
-                'تحویل‌شده',
+            'assigned' => 'تحویل‌شده',
 
-            'destroyed' =>
-                'اسقاط‌شده',
+            'destroyed' => 'اسقاط‌شده',
         ];
 
         $transactionLabels = [
-            'delivery' =>
-                'تحویل',
+            'delivery' => 'تحویل',
 
-            'transfer' =>
-                'انتقال',
+            'transfer' => 'انتقال',
 
-            'return' =>
-                'بازگشت به انبار',
+            'return' => 'بازگشت به انبار',
 
-            'destroy' =>
-                'اسقاط',
+            'destroy' => 'اسقاط',
         ];
 
         $sheet->setRightToLeft(
@@ -652,18 +622,17 @@ final class ReportExportController extends Controller
             'دارنده فعلی',
             'تاریخ خرید',
             'مبلغ خرید',
+            'تأمین‌کننده',
+            'شماره سند خرید/تحصیل',
             'نوع تحویل', 'واحد سازمانی', 'سایت', 'موقعیت',
         ];
 
         $statusLabels = [
-            'warehouse' =>
-                'موجود در انبار',
+            'warehouse' => 'موجود در انبار',
 
-            'assigned' =>
-                'تحویل‌شده',
+            'assigned' => 'تحویل‌شده',
 
-            'destroyed' =>
-                'اسقاط‌شده',
+            'destroyed' => 'اسقاط‌شده',
         ];
 
         $sheet->fromArray(
@@ -675,8 +644,7 @@ final class ReportExportController extends Controller
         $row = 2;
 
         foreach (
-            $assets
-            as $index => $asset
+            $assets as $index => $asset
         ) {
             $currentHolder = '-';
 
@@ -687,16 +655,14 @@ final class ReportExportController extends Controller
             ) {
                 $currentHolder =
                     'انبار';
-            }
-            elseif (
+            } elseif (
                 $asset->status
                 ===
                 'destroyed'
             ) {
                 $currentHolder =
                     'اسقاط';
-            }
-            elseif (
+            } elseif (
                 $asset->status
                 ===
                 'assigned'
@@ -704,15 +670,14 @@ final class ReportExportController extends Controller
                 $lastAssignment =
                     $asset->transactions
                         ->first(
-                            fn ($transaction): bool =>
-                                in_array(
-                                    $transaction->type,
-                                    [
-                                        'delivery',
-                                        'transfer',
-                                    ],
-                                    true
-                                )
+                            fn ($transaction): bool => in_array(
+                                $transaction->type,
+                                [
+                                    'delivery',
+                                    'transfer',
+                                ],
+                                true
+                            )
                                 &&
                                 $transaction->toUser
                                 !==
@@ -784,7 +749,9 @@ final class ReportExportController extends Controller
                     ),
 
                     $canViewFinancial ? (float) $asset->purchase_price : null,
-                    ['employee'=>'پرسنلی','organization'=>'سازمانی','user'=>'کاربری'][$asset->custody_type] ?? '-',
+                    $canViewFinancial ? ($asset->supplier_name ?? '-') : null,
+                    $canViewFinancial ? ($asset->acquisition_document_number ?? '-') : null,
+                    ['employee' => 'پرسنلی', 'organization' => 'سازمانی', 'user' => 'کاربری'][$asset->custody_type] ?? '-',
                     $asset->custodyDepartment?->name ?? '-', $asset->currentSite?->name ?? '-', $asset->currentLocation?->name ?? '-',
                 ],
                 null,
@@ -812,10 +779,8 @@ final class ReportExportController extends Controller
         }
 
         $this->styleDataSheet(
-            sheet:
-                $sheet,
-            headerRange:
-                'A1:R1'
+            sheet: $sheet,
+            headerRange: 'A1:T1'
         );
     }
 
@@ -839,17 +804,13 @@ final class ReportExportController extends Controller
         ];
 
         $typeLabels = [
-            'delivery' =>
-                'تحویل',
+            'delivery' => 'تحویل',
 
-            'transfer' =>
-                'انتقال',
+            'transfer' => 'انتقال',
 
-            'return' =>
-                'بازگشت به انبار',
+            'return' => 'بازگشت به انبار',
 
-            'destroy' =>
-                'اسقاط',
+            'destroy' => 'اسقاط',
         ];
 
         $sheet->fromArray(
@@ -861,8 +822,7 @@ final class ReportExportController extends Controller
         $row = 2;
 
         foreach (
-            $transactions
-            as $index => $transaction
+            $transactions as $index => $transaction
         ) {
             $fromName =
                 $transaction->fromUser?->name
@@ -876,16 +836,14 @@ final class ReportExportController extends Controller
             ) {
                 $toName =
                     $transaction->toUser->name;
-            }
-            elseif (
+            } elseif (
                 $transaction->type
                 ===
                 'return'
             ) {
                 $toName =
                     'انبار';
-            }
-            elseif (
+            } elseif (
                 $transaction->type
                 ===
                 'destroy'
@@ -946,10 +904,8 @@ final class ReportExportController extends Controller
         }
 
         $this->styleDataSheet(
-            sheet:
-                $sheet,
-            headerRange:
-                'A1:K1'
+            sheet: $sheet,
+            headerRange: 'A1:K1'
         );
     }
 
@@ -981,8 +937,7 @@ final class ReportExportController extends Controller
                 'A3:A11',
                 'A13:B13',
                 'C13:D13',
-            ]
-            as $range
+            ] as $range
         ) {
             $sheet
                 ->getStyle(
@@ -1018,8 +973,7 @@ final class ReportExportController extends Controller
             );
 
         foreach (
-            ['A', 'B', 'C', 'D']
-            as $column
+            ['A', 'B', 'C', 'D'] as $column
         ) {
             $sheet
                 ->getColumnDimension(
@@ -1107,8 +1061,7 @@ final class ReportExportController extends Controller
             range(
                 'A',
                 $highestColumn
-            )
-            as $column
+            ) as $column
         ) {
             $sheet
                 ->getColumnDimension(
@@ -1119,5 +1072,4 @@ final class ReportExportController extends Controller
                 );
         }
     }
-
 }

@@ -22,24 +22,24 @@ final class StocktakeFinalizationServiceTest extends TestCase
 
     public function test_pending_items_block_recount_and_completion(): void
     {
-        [, $user, , $stocktake] = $this->fixture();
+        [, , $finalizer, , $stocktake] = $this->fixture();
 
         $service = app(StocktakeFinalizationService::class);
 
         try {
-            $service->requestRecount($stocktake, $user);
+            $service->requestRecount($stocktake, $finalizer);
             $this->fail('Pending stocktake must not enter recount.');
         } catch (ValidationException) {
             $this->assertTrue(true);
         }
 
         $this->expectException(ValidationException::class);
-        $service->complete($stocktake->fresh(), $user);
+        $service->complete($stocktake->fresh(), $finalizer);
     }
 
     public function test_discrepancies_enter_recount_and_can_be_resolved_then_completed(): void
     {
-        [, $user, $asset, $stocktake] = $this->fixture();
+        [, $counter, $finalizer, $asset, $stocktake] = $this->fixture();
 
         $counting = app(StocktakeCountingService::class);
         $finalization = app(StocktakeFinalizationService::class);
@@ -47,7 +47,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
         $missing = $counting->markMissing(
             $stocktake,
             $asset,
-            $user,
+            $counter,
             'First count: not found'
         );
 
@@ -58,7 +58,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
 
         $recount = $finalization->requestRecount(
             $stocktake->fresh(),
-            $user
+            $finalizer
         );
 
         $this->assertSame(
@@ -76,7 +76,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
         $resolved = $counting->observe(
             $recount,
             $asset,
-            $user,
+            $counter,
             ['notes' => 'Found during recount']
         );
 
@@ -88,7 +88,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
 
         $completed = $finalization->complete(
             $recount->fresh(),
-            $user
+            $finalizer
         );
 
         $this->assertSame(
@@ -97,7 +97,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
         );
         $this->assertNotNull($completed->completed_at);
         $this->assertSame(
-            (int) $user->id,
+            (int) $finalizer->id,
             (int) $completed->completed_by
         );
 
@@ -107,43 +107,48 @@ final class StocktakeFinalizationServiceTest extends TestCase
         $this->assertSame('warehouse', $asset->custody_type);
     }
 
-    public function test_resolved_discrepancy_may_be_completed_without_forcing_recount(): void
+    public function test_discrepancy_cannot_be_completed_without_independent_recount(): void
     {
-        [, $user, $asset, $stocktake] = $this->fixture();
+        [, $counter, $finalizer, $asset, $stocktake] = $this->fixture();
 
         $counting = app(StocktakeCountingService::class);
         $finalization = app(StocktakeFinalizationService::class);
 
-        $counting->markMissing($stocktake, $asset, $user);
+        $counting->markMissing($stocktake, $asset, $counter);
 
-        $completed = $finalization->complete(
+        $this->expectException(ValidationException::class);
+        $finalization->complete($stocktake->fresh(), $finalizer);
+    }
+
+    public function test_creator_or_counter_cannot_finalize_their_own_stocktake(): void
+    {
+        [, $creatorAndCounter, , $asset, $stocktake] = $this->fixture();
+
+        app(StocktakeCountingService::class)->observe(
+            $stocktake,
+            $asset,
+            $creatorAndCounter
+        );
+
+        $this->expectException(ValidationException::class);
+        app(StocktakeFinalizationService::class)->complete(
             $stocktake->fresh(),
-            $user
-        );
-
-        $this->assertSame(
-            Stocktake::STATUS_COMPLETED,
-            $completed->status
-        );
-
-        $this->assertSame(
-            StocktakeItem::RESULT_MISSING,
-            $completed->items->first()->result_status
+            $creatorAndCounter
         );
     }
 
     public function test_completed_stocktake_cannot_be_reopened_or_completed_twice(): void
     {
-        [, $user, $asset, $stocktake] = $this->fixture();
+        [, $counter, $finalizer, $asset, $stocktake] = $this->fixture();
 
         app(StocktakeCountingService::class)
-            ->observe($stocktake, $asset, $user);
+            ->observe($stocktake, $asset, $counter);
 
         $service = app(StocktakeFinalizationService::class);
 
         $completed = $service->complete(
             $stocktake->fresh(),
-            $user
+            $finalizer
         );
 
         $this->assertSame(
@@ -152,7 +157,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
         );
 
         try {
-            $service->complete($completed, $user);
+            $service->complete($completed, $finalizer);
             $this->fail('Completed stocktake must not complete twice.');
         } catch (ValidationException) {
             $this->assertTrue(true);
@@ -160,22 +165,32 @@ final class StocktakeFinalizationServiceTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        $service->requestRecount($completed->fresh(), $user);
+        $service->requestRecount($completed->fresh(), $finalizer);
     }
 
     private function fixture(): array
     {
         $company = Company::withoutGlobalScopes()->create([
-            'name' => 'Finalize ' . uniqid(),
-            'code' => 'SF-' . strtoupper(substr(uniqid(), -7)),
+            'name' => 'Finalize '.uniqid(),
+            'code' => 'SF-'.strtoupper(substr(uniqid(), -7)),
             'is_active' => true,
         ]);
 
         $user = User::withoutGlobalScopes()->create([
             'company_id' => $company->id,
             'name' => 'Stocktake Finalizer',
-            'username' => 'sf-' . uniqid(),
-            'email' => 'sf-' . uniqid() . '@example.test',
+            'username' => 'sf-'.uniqid(),
+            'email' => 'sf-'.uniqid().'@example.test',
+            'password' => bcrypt('secret'),
+            'is_active' => true,
+            'is_super_admin' => false,
+        ]);
+
+        $finalizer = User::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'name' => 'Independent Finalizer',
+            'username' => 'sf-final-'.uniqid(),
+            'email' => 'sf-final-'.uniqid().'@example.test',
             'password' => bcrypt('secret'),
             'is_active' => true,
             'is_super_admin' => false,
@@ -189,8 +204,8 @@ final class StocktakeFinalizationServiceTest extends TestCase
         $asset = Asset::withoutGlobalScopes()->create([
             'company_id' => $company->id,
             'asset_category_id' => $category->id,
-            'inventory_code' => 'INV-' . uniqid(),
-            'asset_code' => 'FINAL-' . uniqid(),
+            'inventory_code' => 'INV-'.uniqid(),
+            'asset_code' => 'FINAL-'.uniqid(),
             'title' => 'Finalization Asset',
             'status' => 'warehouse',
             'custody_type' => 'warehouse',
@@ -199,7 +214,7 @@ final class StocktakeFinalizationServiceTest extends TestCase
 
         $stocktake = Stocktake::withoutGlobalScopes()->create([
             'company_id' => $company->id,
-            'code' => 'COUNT-' . strtoupper(substr(uniqid(), -7)),
+            'code' => 'COUNT-'.strtoupper(substr(uniqid(), -7)),
             'title' => 'Finalization Test',
             'scope_type' => Stocktake::SCOPE_COMPANY,
             'status' => Stocktake::STATUS_ACTIVE,
@@ -221,6 +236,6 @@ final class StocktakeFinalizationServiceTest extends TestCase
             'result_status' => StocktakeItem::RESULT_PENDING,
         ]);
 
-        return [$company, $user, $asset, $stocktake];
+        return [$company, $user, $finalizer, $asset, $stocktake];
     }
 }

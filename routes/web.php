@@ -9,6 +9,7 @@ use App\Http\Controllers\AssetCodeMasterDataController;
 use App\Http\Controllers\AssetCodeSettingsController;
 use App\Http\Controllers\AssetCompletenessQueueController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetFinancialController;
 use App\Http\Controllers\AssetManagerCompletionController;
 use App\Http\Controllers\AssetManagerRequestController;
 use App\Http\Controllers\AssetMovementRequestController;
@@ -31,8 +32,8 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FinalWarehouseDeliveryController;
 use App\Http\Controllers\FinalWarehousePlatePrintController;
-use App\Http\Controllers\InventoryRequestController;
 use App\Http\Controllers\InitialAssetSetupController;
+use App\Http\Controllers\InventoryRequestController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyApprovalController;
 use App\Http\Controllers\OperationalAlertController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseRecoveryController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\WorkflowStepController;
+use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureActiveLoginSession;
 use App\Http\Middleware\EnsureAssetManagerAssetContext;
 use App\Http\Middleware\EnsureAssetManagerReadyForApproval;
@@ -157,13 +159,13 @@ Route::get('/users-export', [UserController::class, 'export'])
     ->middleware([EnsureActiveLoginSession::class, 'permission:users.view', 'throttle:10,1'])->name('users.export');
 
 Route::middleware(EnsureActiveLoginSession::class)->group(function () {
-    Route::get('/workspace/preferences', [\App\Http\Controllers\WorkspaceController::class, 'preferences'])->name('workspace.preferences');
-    Route::post('/workspace/preferences', [\App\Http\Controllers\WorkspaceController::class, 'saveTheme'])->name('workspace.theme');
-    Route::get('/workspace/history', [\App\Http\Controllers\WorkspaceController::class, 'history'])->name('workspace.history');
+    Route::get('/workspace/preferences', [WorkspaceController::class, 'preferences'])->name('workspace.preferences');
+    Route::post('/workspace/preferences', [WorkspaceController::class, 'saveTheme'])->name('workspace.theme');
+    Route::get('/workspace/history', [WorkspaceController::class, 'history'])->name('workspace.history');
     Route::middleware('permission:reports.view')->group(function () {
-        Route::get('/workspace/charts', [\App\Http\Controllers\WorkspaceController::class, 'charts'])->name('workspace.charts');
-        Route::post('/workspace/charts', [\App\Http\Controllers\WorkspaceController::class, 'saveChart'])->name('workspace.charts.store');
-        Route::delete('/workspace/charts/{id}', [\App\Http\Controllers\WorkspaceController::class, 'deleteChart'])->name('workspace.charts.destroy');
+        Route::get('/workspace/charts', [WorkspaceController::class, 'charts'])->name('workspace.charts');
+        Route::post('/workspace/charts', [WorkspaceController::class, 'saveChart'])->name('workspace.charts.store');
+        Route::delete('/workspace/charts/{id}', [WorkspaceController::class, 'deleteChart'])->name('workspace.charts.destroy');
     });
 });
 
@@ -342,6 +344,26 @@ Route::get('/inventory-assets/{asset}', [
         'permission:assets.view',
     ])
     ->name('assets.show');
+
+Route::get('/inventory-assets/{asset}/financial', [
+    AssetFinancialController::class,
+    'edit',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:assets.financial_edit',
+    ])
+    ->name('assets.financial.edit');
+
+Route::patch('/inventory-assets/{asset}/financial', [
+    AssetFinancialController::class,
+    'update',
+])
+    ->middleware([
+        EnsureActiveLoginSession::class,
+        'permission:assets.financial_edit',
+    ])
+    ->name('assets.financial.update');
 
 Route::get('/inventory-assets/{asset}/edit', [
     AssetController::class,

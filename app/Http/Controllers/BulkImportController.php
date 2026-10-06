@@ -6,10 +6,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\BulkImport\AssetImportCommitService;
+use App\Services\BulkImport\AssetImportPreviewService;
+use App\Services\BulkImport\AssetImportTemplateService;
 use App\Services\BulkImport\BulkImportCompanyResolver;
 use App\Services\BulkImport\EmployeeImportCommitService;
 use App\Services\BulkImport\EmployeeImportPreviewService;
 use App\Services\BulkImport\EmployeeImportTemplateService;
+use App\Services\BulkImport\ReferenceStructureCommitService;
+use App\Services\BulkImport\ReferenceStructurePreviewService;
+use App\Services\BulkImport\ReferenceStructureTemplateService;
+use App\Services\RoleAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
@@ -36,16 +43,13 @@ final class BulkImportController extends Controller
         return view(
             'bulk_import.index',
             [
-                'companies' =>
-                    $this->companiesFor(
-                        $user
-                    ),
+                'companies' => $this->companiesFor(
+                    $user
+                ),
 
-                'preview' =>
-                    null,
+                'preview' => null,
 
-                'previewToken' =>
-                    null,
+                'previewToken' => null,
             ]
         );
     }
@@ -79,7 +83,7 @@ final class BulkImportController extends Controller
                 'app/tmp/bulk-import'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             mkdir(
                 $directory,
                 0775,
@@ -89,12 +93,12 @@ final class BulkImportController extends Controller
 
         $path =
             $directory
-            . DIRECTORY_SEPARATOR
-            . 'employee-import-template-'
-            . $company->id
-            . '-'
-            . now()->format('Ymd-His')
-            . '.xlsx';
+            .DIRECTORY_SEPARATOR
+            .'employee-import-template-'
+            .$company->id
+            .'-'
+            .now()->format('Ymd-His')
+            .'.xlsx';
 
         (new Xlsx($spreadsheet))
             ->save($path);
@@ -106,11 +110,10 @@ final class BulkImportController extends Controller
             ->download(
                 $path,
                 'employee-import-template-'
-                    . $company->id
-                    . '.xlsx',
+                    .$company->id
+                    .'.xlsx',
                 [
-                    'Content-Type' =>
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 ]
             )
             ->deleteFileAfterSend(
@@ -167,12 +170,10 @@ final class BulkImportController extends Controller
                     ),
                     $company
                 );
-        }
-        catch (\Throwable $e) {
+        } catch (\Throwable $e) {
             throw ValidationException::withMessages([
-                'file' =>
-                    'فایل قابل بررسی نیست: '
-                    . $e->getMessage(),
+                'file' => 'فایل قابل بررسی نیست: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -186,32 +187,26 @@ final class BulkImportController extends Controller
         ) {
             $previewToken =
                 $this->storePreviewFile(
-                    request:
-                        $request,
+                    request: $request,
 
-                    company:
-                        $company,
+                    company: $company,
 
-                    file:
-                        $request->file(
-                            'file'
-                        )
+                    file: $request->file(
+                        'file'
+                    )
                 );
         }
 
         return view(
             'bulk_import.index',
             [
-                'companies' =>
-                    $this->companiesFor(
-                        $user
-                    ),
+                'companies' => $this->companiesFor(
+                    $user
+                ),
 
-                'preview' =>
-                    $preview,
+                'preview' => $preview,
 
-                'previewToken' =>
-                    $previewToken,
+                'previewToken' => $previewToken,
             ]
         );
     }
@@ -253,10 +248,9 @@ final class BulkImportController extends Controller
                     $sessionKey
                 );
 
-        if (!is_array($stored)) {
+        if (! is_array($stored)) {
             throw ValidationException::withMessages([
-                'file' =>
-                    'پیش‌نمایش معتبر نیست یا منقضی شده است. فایل را دوباره بررسی کنید.',
+                'file' => 'پیش‌نمایش معتبر نیست یا منقضی شده است. فایل را دوباره بررسی کنید.',
             ]);
         }
 
@@ -286,8 +280,7 @@ final class BulkImportController extends Controller
             );
 
             throw ValidationException::withMessages([
-                'file' =>
-                    'مهلت پیش‌نمایش پایان یافته است. فایل را دوباره بررسی کنید.',
+                'file' => 'مهلت پیش‌نمایش پایان یافته است. فایل را دوباره بررسی کنید.',
             ]);
         }
 
@@ -300,7 +293,7 @@ final class BulkImportController extends Controller
 
         if (
             $path === ''
-            || !is_file(
+            || ! is_file(
                 $path
             )
         ) {
@@ -311,8 +304,7 @@ final class BulkImportController extends Controller
             );
 
             throw ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش در دسترس نیست. دوباره فایل را بارگذاری کنید.',
+                'file' => 'فایل پیش‌نمایش در دسترس نیست. دوباره فایل را بارگذاری کنید.',
             ]);
         }
 
@@ -331,7 +323,7 @@ final class BulkImportController extends Controller
 
         if (
             $expectedHash === ''
-            || !hash_equals(
+            || ! hash_equals(
                 $expectedHash,
                 $actualHash
             )
@@ -343,8 +335,7 @@ final class BulkImportController extends Controller
             );
 
             throw ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش تغییر کرده است. دوباره فایل را بارگذاری کنید.',
+                'file' => 'فایل پیش‌نمایش تغییر کرده است. دوباره فایل را بارگذاری کنید.',
             ]);
         }
 
@@ -390,12 +381,10 @@ final class BulkImportController extends Controller
                     $upload,
                     $company
                 );
-        }
-        catch (\Throwable $e) {
+        } catch (\Throwable $e) {
             throw ValidationException::withMessages([
-                'file' =>
-                    'اعتبارسنجی نهایی فایل ناموفق بود: '
-                    . $e->getMessage(),
+                'file' => 'اعتبارسنجی نهایی فایل ناموفق بود: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -411,8 +400,7 @@ final class BulkImportController extends Controller
                     ]
                 )
                     ->filter(
-                        fn (array $row): bool =>
-                            ($row[
+                        fn (array $row): bool => ($row[
                                 'valid'
                             ] ?? false)
                             !== true
@@ -437,11 +425,10 @@ final class BulkImportController extends Controller
                                 ->map(
                                     fn (
                                         string $error
-                                    ): string =>
-                                        'ردیف '
-                                        . $excelRow
-                                        . ': '
-                                        . $error
+                                    ): string => 'ردیف '
+                                        .$excelRow
+                                        .': '
+                                        .$error
                                 )
                                 ->all();
                         }
@@ -450,36 +437,30 @@ final class BulkImportController extends Controller
                     ->all();
 
             throw ValidationException::withMessages([
-                'file' =>
-                    array_merge(
-                        [
-                            'فایل از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست.',
-                        ],
-                        $messages
-                    ),
+                'file' => array_merge(
+                    [
+                        'فایل از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست.',
+                    ],
+                    $messages
+                ),
             ]);
         }
 
         try {
             $created =
                 $commitService->commit(
-                    company:
-                        $company,
+                    company: $company,
 
-                    rows:
-                        $freshPreview[
+                    rows: $freshPreview[
                             'rows'
                         ],
 
-                    request:
-                        $request
+                    request: $request
                 );
-        }
-        catch (\Throwable $e) {
+        } catch (\Throwable $e) {
             throw ValidationException::withMessages([
-                'file' =>
-                    'ثبت نهایی انجام نشد و هیچ ردیفی ذخیره نشد: '
-                    . $e->getMessage(),
+                'file' => 'ثبت نهایی انجام نشد و هیچ ردیفی ذخیره نشد: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -498,7 +479,7 @@ final class BulkImportController extends Controller
                 number_format(
                     $created->count()
                 )
-                . ' پرسنل با موفقیت به‌صورت گروهی ثبت شد.'
+                .' پرسنل با موفقیت به‌صورت گروهی ثبت شد.'
             );
     }
 
@@ -512,7 +493,7 @@ final class BulkImportController extends Controller
                 'app/tmp/bulk-import/previews'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             mkdir(
                 $directory,
                 0775,
@@ -529,19 +510,18 @@ final class BulkImportController extends Controller
 
         $path =
             $directory
-            . DIRECTORY_SEPARATOR
-            . $token
-            . '.xlsx';
+            .DIRECTORY_SEPARATOR
+            .$token
+            .'.xlsx';
 
         if (
-            !copy(
+            ! copy(
                 $file->getRealPath(),
                 $path
             )
         ) {
             throw ValidationException::withMessages([
-                'file' =>
-                    'ذخیره امن فایل پیش‌نمایش انجام نشد.',
+                'file' => 'ذخیره امن فایل پیش‌نمایش انجام نشد.',
             ]);
         }
 
@@ -551,27 +531,22 @@ final class BulkImportController extends Controller
                     $token
                 ),
                 [
-                    'user_id' =>
-                        $request->user()->id,
+                    'user_id' => $request->user()->id,
 
-                    'company_id' =>
-                        $company->id,
+                    'company_id' => $company->id,
 
-                    'path' =>
-                        $path,
+                    'path' => $path,
 
-                    'sha256' =>
-                        hash_file(
-                            'sha256',
-                            $path
-                        ),
+                    'sha256' => hash_file(
+                        'sha256',
+                        $path
+                    ),
 
-                    'expires_at' =>
-                        now()
-                            ->addMinutes(
-                                self::PREVIEW_TTL_MINUTES
-                            )
-                            ->timestamp,
+                    'expires_at' => now()
+                        ->addMinutes(
+                            self::PREVIEW_TTL_MINUTES
+                        )
+                        ->timestamp,
                 ]
             );
 
@@ -617,7 +592,7 @@ final class BulkImportController extends Controller
                 'app/tmp/bulk-import/previews'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             return;
         }
 
@@ -629,10 +604,9 @@ final class BulkImportController extends Controller
         foreach (
             glob(
                 $directory
-                . DIRECTORY_SEPARATOR
-                . '*.xlsx'
-            ) ?: []
-            as $path
+                .DIRECTORY_SEPARATOR
+                .'*.xlsx'
+            ) ?: [] as $path
         ) {
             if (
                 is_file($path)
@@ -647,7 +621,7 @@ final class BulkImportController extends Controller
         string $token
     ): string {
         return 'bulk_import.employee_preview.'
-            . $token;
+            .$token;
     }
 
     private function companiesFor(
@@ -667,11 +641,11 @@ final class BulkImportController extends Controller
         User $user
     ): void {
         abort_if(
-            !$user->isSuperAdmin()
-            && !$user->hasPermission(
+            ! $user->isSuperAdmin()
+            && ! $user->hasPermission(
                 'employees.create'
             )
-            && !$user->hasPermission(
+            && ! $user->hasPermission(
                 'assets.create'
             ),
             403
@@ -682,8 +656,8 @@ final class BulkImportController extends Controller
         User $user
     ): void {
         abort_if(
-            !$user->isSuperAdmin()
-            && !$user->hasPermission(
+            ! $user->isSuperAdmin()
+            && ! $user->hasPermission(
                 'employees.create'
             ),
             403
@@ -691,8 +665,8 @@ final class BulkImportController extends Controller
     }
 
     public function assetIndex(
-        \Illuminate\Http\Request $request
-    ): \Illuminate\View\View {
+        Request $request
+    ): View {
         $user = $request->user();
 
         $this->ensureCanImportAssets(
@@ -704,26 +678,22 @@ final class BulkImportController extends Controller
         return view(
             'bulk_import.assets',
             [
-                'companies' =>
-                    $this->companiesFor(
-                        $user
-                    ),
+                'companies' => $this->companiesFor(
+                    $user
+                ),
 
-                'assetPreview' =>
-                    null,
+                'assetPreview' => null,
 
-                'assetPreviewToken' =>
-                    null,
+                'assetPreviewToken' => null,
             ]
         );
     }
 
-
     public function assetTemplate(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\AssetImportTemplateService $service
-    ): \Symfony\Component\HttpFoundation\BinaryFileResponse {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        AssetImportTemplateService $service
+    ): BinaryFileResponse {
         $user = $request->user();
 
         $this->ensureCanImportAssets(
@@ -747,11 +717,10 @@ final class BulkImportController extends Controller
             ->download(
                 $path,
                 'asset-import-template-'
-                    . $company->id
-                    . '.xlsx',
+                    .$company->id
+                    .'.xlsx',
                 [
-                    'Content-Type' =>
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 ]
             )
             ->deleteFileAfterSend(
@@ -759,12 +728,11 @@ final class BulkImportController extends Controller
             );
     }
 
-
     public function assetPreview(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\AssetImportPreviewService $service
-    ): \Illuminate\View\View {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        AssetImportPreviewService $service
+    ): View {
         $user = $request->user();
 
         $this->ensureCanImportAssets(
@@ -802,12 +770,10 @@ final class BulkImportController extends Controller
                         ->getRealPath(),
                     (int) $company->id
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل دارایی قابل بررسی نیست: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'فایل دارایی قابل بررسی نیست: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -820,41 +786,34 @@ final class BulkImportController extends Controller
         ) {
             $assetPreviewToken =
                 $this->storeAssetPreviewFile(
-                    request:
-                        $request,
+                    request: $request,
 
-                    company:
-                        $company,
+                    company: $company,
 
-                    file:
-                        $request->file('file')
+                    file: $request->file('file')
                 );
         }
 
         return view(
             'bulk_import.assets',
             [
-                'companies' =>
-                    $this->companiesFor(
-                        $user
-                    ),
+                'companies' => $this->companiesFor(
+                    $user
+                ),
 
-                'assetPreview' =>
-                    $assetPreview,
+                'assetPreview' => $assetPreview,
 
-                'assetPreviewToken' =>
-                    $assetPreviewToken,
+                'assetPreviewToken' => $assetPreviewToken,
             ]
         );
     }
 
-
     public function assetCommit(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\AssetImportPreviewService $previewService,
-        \App\Services\BulkImport\AssetImportCommitService $commitService
-    ): \Symfony\Component\HttpFoundation\Response {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        AssetImportPreviewService $previewService,
+        AssetImportCommitService $commitService
+    ): Response {
         $user = $request->user();
 
         $this->ensureCanImportAssets(
@@ -884,10 +843,9 @@ final class BulkImportController extends Controller
                     $sessionKey
                 );
 
-        if (!is_array($stored)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'پیش‌نمایش دارایی معتبر نیست یا منقضی شده است. فایل را دوباره بررسی کنید.',
+        if (! is_array($stored)) {
+            throw ValidationException::withMessages([
+                'file' => 'پیش‌نمایش دارایی معتبر نیست یا منقضی شده است. فایل را دوباره بررسی کنید.',
             ]);
         }
 
@@ -908,9 +866,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'مهلت پیش‌نمایش دارایی پایان یافته است. فایل را دوباره بررسی کنید.',
+            throw ValidationException::withMessages([
+                'file' => 'مهلت پیش‌نمایش دارایی پایان یافته است. فایل را دوباره بررسی کنید.',
             ]);
         }
 
@@ -919,7 +876,7 @@ final class BulkImportController extends Controller
 
         if (
             $path === ''
-            || !is_file($path)
+            || ! is_file($path)
         ) {
             $this->forgetAssetPreview(
                 $request,
@@ -927,9 +884,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش دارایی در دسترس نیست.',
+            throw ValidationException::withMessages([
+                'file' => 'فایل پیش‌نمایش دارایی در دسترس نیست.',
             ]);
         }
 
@@ -944,7 +900,7 @@ final class BulkImportController extends Controller
 
         if (
             $expectedHash === ''
-            || !hash_equals(
+            || ! hash_equals(
                 $expectedHash,
                 $actualHash
             )
@@ -955,9 +911,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش دارایی تغییر کرده است. دوباره بارگذاری کنید.',
+            throw ValidationException::withMessages([
+                'file' => 'فایل پیش‌نمایش دارایی تغییر کرده است. دوباره بارگذاری کنید.',
             ]);
         }
 
@@ -984,12 +939,10 @@ final class BulkImportController extends Controller
                     $path,
                     (int) $company->id
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'اعتبارسنجی نهایی دارایی‌ها ناموفق بود: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'اعتبارسنجی نهایی دارایی‌ها ناموفق بود: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -1000,8 +953,7 @@ final class BulkImportController extends Controller
             $messages =
                 collect($freshPreview['rows'])
                     ->filter(
-                        fn (array $row): bool =>
-                            ($row['valid'] ?? false)
+                        fn (array $row): bool => ($row['valid'] ?? false)
                             !== true
                     )
                     ->take(5)
@@ -1016,11 +968,10 @@ final class BulkImportController extends Controller
                                 ?? []
                             )
                                 ->map(
-                                    fn (string $error): string =>
-                                        'ردیف '
-                                        . $excelRow
-                                        . ': '
-                                        . $error
+                                    fn (string $error): string => 'ردیف '
+                                        .$excelRow
+                                        .': '
+                                        .$error
                                 )
                                 ->all();
                         }
@@ -1028,35 +979,29 @@ final class BulkImportController extends Controller
                     ->values()
                     ->all();
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    array_merge(
-                        [
-                            'فایل دارایی از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست.',
-                        ],
-                        $messages
-                    ),
+            throw ValidationException::withMessages([
+                'file' => array_merge(
+                    [
+                        'فایل دارایی از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست.',
+                    ],
+                    $messages
+                ),
             ]);
         }
 
         try {
             $created =
                 $commitService->commit(
-                    company:
-                        $company,
+                    company: $company,
 
-                    rows:
-                        $freshPreview['rows'],
+                    rows: $freshPreview['rows'],
 
-                    request:
-                        $request
+                    request: $request
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'ثبت نهایی دارایی‌ها انجام نشد و هیچ ردیفی ذخیره نشد: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'ثبت نهایی دارایی‌ها انجام نشد و هیچ ردیفی ذخیره نشد: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -1075,22 +1020,21 @@ final class BulkImportController extends Controller
                 number_format(
                     $created->count()
                 )
-                . ' دارایی با موفقیت به‌صورت گروهی ثبت شد.'
+                .' دارایی با موفقیت به‌صورت گروهی ثبت شد.'
             );
     }
 
-
     private function storeAssetPreviewFile(
-        \Illuminate\Http\Request $request,
-        \App\Models\Company $company,
-        \Illuminate\Http\UploadedFile $file
+        Request $request,
+        Company $company,
+        UploadedFile $file
     ): string {
         $directory =
             storage_path(
                 'app/tmp/bulk-import/asset-previews'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             mkdir(
                 $directory,
                 0775,
@@ -1105,19 +1049,18 @@ final class BulkImportController extends Controller
 
         $path =
             $directory
-            . DIRECTORY_SEPARATOR
-            . $token
-            . '.xlsx';
+            .DIRECTORY_SEPARATOR
+            .$token
+            .'.xlsx';
 
         if (
-            !copy(
+            ! copy(
                 $file->getRealPath(),
                 $path
             )
         ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'ذخیره امن فایل پیش‌نمایش دارایی انجام نشد.',
+            throw ValidationException::withMessages([
+                'file' => 'ذخیره امن فایل پیش‌نمایش دارایی انجام نشد.',
             ]);
         }
 
@@ -1127,36 +1070,30 @@ final class BulkImportController extends Controller
                     $token
                 ),
                 [
-                    'user_id' =>
-                        $request->user()->id,
+                    'user_id' => $request->user()->id,
 
-                    'company_id' =>
-                        $company->id,
+                    'company_id' => $company->id,
 
-                    'path' =>
-                        $path,
+                    'path' => $path,
 
-                    'sha256' =>
-                        hash_file(
-                            'sha256',
-                            $path
-                        ),
+                    'sha256' => hash_file(
+                        'sha256',
+                        $path
+                    ),
 
-                    'expires_at' =>
-                        now()
-                            ->addMinutes(
-                                self::PREVIEW_TTL_MINUTES
-                            )
-                            ->timestamp,
+                    'expires_at' => now()
+                        ->addMinutes(
+                            self::PREVIEW_TTL_MINUTES
+                        )
+                        ->timestamp,
                 ]
             );
 
         return $token;
     }
 
-
     private function forgetAssetPreview(
-        \Illuminate\Http\Request $request,
+        Request $request,
         string $token,
         array $stored
     ): void {
@@ -1178,7 +1115,6 @@ final class BulkImportController extends Controller
             );
     }
 
-
     private function cleanupExpiredAssetPreviewFiles(): void
     {
         $directory =
@@ -1186,7 +1122,7 @@ final class BulkImportController extends Controller
                 'app/tmp/bulk-import/asset-previews'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             return;
         }
 
@@ -1198,10 +1134,9 @@ final class BulkImportController extends Controller
         foreach (
             glob(
                 $directory
-                . DIRECTORY_SEPARATOR
-                . '*.xlsx'
-            ) ?: []
-            as $path
+                .DIRECTORY_SEPARATOR
+                .'*.xlsx'
+            ) ?: [] as $path
         ) {
             if (
                 is_file($path)
@@ -1212,31 +1147,28 @@ final class BulkImportController extends Controller
         }
     }
 
-
     private function assetSessionKey(
         string $token
     ): string {
         return 'bulk_import.asset_preview.'
-            . $token;
+            .$token;
     }
 
-
     private function ensureCanImportAssets(
-        \App\Models\User $user
+        User $user
     ): void {
         abort_if(
-            !$user->isSuperAdmin()
-            && !$user->hasPermission(
-                'assets.create'
-            ),
-            403
+            ! $user->isSuperAdmin()
+            && (! $user->hasPermission('assets.create')
+                || ! app(RoleAccessService::class)->financialEdit($user)),
+            403,
+            'ورود گروهی دارایی به‌دلیل ثبت اطلاعات خرید، نیازمند مجوز مستقل کنترل مالی است.'
         );
     }
 
-
     public function referenceStructureIndex(
-        \Illuminate\Http\Request $request
-    ): \Illuminate\View\View {
+        Request $request
+    ): View {
         $user = $request->user();
 
         $this->ensureCanImportReferenceStructure(
@@ -1246,23 +1178,20 @@ final class BulkImportController extends Controller
         return view(
             'bulk_import.reference_structure',
             [
-                'companies' =>
-                    $this->companiesFor(
-                        $user
-                    ),
+                'companies' => $this->companiesFor(
+                    $user
+                ),
 
-                'referencePreview' =>
-                    null,
+                'referencePreview' => null,
             ]
         );
     }
 
-
     public function referenceStructureTemplate(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\ReferenceStructureTemplateService $service
-    ): \Symfony\Component\HttpFoundation\BinaryFileResponse {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        ReferenceStructureTemplateService $service
+    ): BinaryFileResponse {
         $user = $request->user();
 
         $this->ensureCanImportReferenceStructure(
@@ -1286,11 +1215,10 @@ final class BulkImportController extends Controller
             ->download(
                 $path,
                 'reference-structure-template-'
-                    . $company->id
-                    . '.xlsx',
+                    .$company->id
+                    .'.xlsx',
                 [
-                    'Content-Type' =>
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 ]
             )
             ->deleteFileAfterSend(
@@ -1298,12 +1226,11 @@ final class BulkImportController extends Controller
             );
     }
 
-
     public function referenceStructurePreview(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\ReferenceStructurePreviewService $service
-    ): \Illuminate\View\View {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        ReferenceStructurePreviewService $service
+    ): View {
         $user = $request->user();
 
         $this->ensureCanImportReferenceStructure(
@@ -1341,12 +1268,10 @@ final class BulkImportController extends Controller
                         ->getRealPath(),
                     (int) $company->id
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل ساختار سازمانی قابل بررسی نیست: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'فایل ساختار سازمانی قابل بررسی نیست: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -1368,25 +1293,21 @@ final class BulkImportController extends Controller
         return view(
             'bulk_import.reference_structure',
             [
-                'companies' =>
-                    $this->companiesFor($user),
+                'companies' => $this->companiesFor($user),
 
-                'referencePreview' =>
-                    $referencePreview,
+                'referencePreview' => $referencePreview,
 
-                'referencePreviewToken' =>
-                    $referencePreviewToken,
+                'referencePreviewToken' => $referencePreviewToken,
             ]
         );
     }
 
-
     public function referenceStructureCommit(
-        \Illuminate\Http\Request $request,
-        \App\Services\BulkImport\BulkImportCompanyResolver $resolver,
-        \App\Services\BulkImport\ReferenceStructurePreviewService $previewService,
-        \App\Services\BulkImport\ReferenceStructureCommitService $commitService
-    ): \Symfony\Component\HttpFoundation\Response {
+        Request $request,
+        BulkImportCompanyResolver $resolver,
+        ReferenceStructurePreviewService $previewService,
+        ReferenceStructureCommitService $commitService
+    ): Response {
         $user = $request->user();
 
         $this->ensureCanImportReferenceStructure(
@@ -1414,10 +1335,9 @@ final class BulkImportController extends Controller
             $request->session()
                 ->get($sessionKey);
 
-        if (!is_array($stored)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'پیش‌نمایش ساختار سازمانی معتبر نیست یا منقضی شده است.',
+        if (! is_array($stored)) {
+            throw ValidationException::withMessages([
+                'file' => 'پیش‌نمایش ساختار سازمانی معتبر نیست یا منقضی شده است.',
             ]);
         }
 
@@ -1438,9 +1358,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'مهلت پیش‌نمایش ساختار سازمانی پایان یافته است.',
+            throw ValidationException::withMessages([
+                'file' => 'مهلت پیش‌نمایش ساختار سازمانی پایان یافته است.',
             ]);
         }
 
@@ -1449,7 +1368,7 @@ final class BulkImportController extends Controller
 
         if (
             $path === ''
-            || !is_file($path)
+            || ! is_file($path)
         ) {
             $this->forgetReferenceStructurePreview(
                 $request,
@@ -1457,9 +1376,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش ساختار سازمانی در دسترس نیست.',
+            throw ValidationException::withMessages([
+                'file' => 'فایل پیش‌نمایش ساختار سازمانی در دسترس نیست.',
             ]);
         }
 
@@ -1474,7 +1392,7 @@ final class BulkImportController extends Controller
 
         if (
             $expectedHash === ''
-            || !hash_equals(
+            || ! hash_equals(
                 $expectedHash,
                 $actualHash
             )
@@ -1485,9 +1403,8 @@ final class BulkImportController extends Controller
                 $stored
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل پیش‌نمایش تغییر کرده است؛ دوباره بارگذاری کنید.',
+            throw ValidationException::withMessages([
+                'file' => 'فایل پیش‌نمایش تغییر کرده است؛ دوباره بارگذاری کنید.',
             ]);
         }
 
@@ -1513,12 +1430,10 @@ final class BulkImportController extends Controller
                     $path,
                     (int) $company->id
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'اعتبارسنجی نهایی ساختار سازمانی ناموفق بود: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'اعتبارسنجی نهایی ساختار سازمانی ناموفق بود: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -1526,9 +1441,8 @@ final class BulkImportController extends Controller
             $freshPreview['can_commit']
             !== true
         ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'فایل از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست؛ دوباره بررسی کنید.',
+            throw ValidationException::withMessages([
+                'file' => 'فایل از زمان پیش‌نمایش تا ثبت نهایی دیگر معتبر نیست؛ دوباره بررسی کنید.',
             ]);
         }
 
@@ -1539,12 +1453,10 @@ final class BulkImportController extends Controller
                     preview: $freshPreview,
                     request: $request
                 );
-        }
-        catch (\Throwable $e) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'ثبت ساختار سازمانی انجام نشد و هیچ ردیفی ذخیره نشد: '
-                    . $e->getMessage(),
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => 'ثبت ساختار سازمانی انجام نشد و هیچ ردیفی ذخیره نشد: '
+                    .$e->getMessage(),
             ]);
         }
 
@@ -1563,22 +1475,21 @@ final class BulkImportController extends Controller
                 number_format(
                     $result['created_count']
                 )
-                . ' رکورد ساختار سازمانی با موفقیت ثبت شد.'
+                .' رکورد ساختار سازمانی با موفقیت ثبت شد.'
             );
     }
 
-
     private function storeReferenceStructurePreviewFile(
-        \Illuminate\Http\Request $request,
-        \App\Models\Company $company,
-        \Illuminate\Http\UploadedFile $file
+        Request $request,
+        Company $company,
+        UploadedFile $file
     ): string {
         $directory =
             storage_path(
                 'app/tmp/bulk-import/reference-structure-previews'
             );
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             mkdir(
                 $directory,
                 0775,
@@ -1593,19 +1504,18 @@ final class BulkImportController extends Controller
 
         $path =
             $directory
-            . DIRECTORY_SEPARATOR
-            . $token
-            . '.xlsx';
+            .DIRECTORY_SEPARATOR
+            .$token
+            .'.xlsx';
 
         if (
-            !copy(
+            ! copy(
                 $file->getRealPath(),
                 $path
             )
         ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'file' =>
-                    'ذخیره امن فایل پیش‌نمایش انجام نشد.',
+            throw ValidationException::withMessages([
+                'file' => 'ذخیره امن فایل پیش‌نمایش انجام نشد.',
             ]);
         }
 
@@ -1615,34 +1525,28 @@ final class BulkImportController extends Controller
                     $token
                 ),
                 [
-                    'user_id' =>
-                        $request->user()->id,
+                    'user_id' => $request->user()->id,
 
-                    'company_id' =>
-                        $company->id,
+                    'company_id' => $company->id,
 
-                    'path' =>
-                        $path,
+                    'path' => $path,
 
-                    'sha256' =>
-                        hash_file(
-                            'sha256',
-                            $path
-                        ),
+                    'sha256' => hash_file(
+                        'sha256',
+                        $path
+                    ),
 
-                    'expires_at' =>
-                        now()
-                            ->addMinutes(30)
-                            ->timestamp,
+                    'expires_at' => now()
+                        ->addMinutes(30)
+                        ->timestamp,
                 ]
             );
 
         return $token;
     }
 
-
     private function forgetReferenceStructurePreview(
-        \Illuminate\Http\Request $request,
+        Request $request,
         string $token,
         array $stored
     ): void {
@@ -1664,28 +1568,26 @@ final class BulkImportController extends Controller
             );
     }
 
-
     private function referenceStructureSessionKey(
         string $token
     ): string {
         return
             'bulk_import.reference_structure_preview.'
-            . $token;
+            .$token;
     }
 
     private function ensureCanImportReferenceStructure(
-        \App\Models\User $user
+        User $user
     ): void {
         abort_if(
-            !$user->isSuperAdmin()
-            && !$user->hasPermission(
+            ! $user->isSuperAdmin()
+            && ! $user->hasPermission(
                 'organization.manage'
             )
-            && !$user->hasPermission(
+            && ! $user->hasPermission(
                 'employees.create'
             ),
             403
         );
     }
-
 }

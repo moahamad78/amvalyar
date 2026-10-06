@@ -12,6 +12,7 @@ use App\Support\JalaliDate;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 final class AssetRequest extends FormRequest
 {
@@ -19,7 +20,6 @@ final class AssetRequest extends FormRequest
     {
         return auth()->check();
     }
-
 
     public function rules(): array
     {
@@ -32,7 +32,6 @@ final class AssetRequest extends FormRequest
         $companyId =
             null;
 
-
         if (
             $asset instanceof Asset
         ) {
@@ -43,20 +42,18 @@ final class AssetRequest extends FormRequest
         } elseif (
             $user !== null
             &&
-            !$user->isSuperAdmin()
+            ! $user->isSuperAdmin()
         ) {
 
             $companyId =
                 $user->company_id;
         }
 
-
         $inventoryCodeRule =
             Rule::unique(
                 'assets',
                 'inventory_code'
             );
-
 
         if (
             $companyId !== null
@@ -68,7 +65,6 @@ final class AssetRequest extends FormRequest
             );
         }
 
-
         if (
             $asset instanceof Asset
         ) {
@@ -78,7 +74,6 @@ final class AssetRequest extends FormRequest
             );
         }
 
-
         $rules = [
 
             'asset_category_id' => [
@@ -86,7 +81,6 @@ final class AssetRequest extends FormRequest
                 'integer',
                 'exists:asset_categories,id',
             ],
-
 
             'asset_type_id' => [
                 'required',
@@ -111,7 +105,6 @@ final class AssetRequest extends FormRequest
                             )
                             ->first();
 
-
                     if (
                         $type === null
                     ) {
@@ -122,7 +115,6 @@ final class AssetRequest extends FormRequest
 
                         return;
                     }
-
 
                     if (
                         (int) $type->asset_category_id
@@ -139,7 +131,6 @@ final class AssetRequest extends FormRequest
                         return;
                     }
 
-
                     if (
                         $companyId !== null
                         &&
@@ -155,7 +146,6 @@ final class AssetRequest extends FormRequest
                 },
             ],
 
-
             'inventory_code' => [
                 'nullable',
                 'string',
@@ -163,13 +153,11 @@ final class AssetRequest extends FormRequest
                 $inventoryCodeRule,
             ],
 
-
             'title' => [
                 'required',
                 'string',
                 'max:255',
             ],
-
 
             'brand' => [
                 'nullable',
@@ -177,13 +165,11 @@ final class AssetRequest extends FormRequest
                 'max:255',
             ],
 
-
             'model' => [
                 'nullable',
                 'string',
                 'max:255',
             ],
-
 
             'serial_number' => [
                 'nullable',
@@ -191,13 +177,11 @@ final class AssetRequest extends FormRequest
                 'max:255',
             ],
 
-
             'manufacturer' => [
                 'nullable',
                 'string',
                 'max:255',
             ],
-
 
             'country' => [
                 'nullable',
@@ -205,64 +189,24 @@ final class AssetRequest extends FormRequest
                 'max:255',
             ],
 
-
             'purchase_date' => [
-                'nullable',
-                'string',
-
-                function (
-                    string $attribute,
-                    mixed $value,
-                    Closure $fail
-                ): void {
-
-                    if (
-                        $value === null
-                        ||
-                        trim(
-                            (string) $value
-                        ) === ''
-                    ) {
-
-                        return;
-                    }
-
-
-                    try {
-
-                        JalaliDate::toGregorianDate(
-                            (string) $value
-                        );
-
-                    } catch (\Throwable) {
-
-                        $fail(
-                            'تاریخ خرید معتبر نیست. نمونه صحیح: 1405/05/16'
-                        );
-                    }
-                },
+                'prohibited',
             ],
-
 
             'purchase_price' => [
-                'nullable',
-                'numeric',
-                'min:0',
+                'prohibited',
             ],
-
 
             'description' => [
                 'nullable',
                 'string',
             ],
 
-
             'photos' => [
                 'nullable',
                 'array',
                 'max:8',
             ],
-
 
             'photos.*' => [
                 'file',
@@ -271,18 +215,15 @@ final class AssetRequest extends FormRequest
                 'max:5120',
             ],
 
-
             'dynamic_attributes' => [
                 'nullable',
                 'array',
             ],
 
-
             'dynamic_attribute_files' => [
                 'nullable',
                 'array',
             ],
-
 
             'is_active' => [
                 'nullable',
@@ -290,13 +231,11 @@ final class AssetRequest extends FormRequest
             ],
         ];
 
-
         $typeId =
             (int) $this->input(
                 'asset_type_id',
                 0
             );
-
 
         if (
             $typeId > 0
@@ -314,11 +253,10 @@ final class AssetRequest extends FormRequest
                     )
                     ->when(
                         $companyId !== null,
-                        fn ($query) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
+                        fn ($query) => $query->where(
+                            'company_id',
+                            $companyId
+                        )
                     )
                     ->with([
                         'options' => function ($query) {
@@ -330,7 +268,6 @@ final class AssetRequest extends FormRequest
                     ])
                     ->get();
 
-
             foreach (
                 $definitions as $definition
             ) {
@@ -338,12 +275,10 @@ final class AssetRequest extends FormRequest
                 $id =
                     (int) $definition->id;
 
-
                 $requiredAtWarehouse =
                     $definition->required_stage
                     ===
                     'warehouse_entry';
-
 
                 if (
                     $definition->data_type
@@ -353,8 +288,7 @@ final class AssetRequest extends FormRequest
 
                     $field =
                         'dynamic_attribute_files.'
-                        . $id;
-
+                        .$id;
 
                     $photoRules = [
                         'nullable',
@@ -364,11 +298,10 @@ final class AssetRequest extends FormRequest
                         'max:5120',
                     ];
 
-
                     if (
                         $requiredAtWarehouse
                         &&
-                        !(
+                        ! (
                             $asset instanceof Asset
                             &&
                             $asset->attributeValues()
@@ -387,26 +320,21 @@ final class AssetRequest extends FormRequest
                             'required';
                     }
 
-
                     $rules[$field] =
                         $photoRules;
-
 
                     continue;
                 }
 
-
                 $field =
                     'dynamic_attributes.'
-                    . $id;
-
+                    .$id;
 
                 $fieldRules = [
                     $requiredAtWarehouse
                         ? 'required'
                         : 'nullable',
                 ];
-
 
                 switch (
                     $definition->data_type
@@ -419,7 +347,6 @@ final class AssetRequest extends FormRequest
 
                         break;
 
-
                     case 'date':
 
                         $fieldRules[] =
@@ -427,14 +354,12 @@ final class AssetRequest extends FormRequest
 
                         break;
 
-
                     case 'boolean':
 
                         $fieldRules[] =
                             'boolean';
 
                         break;
-
 
                     case 'select':
 
@@ -458,7 +383,6 @@ final class AssetRequest extends FormRequest
                                     return;
                                 }
 
-
                                 $valid =
                                     AssetAttributeOption::query()
                                         ->whereKey(
@@ -474,19 +398,17 @@ final class AssetRequest extends FormRequest
                                         )
                                         ->exists();
 
-
-                                if (!$valid) {
+                                if (! $valid) {
 
                                     $fail(
                                         'گزینه انتخاب‌شده برای '
-                                        . $definition->name
-                                        . ' معتبر نیست.'
+                                        .$definition->name
+                                        .' معتبر نیست.'
                                     );
                                 }
                             };
 
                         break;
-
 
                     case 'textarea':
 
@@ -494,7 +416,6 @@ final class AssetRequest extends FormRequest
                             'string';
 
                         break;
-
 
                     case 'text':
                     default:
@@ -508,22 +429,25 @@ final class AssetRequest extends FormRequest
                         break;
                 }
 
-
                 $rules[$field] =
                     $fieldRules;
             }
         }
 
-
-        return $rules;
+        return array_map(
+            static fn (array $fieldRules): array => array_values(array_filter(
+                $fieldRules,
+                static fn (mixed $rule): bool => $rule !== null
+            )),
+            $rules
+        );
     }
-
 
     protected function prepareForValidation(): void
     {
         $dates = $this->input('dynamic_dates_jalali', []);
         if (! is_array($dates)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['dynamic_dates_jalali' => 'تاریخ‌ها معتبر نیستند.']);
+            throw ValidationException::withMessages(['dynamic_dates_jalali' => 'تاریخ‌ها معتبر نیستند.']);
         }
         if ($dates === [] || ! is_scalar($this->input('asset_type_id'))) {
             return;
@@ -545,7 +469,7 @@ final class AssetRequest extends FormRequest
                 }
                 $values[$id] = JalaliDate::toGregorianDate($value);
             } catch (\Throwable) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['dynamic_dates_jalali.'.$id => 'تاریخ شمسی معتبر وارد کنید.']);
+                throw ValidationException::withMessages(['dynamic_dates_jalali.'.$id => 'تاریخ شمسی معتبر وارد کنید.']);
             }
         }
         $this->merge(['dynamic_attributes' => $values]);
@@ -555,31 +479,27 @@ final class AssetRequest extends FormRequest
          */
     }
 
-
     public function messages(): array
     {
         return [
 
-            'asset_category_id.required' =>
-                'دسته‌بندی الزامی است.',
+            'asset_category_id.required' => 'دسته‌بندی الزامی است.',
 
-            'asset_category_id.exists' =>
-                'دسته‌بندی انتخاب‌شده معتبر نیست.',
+            'asset_category_id.exists' => 'دسته‌بندی انتخاب‌شده معتبر نیست.',
 
-            'asset_type_id.required' =>
-                'نوع دارایی الزامی است.',
+            'asset_type_id.required' => 'نوع دارایی الزامی است.',
 
-            'asset_type_id.integer' =>
-                'نوع دارایی انتخاب‌شده معتبر نیست.',
+            'asset_type_id.integer' => 'نوع دارایی انتخاب‌شده معتبر نیست.',
 
-            'inventory_code.unique' =>
-                'این کد انبار قبلاً در همین شرکت ثبت شده است.',
+            'inventory_code.unique' => 'این کد انبار قبلاً در همین شرکت ثبت شده است.',
 
-            'title.required' =>
-                'عنوان دارایی الزامی است.',
+            'title.required' => 'عنوان دارایی الزامی است.',
 
-            'purchase_price.numeric' =>
-                'مبلغ خرید معتبر نیست.',
+            'purchase_price.numeric' => 'مبلغ خرید معتبر نیست.',
+
+            'purchase_price.prohibited' => 'ویرایش مبلغ خرید فقط از بخش کنترل مالی دارایی مجاز است.',
+
+            'purchase_date.prohibited' => 'ویرایش تاریخ خرید فقط از بخش کنترل مالی دارایی مجاز است.',
         ];
     }
 }

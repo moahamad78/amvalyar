@@ -18,11 +18,14 @@ use Illuminate\Validation\ValidationException;
 
 final class StocktakeReconciliationService
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     public function applyObserved(StocktakeItem $item, User $actor, ?string $note = null): StocktakeItem
     {
         return DB::transaction(function () use ($item, $actor, $note): StocktakeItem {
             $locked = $this->lockItem($item, $actor);
             $stocktake = $this->completedStocktake($locked);
+            $note = $this->requiredNote($note);
             $asset = Asset::withoutGlobalScopes()->lockForUpdate()->findOrFail($locked->asset_id);
 
             if ((int) $asset->company_id !== (int) $stocktake->company_id) {
@@ -80,6 +83,15 @@ final class StocktakeReconciliationService
                 'reconciliation_note' => $note,
             ])->save();
 
+            $this->auditLog->log(
+                'stocktake.discrepancy_applied',
+                $locked,
+                $before,
+                $after,
+                'مغایرت انبارگردانی با اعمال وضعیت مشاهده‌شده رفع شد: '.$note,
+                actor: $actor
+            );
+
             return $locked->fresh(['asset', 'reconciler']);
         });
     }
@@ -89,6 +101,7 @@ final class StocktakeReconciliationService
         return DB::transaction(function () use ($item, $actor, $note): StocktakeItem {
             $locked = $this->lockItem($item, $actor);
             $this->completedStocktake($locked);
+            $note = $this->requiredNote($note);
 
             if (! in_array($locked->result_status, [
                 StocktakeItem::RESULT_MISSING,
@@ -109,6 +122,18 @@ final class StocktakeReconciliationService
                 'reconciliation_note' => $note,
             ])->save();
 
+            $this->auditLog->log(
+                'stocktake.discrepancy_resolved_without_change',
+                $locked,
+                ['reconciliation_status' => StocktakeItem::RECONCILIATION_PENDING],
+                [
+                    'reconciliation_status' => StocktakeItem::RECONCILIATION_NO_CHANGE,
+                    'reconciliation_note' => $note,
+                ],
+                'مغایرت بدون تغییر در پرونده اصلی مختومه شد: '.$note,
+                actor: $actor
+            );
+
             return $locked->fresh(['reconciler']);
         });
     }
@@ -123,6 +148,19 @@ final class StocktakeReconciliationService
 
         if ($locked->reconciliation_status !== StocktakeItem::RECONCILIATION_PENDING) {
             throw ValidationException::withMessages(['reconciliation' => 'Stocktake item is already reconciled.']);
+        }
+
+        if ((int) $locked->counted_by === (int) $actor->id) {
+            throw ValidationException::withMessages([
+                'reconciliation' => 'شمارش‌کننده نمی‌تواند مغایرت همان قلم را رسیدگی و مختومه کند.',
+            ]);
+        }
+
+        $stocktake = Stocktake::withoutGlobalScopes()->findOrFail($locked->stocktake_id);
+        if ((int) $stocktake->completed_by === (int) $actor->id) {
+            throw ValidationException::withMessages([
+                'reconciliation' => 'تأییدکننده نهایی انبارگردانی نمی‌تواند نتیجه تأییدشده خود را شخصاً اصلاح کند.',
+            ]);
         }
 
         return $locked;
@@ -170,6 +208,7 @@ final class StocktakeReconciliationService
             if ($userId || $employeeId || $departmentId || $siteId || $locationId) {
                 throw ValidationException::withMessages(['reconciliation' => 'Warehouse custody cannot retain holder or location references.']);
             }
+
             return $this->state('warehouse', $type, null, null, null, null, null);
         }
 
@@ -182,6 +221,7 @@ final class StocktakeReconciliationService
             if ($userId !== null && $employee->user_id !== null && (int) $userId !== (int) $employee->user_id) {
                 throw ValidationException::withMessages(['user_id' => 'Observed user does not match observed employee.']);
             }
+
             return $this->state(
                 'assigned',
                 $type,
@@ -199,6 +239,7 @@ final class StocktakeReconciliationService
             }
             User::withoutGlobalScopes()->where('company_id', $asset->company_id)
                 ->where('is_active', true)->findOrFail($userId);
+
             return $this->state('assigned', $type, $userId, null, $departmentId, $siteId, $locationId);
         }
 
@@ -206,6 +247,7 @@ final class StocktakeReconciliationService
             if (! $departmentId && ! $siteId && ! $locationId) {
                 throw ValidationException::withMessages(['organization' => 'Observed organization custody requires department, site, or location.']);
             }
+
             return $this->state('assigned', $type, null, null, $departmentId, $siteId, $locationId);
         }
 
@@ -242,5 +284,17 @@ final class StocktakeReconciliationService
             'site_id' => $asset->current_site_id,
             'location_id' => $asset->current_location_id,
         ];
+    }
+
+    private function requiredNote(?string $note): string
+    {
+        $note = trim((string) $note);
+        if (mb_strlen($note) < 10) {
+            throw ValidationException::withMessages([
+                'note' => 'برای رسیدگی مغایرت، شرح مستند حداقل ۱۰ نویسه الزامی است.',
+            ]);
+        }
+
+        return $note;
     }
 }

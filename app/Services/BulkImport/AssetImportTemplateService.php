@@ -13,13 +13,15 @@ use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
 
 final class AssetImportTemplateService
 {
     public const TEMPLATE_TYPE = 'assets';
-    public const TEMPLATE_VERSION = '1.0';
+
+    public const TEMPLATE_VERSION = '1.1';
 
     public function generate(int $companyId): string
     {
@@ -29,7 +31,7 @@ final class AssetImportTemplateService
             throw new RuntimeException('Company not found.');
         }
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $input = $spreadsheet->getActiveSheet();
         $input->setTitle('دارایی‌ها');
 
@@ -45,6 +47,8 @@ final class AssetImportTemplateService
             'کشور',
             'تاریخ خرید',
             'مبلغ خرید',
+            'تأمین‌کننده',
+            'شماره سند خرید/تحصیل',
             'توضیحات',
             'وضعیت',
         ];
@@ -55,13 +59,13 @@ final class AssetImportTemplateService
 
         $input->freezePane('A2');
         $input->setRightToLeft(true);
-        $input->getStyle('A1:M1')->getFont()->setBold(true);
-        $input->getStyle('A1:M1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $input->getStyle('A1:M1')->getFill()
+        $input->getStyle('A1:O1')->getFont()->setBold(true);
+        $input->getStyle('A1:O1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $input->getStyle('A1:O1')->getFill()
             ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setARGB('FFE2E8F0');
 
-        foreach (range('A', 'M') as $column) {
+        foreach (range('A', 'O') as $column) {
             $input->getColumnDimension($column)->setWidth(20);
         }
 
@@ -70,7 +74,7 @@ final class AssetImportTemplateService
         $guide->setRightToLeft(true);
         $guide->fromArray([
             ['راهنمای ورود گروهی دارایی‌ها'],
-            ['شرکت', $company->name ?? ('#' . $companyId)],
+            ['شرکت', $company->name ?? ('#'.$companyId)],
             ['نسخه قالب', self::TEMPLATE_VERSION],
             [],
             ['نکته'],
@@ -79,11 +83,12 @@ final class AssetImportTemplateService
             ['کد اموال در صورت ورود، داخل همان شرکت باید یکتا باشد.'],
             ['دارایی جدید با وضعیت انبار وارد می‌شود؛ تحویل/انتقال از گردش دارایی انجام شود.'],
             ['تاریخ خرید را به صورت شمسی مانند 1405/05/24 وارد کنید.'],
+            ['برای مبلغ خرید بیشتر از صفر، تاریخ و شماره فاکتور/سند تحصیل الزامی است.'],
         ]);
 
         $lists = $spreadsheet->createSheet();
         $lists->setTitle('_lists');
-        $lists->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_VERYHIDDEN);
+        $lists->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
 
         $lists->fromArray([
             ['category_label', 'category_id', 'type_label', 'type_id', 'type_category_id', 'status_label', 'status_value'],
@@ -124,10 +129,10 @@ final class AssetImportTemplateService
         $lists->setCellValue('G2', 'warehouse');
 
         $spreadsheet->addNamedRange(
-            new NamedRange('BI_ASSET_CATEGORIES', $lists, '$A$2:$A$' . $categoryEnd)
+            new NamedRange('BI_ASSET_CATEGORIES', $lists, '$A$2:$A$'.$categoryEnd)
         );
         $spreadsheet->addNamedRange(
-            new NamedRange('BI_ASSET_TYPES', $lists, '$C$2:$C$' . $typeEnd)
+            new NamedRange('BI_ASSET_TYPES', $lists, '$C$2:$C$'.$typeEnd)
         );
         $spreadsheet->addNamedRange(
             new NamedRange('BI_ASSET_STATUSES', $lists, '$F$2:$F$2')
@@ -137,22 +142,22 @@ final class AssetImportTemplateService
             foreach ([
                 'A' => '=BI_ASSET_CATEGORIES',
                 'B' => '=BI_ASSET_TYPES',
-                'M' => '=BI_ASSET_STATUSES',
+                'O' => '=BI_ASSET_STATUSES',
             ] as $column => $formula) {
-                $validation = new DataValidation();
+                $validation = new DataValidation;
                 $validation->setType(DataValidation::TYPE_LIST);
                 $validation->setErrorStyle(DataValidation::STYLE_STOP);
                 $validation->setAllowBlank($column !== 'A' && $column !== 'B');
                 $validation->setShowDropDown(true);
                 $validation->setShowErrorMessage(true);
                 $validation->setFormula1($formula);
-                $input->getCell($column . $excelRow)->setDataValidation($validation);
+                $input->getCell($column.$excelRow)->setDataValidation($validation);
             }
         }
 
         $meta = $spreadsheet->createSheet();
         $meta->setTitle('_meta');
-        $meta->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_VERYHIDDEN);
+        $meta->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
         $meta->fromArray([
             ['key', 'value'],
             ['template_type', self::TEMPLATE_TYPE],
@@ -169,12 +174,12 @@ final class AssetImportTemplateService
 
         $directory = storage_path('app/bulk-import/templates');
 
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
             throw new RuntimeException('Could not create template directory.');
         }
 
-        $path = $directory . DIRECTORY_SEPARATOR
-            . 'assets-company-' . $companyId . '-' . now()->format('Ymd-His') . '.xlsx';
+        $path = $directory.DIRECTORY_SEPARATOR
+            .'assets-company-'.$companyId.'-'.now()->format('Ymd-His').'.xlsx';
 
         (new Xlsx($spreadsheet))->save($path);
         $spreadsheet->disconnectWorksheets();

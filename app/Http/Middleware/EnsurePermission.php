@@ -24,7 +24,7 @@ class EnsurePermission
         }
 
         if (
-            !$user->hasPermission(
+            ! $user->hasPermission(
                 $permission
             )
         ) {

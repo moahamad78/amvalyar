@@ -21,6 +21,7 @@ chown -R www-data:www-data storage bootstrap/cache
 php artisan package:discover --ansi
 php artisan config:clear
 php artisan migrate --force
+php artisan permissions:sync --no-interaction
 php artisan app:bootstrap-demo-admin
 if [ "${KIMIA_DEMO_ENABLED:-false}" = "true" ]; then
     php artisan demo:provision-kimia --force --no-interaction

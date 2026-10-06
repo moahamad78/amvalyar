@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 final class StocktakeCountingService
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     public function observe(
         Stocktake $stocktake,
         Asset $asset,
@@ -100,6 +102,7 @@ final class StocktakeCountingService
                 (bool) ($observed['damaged'] ?? false)
             );
 
+            $previousResult = $item->result_status;
             $item->forceFill([
                 'result_status' => $result,
                 'observed_custody_type' => $observedCustodyType,
@@ -113,6 +116,15 @@ final class StocktakeCountingService
                 'count_round' => max(1, (int) $item->count_round + 1),
                 'notes' => $observed['notes'] ?? $item->notes,
             ])->save();
+
+            $this->auditLog->log(
+                'stocktake.item_counted',
+                $item,
+                ['result_status' => $previousResult],
+                ['result_status' => $result, 'count_round' => $item->count_round],
+                'مشاهده فیزیکی قلم در انبارگردانی ثبت شد.',
+                actor: $actor
+            );
 
             return $item->fresh();
         });
@@ -169,6 +181,7 @@ final class StocktakeCountingService
                 ]);
             }
 
+            $previousResult = $item->result_status;
             $item->forceFill([
                 'result_status' => StocktakeItem::RESULT_MISSING,
                 'counted_by' => $actor->id,
@@ -176,6 +189,15 @@ final class StocktakeCountingService
                 'count_round' => max(1, (int) $item->count_round + 1),
                 'notes' => $notes ?? $item->notes,
             ])->save();
+
+            $this->auditLog->log(
+                'stocktake.item_missing',
+                $item,
+                ['result_status' => $previousResult],
+                ['result_status' => StocktakeItem::RESULT_MISSING, 'count_round' => $item->count_round],
+                'قلم در شمارش فیزیکی یافت نشد.',
+                actor: $actor
+            );
 
             return $item->fresh();
         });

@@ -130,6 +130,7 @@ final class AssetRepairProductionEndToEndTest extends TestCase
         $role = Role::withoutGlobalScopes()->findOrFail($user->role_id);
         $role->permissions()->syncWithoutDetaching($permissions->pluck('id')->all());
         $user->unsetRelation('role');
+        auth()->user()?->unsetRelation('role');
     }
 
     private function loginAs(User $user): void

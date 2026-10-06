@@ -20,7 +20,6 @@ final class AssetCodeHttpTest extends TestCase
 {
     use DatabaseTransactions;
 
-
     public function test_real_asset_store_route_defers_permanent_asset_code(): void
     {
         /*
@@ -58,7 +57,6 @@ final class AssetCodeHttpTest extends TestCase
             'testadmin does not have assets.create permission.'
         );
 
-
         /*
          * Build a REAL domain login session.
          *
@@ -70,24 +68,18 @@ final class AssetCodeHttpTest extends TestCase
 
         $loginSession =
             LoginSession::start(
-                sessionId:
-                    $sessionId,
+                sessionId: $sessionId,
 
-                userId:
-                    UserId::fromInt(
-                        (int) $user->id
-                    ),
+                userId: UserId::fromInt(
+                    (int) $user->id
+                ),
 
-                ipAddress:
-                    '127.0.0.1',
+                ipAddress: '127.0.0.1',
 
-                userAgent:
-                    'PHPUnit Asset Code HTTP Test',
+                userAgent: 'PHPUnit Asset Code HTTP Test',
 
-                computerName:
-                    'PHPUNIT',
+                computerName: 'PHPUNIT',
             );
-
 
         $sessionRepository =
             app(
@@ -97,7 +89,6 @@ final class AssetCodeHttpTest extends TestCase
         $sessionRepository->save(
             $loginSession
         );
-
 
         /*
          * Confirm the repository can read it back,
@@ -124,7 +115,6 @@ final class AssetCodeHttpTest extends TestCase
                 ->userId()
                 ->value()
         );
-
 
         /*
          * Resolve actual company-specific LAPTOP type.
@@ -154,7 +144,6 @@ final class AssetCodeHttpTest extends TestCase
             'Active LAPTOP asset type was not found.'
         );
 
-
         $unique =
             str_replace(
                 '.',
@@ -165,49 +154,32 @@ final class AssetCodeHttpTest extends TestCase
                 )
             );
 
-
         $payload = [
 
-            'asset_category_id' =>
-                (int) $type->asset_category_id,
+            'asset_category_id' => (int) $type->asset_category_id,
 
-            'asset_type_id' =>
-                (int) $type->id,
+            'asset_type_id' => (int) $type->id,
 
-            'inventory_code' =>
-                'HTTP-' . $unique,
+            'inventory_code' => 'HTTP-'.$unique,
 
-            'title' =>
-                'HTTP Asset Code Policy Test',
+            'title' => 'HTTP Asset Code Policy Test',
 
-            'brand' =>
-                'TEST',
+            'brand' => 'TEST',
 
-            'model' =>
-                'HTTP',
+            'model' => 'HTTP',
 
-            'serial_number' =>
-                'SER-' . $unique,
+            'serial_number' => 'SER-'.$unique,
 
-            'manufacturer' =>
-                'TEST',
+            'manufacturer' => 'TEST',
 
-            'country' =>
-                'IR',
+            'country' => 'IR',
 
-            'purchase_price' =>
-                0,
+            'description' => 'Automated real HTTP policy test',
 
-            'description' =>
-                'Automated real HTTP policy test',
+            'is_active' => 1,
 
-            'is_active' =>
-                1,
-
-            'dynamic_attributes' =>
-                [],
+            'dynamic_attributes' => [],
         ];
-
 
         /*
          * Automatically satisfy required dynamic fields
@@ -228,24 +200,22 @@ final class AssetCodeHttpTest extends TestCase
                     true
                 )
                 ->with([
-                    'options' =>
-                        function ($query): void {
+                    'options' => function ($query): void {
 
-                            $query
-                                ->where(
-                                    'is_active',
-                                    true
-                                )
-                                ->orderBy(
-                                    'sort_order'
-                                )
-                                ->orderBy(
-                                    'id'
-                                );
-                        },
+                        $query
+                            ->where(
+                                'is_active',
+                                true
+                            )
+                            ->orderBy(
+                                'sort_order'
+                            )
+                            ->orderBy(
+                                'id'
+                            );
+                    },
                 ])
                 ->get();
-
 
         foreach ($definitions as $definition) {
 
@@ -257,10 +227,8 @@ final class AssetCodeHttpTest extends TestCase
                 continue;
             }
 
-
             $id =
                 (int) $definition->id;
-
 
             switch ($definition->data_type) {
 
@@ -271,7 +239,6 @@ final class AssetCodeHttpTest extends TestCase
                     ][$id] = 1;
 
                     break;
-
 
                 case 'date':
 
@@ -284,7 +251,6 @@ final class AssetCodeHttpTest extends TestCase
 
                     break;
 
-
                 case 'boolean':
 
                     $payload[
@@ -292,7 +258,6 @@ final class AssetCodeHttpTest extends TestCase
                     ][$id] = 1;
 
                     break;
-
 
                 case 'select':
 
@@ -313,7 +278,6 @@ final class AssetCodeHttpTest extends TestCase
 
                     break;
 
-
                 case 'photo':
 
                     $payload[
@@ -328,7 +292,6 @@ final class AssetCodeHttpTest extends TestCase
 
                     break;
 
-
                 case 'textarea':
                 case 'text':
                 default:
@@ -342,7 +305,6 @@ final class AssetCodeHttpTest extends TestCase
             }
         }
 
-
         /*
          * Standard Laravel authentication.
          */
@@ -350,19 +312,15 @@ final class AssetCodeHttpTest extends TestCase
             $user
         );
 
-
         /*
          * Custom domain-session values used by
          * EnsureActiveLoginSession.
          */
         $this->withSession([
-            'domain_session_id' =>
-                $sessionId->value(),
+            'domain_session_id' => $sessionId->value(),
 
-            'domain_user_id' =>
-                (int) $user->id,
+            'domain_user_id' => (int) $user->id,
         ]);
-
 
         /*
          * Execute the REAL HTTP route.
@@ -374,7 +332,6 @@ final class AssetCodeHttpTest extends TestCase
                 ),
                 $payload
             );
-
 
         /*
          * Give useful information if validation fails.
@@ -389,7 +346,7 @@ final class AssetCodeHttpTest extends TestCase
 
             self::fail(
                 'Validation/Auth errors: '
-                . json_encode(
+                .json_encode(
                     $response
                         ->getSession()
                         ->get(
@@ -403,13 +360,11 @@ final class AssetCodeHttpTest extends TestCase
             );
         }
 
-
         $response->assertRedirect(
             route(
                 'assets.index'
             )
         );
-
 
         /*
          * Find asset created by the real Controller.
@@ -428,30 +383,25 @@ final class AssetCodeHttpTest extends TestCase
                 )
                 ->first();
 
-
         self::assertNotNull(
             $asset,
             'Asset was not created through the real HTTP route.'
         );
-
 
         self::assertSame(
             2,
             (int) $asset->company_id
         );
 
-
         self::assertSame(
             1,
             (int) $asset->asset_category_id
         );
 
-
         self::assertSame(
             (int) $type->id,
             (int) $asset->asset_type_id
         );
-
 
         /*
          * Permanent asset code must NOT be allocated
@@ -463,17 +413,14 @@ final class AssetCodeHttpTest extends TestCase
             $asset->asset_code
         );
 
-
         self::assertSame(
             'warehouse',
             $asset->status
         );
 
-
         self::assertNull(
             $asset->plate_number
         );
-
 
         /*
          * Middleware calls touch() + repository save().

@@ -18,12 +18,13 @@ final class RoleAccessService
         if ($user->isSuperAdmin()) {
             return 'company';
         }
-        if (!$user->role?->is_active) {
+        if (! $user->role?->is_active) {
             return 'self';
         }
         if ($user->hasPermission('assets.view_all')) {
             return 'company';
         }
+
         return match ($user->role?->name) {
             'admin', 'company_admin', 'finance_manager', 'accounting_head', 'inspection_head', 'ceo', 'asset_manager', 'chief_asset_keeper', 'warehouse_manager', 'warehouse_supervisor' => 'company',
             'unit_manager', 'engineering_head', 'production_planning_head', 'production_head', 'qc_rnd_head', 'administrative_head', 'factory_manager', 'commercial_manager', 'hr_manager', 'systems_manager' => 'department',
@@ -35,6 +36,21 @@ final class RoleAccessService
     {
         return $user->isSuperAdmin() || ($user->role?->is_active && in_array($user->role?->name, ['admin', 'company_admin', 'finance_manager', 'accounting_head', 'ceo'], true))
             || $user->hasPermission('assets.financial');
+    }
+
+    /**
+     * Viewing financial values and changing the accounting source record are
+     * intentionally separate privileges. Executives and tenant administrators
+     * may need visibility without being allowed to rewrite acquisition values.
+     */
+    public function financialEdit(User $user): bool
+    {
+        return $user->isSuperAdmin()
+            || ($user->role?->is_active && in_array($user->role?->name, [
+                'finance_manager',
+                'accounting_head',
+            ], true))
+            || ($user->role?->is_active && $user->role->hasPermission('assets.financial_edit'));
     }
 
     public function constrainAssets(Builder $query, User $user): void

@@ -619,50 +619,6 @@
             </div>
 
 
-            <div class="col-md-3 mb-3">
-
-                <label class="form-label">
-                    تاریخ خرید
-                </label>
-
-                <input
-                    type="text"
-                    id="purchase_date"
-                    name="purchase_date"
-                    class="form-control jalali-date-input"
-                    dir="ltr"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    data-jdp
-                    placeholder="1405/05/16"
-                    value="{{ old(
-                        'purchase_date',
-                        isset($asset) && $asset->purchase_date
-                            ? \App\Support\JalaliDate::input($asset->purchase_date)
-                            : ''
-                    ) }}"
-                >
-
-            </div>
-
-
-            <div class="col-md-3 mb-3">
-
-                <label class="form-label">
-                    مبلغ خرید
-                </label>
-
-                <input
-                    type="number"
-                    step="0.01"
-                    name="purchase_price"
-                    class="form-control"
-                    value="{{ old('purchase_price', $asset->purchase_price ?? 0) }}"
-                >
-
-            </div>
-
-
             <div class="col-12 mb-4">
 
                 <label class="form-label">

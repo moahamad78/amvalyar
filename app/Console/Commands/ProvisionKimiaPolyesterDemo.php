@@ -21,8 +21,9 @@ final class ProvisionKimiaPolyesterDemo extends Command
             throw new RuntimeException('Use --force to provision demo data in production.');
         }
 
-        if (Company::query()->where('code', 'KIMIA-DEMO')->exists()) {
-            $this->components->info('Kimia demo company already exists; no data or passwords changed.');
+        if ($company = Company::query()->where('code', 'KIMIA-DEMO')->first()) {
+            $provisioner->reconcileFinancialControls($company);
+            $this->components->info('Kimia demo company already exists; financial controls and missing synthetic acquisition evidence were reconciled without changing passwords.');
 
             return self::SUCCESS;
         }

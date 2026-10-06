@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\BulkImport;
 
-use App\Models\Company;
 use App\Models\Asset;
 use App\Models\AssetTransaction;
+use App\Models\AssetType;
+use App\Models\Company;
+use App\Models\Employee;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\BulkImport\InitialAssetSetupCommitService;
 use App\Services\BulkImport\InitialAssetSetupTemplateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\TestCase;
 use Illuminate\Http\Request;
+use Tests\TestCase;
 
 final class InitialAssetSetupTest extends TestCase
 {
@@ -32,11 +35,12 @@ final class InitialAssetSetupTest extends TestCase
         $spreadsheet = app(InitialAssetSetupTemplateService::class)->build($company);
 
         self::assertSame('موجودی اولیه', $spreadsheet->getSheet(0)->getTitle());
-        self::assertSame('نوع استقرار *', $spreadsheet->getSheet(0)->getCell('L1')->getValue());
-        self::assertSame('کد سایت کدگذاری *', $spreadsheet->getSheet(0)->getCell('Q1')->getValue());
-        self::assertSame('=BI_INITIAL_SETUP_EMPLOYEES', $spreadsheet->getSheet(0)->getCell('M2')->getDataValidation()->getFormula1());
-        self::assertTrue($spreadsheet->getSheet(0)->getCell('M2')->getDataValidation()->getShowDropDown());
-        self::assertSame('=BI_INITIAL_SETUP_LOCATIONS', $spreadsheet->getSheet(0)->getCell('P2')->getDataValidation()->getFormula1());
+        self::assertSame('شماره سند خرید/تحصیل', $spreadsheet->getSheet(0)->getCell('M1')->getValue());
+        self::assertSame('نوع استقرار *', $spreadsheet->getSheet(0)->getCell('N1')->getValue());
+        self::assertSame('کد سایت کدگذاری *', $spreadsheet->getSheet(0)->getCell('S1')->getValue());
+        self::assertSame('=BI_INITIAL_SETUP_EMPLOYEES', $spreadsheet->getSheet(0)->getCell('O2')->getDataValidation()->getFormula1());
+        self::assertTrue($spreadsheet->getSheet(0)->getCell('O2')->getDataValidation()->getShowDropDown());
+        self::assertSame('=BI_INITIAL_SETUP_LOCATIONS', $spreadsheet->getSheet(0)->getCell('R2')->getDataValidation()->getFormula1());
         self::assertSame(InitialAssetSetupTemplateService::TEMPLATE_TYPE, $spreadsheet->getSheetByName('_meta')->getCell('B2')->getValue());
         self::assertSame((int) $company->id, (int) $spreadsheet->getSheetByName('_meta')->getCell('B4')->getValue());
 
@@ -47,9 +51,9 @@ final class InitialAssetSetupTest extends TestCase
     {
         $company = Company::query()->where('code', 'KIMIA-DEMO')->firstOrFail();
         $actor = User::query()->where('company_id', $company->id)->where('username', 'kimia.company.admin')->firstOrFail();
-        $employee = \App\Models\Employee::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
-        $type = \App\Models\AssetType::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
-        $site = \App\Models\Site::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $employee = Employee::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $type = AssetType::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $site = Site::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
         $assetBefore = Asset::withoutGlobalScopes()->where('company_id', $company->id)->count();
         $request = Request::create('/initial-setup/commit', 'POST');
         $request->setUserResolver(static fn () => $actor);
@@ -64,6 +68,7 @@ final class InitialAssetSetupTest extends TestCase
                 'brand' => null, 'model' => null, 'serial_number' => null,
                 'manufacturer' => null, 'country' => null, 'purchase_date' => null,
                 'purchase_price' => 0, 'description' => null,
+                'supplier_name' => null, 'acquisition_document_number' => null,
                 'custody_type' => 'employee', 'employee_id' => $employee->id,
                 'department_id' => null, 'site_id' => null, 'location_id' => null,
                 'coding_site_id' => $site->id,

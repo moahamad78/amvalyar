@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AssetRequest;
 use App\Models\Asset;
-use App\Models\AssetAttributeDefinition;
 use App\Models\AssetCategory;
+use App\Models\AssetRepairRequest;
 use App\Models\AssetType;
 use App\Models\Department;
 use App\Models\Employee;
@@ -15,7 +15,8 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AssetAttributeValueService;
 use App\Services\AssetPhotoService;
-use App\Support\JalaliDate;
+use App\Services\AuditLogService;
+use App\Services\RoleAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -66,11 +67,10 @@ final class AssetController extends Controller
             ->withQueryString();
 
         $employees = Employee::query()->where('is_active', true)
-            ->when(app(\App\Services\RoleAccessService::class)->scope($request->user()) === 'self', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->when(app(RoleAccessService::class)->scope($request->user()) === 'self', fn ($q) => $q->where('user_id', $request->user()->id))
             ->orderBy('display_name')->get(['id', 'display_name', 'personnel_code']);
         $departments = Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-
 
         return view(
             'assets.index',
@@ -79,7 +79,6 @@ final class AssetController extends Controller
             )
         );
     }
-
 
     public function create(
         Request $request
@@ -94,7 +93,6 @@ final class AssetController extends Controller
                 ->orderBy('name')
                 ->get();
 
-
         $types =
             AssetType::query()
                 ->where(
@@ -102,52 +100,47 @@ final class AssetController extends Controller
                     true
                 )
                 ->when(
-                    !$request->user()
+                    ! $request->user()
                         ->isSuperAdmin(),
 
-                    fn ($query) =>
-                        $query->where(
-                            'company_id',
-                            $request->user()
-                                ->company_id
-                        )
+                    fn ($query) => $query->where(
+                        'company_id',
+                        $request->user()
+                            ->company_id
+                    )
                 )
                 ->with([
-                    'attributeDefinitions' =>
-                        function ($query) {
+                    'attributeDefinitions' => function ($query) {
 
-                            $query
-                                ->where(
-                                    'is_active',
-                                    true
-                                )
-                                ->with([
-                                    'options' =>
-                                        function ($optionQuery) {
+                        $query
+                            ->where(
+                                'is_active',
+                                true
+                            )
+                            ->with([
+                                'options' => function ($optionQuery) {
 
-                                            $optionQuery
-                                                ->where(
-                                                    'is_active',
-                                                    true
-                                                )
-                                                ->orderBy(
-                                                    'sort_order'
-                                                )
-                                                ->orderBy(
-                                                    'id'
-                                                );
-                                        },
-                                ]);
-                        },
+                                    $optionQuery
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy(
+                                            'sort_order'
+                                        )
+                                        ->orderBy(
+                                            'id'
+                                        );
+                                },
+                            ]);
+                    },
                 ])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get();
 
-
         $dynamicValues =
             collect();
-
 
         return view(
             'assets.create',
@@ -159,16 +152,15 @@ final class AssetController extends Controller
         );
     }
 
-
     public function store(
         AssetRequest $request,
         AssetPhotoService $assetPhotoService,
-        AssetAttributeValueService $attributeValueService
+        AssetAttributeValueService $attributeValueService,
+        AuditLogService $auditLogService
     ): RedirectResponse {
 
         $data =
             $request->validated();
-
 
         unset(
             $data['photos'],
@@ -176,10 +168,8 @@ final class AssetController extends Controller
             $data['dynamic_attribute_files']
         );
 
-
         $data['status'] =
             'warehouse';
-
 
         /*
          * Permanent asset code is intentionally NOT issued
@@ -191,9 +181,8 @@ final class AssetController extends Controller
         $data['asset_code'] =
             null;
 
-
         if (
-            !$request->user()
+            ! $request->user()
                 ->isSuperAdmin()
         ) {
 
@@ -202,7 +191,6 @@ final class AssetController extends Controller
                     ->company_id;
         }
 
-
         $companyId =
             (int) (
                 $data['company_id']
@@ -210,61 +198,62 @@ final class AssetController extends Controller
                 0
             );
 
-
         if (
             $companyId <= 0
         ) {
 
             throw ValidationException::withMessages([
-                'company_id' =>
-                    'شرکت دارایی مشخص نشده است.',
+                'company_id' => 'شرکت دارایی مشخص نشده است.',
             ]);
         }
-$asset =
-            DB::transaction(
-                function () use (
-                    $request,
-                    $data,
-                    $assetPhotoService,
-                    $attributeValueService
-                ): Asset {
+        $asset =
+                    DB::transaction(
+                        function () use (
+                            $request,
+                            $data,
+                            $assetPhotoService,
+                            $attributeValueService,
+                            $auditLogService
+                        ): Asset {
 
+                            $asset =
+                                Asset::query()
+                                    ->create(
+                                        $data
+                                    );
 
-                    $asset =
-                        Asset::query()
-                            ->create(
-                                $data
+                            $assetPhotoService
+                                ->storeUploadedPhotos(
+                                    asset: $asset,
+
+                                    files: $request->file(
+                                        'photos',
+                                        []
+                                    ),
+
+                                    user: $request->user()
+                                );
+
+                            $auditLogService->log(
+                                'asset.created',
+                                $asset,
+                                [],
+                                $this->auditSnapshot($asset->fresh()),
+                                'پرونده اولیه دارایی ایجاد شد.',
+                                $request,
+                                $request->user()
                             );
 
+                            $attributeValueService
+                                ->sync(
+                                    $asset,
+                                    $request,
+                                    $request->user()
+                                );
 
-                    $assetPhotoService
-                        ->storeUploadedPhotos(
-                            asset:
-                                $asset,
-
-                            files:
-                                $request->file(
-                                    'photos',
-                                    []
-                                ),
-
-                            user:
-                                $request->user()
-                        );
-
-
-                    $attributeValueService
-                        ->sync(
-                            $asset,
-                            $request,
-                            $request->user()
-                        );
-
-
-                    return $asset;
-                }
-            );
-
+                            return $asset;
+                        }
+                    );
 
         return redirect()
             ->route(
@@ -276,7 +265,6 @@ $asset =
             );
     }
 
-
     public function show(
         Request $request,
         Asset $asset
@@ -287,7 +275,6 @@ $asset =
             $asset
         );
 
-
         $asset->load([
 
             'category',
@@ -297,43 +284,40 @@ $asset =
             'attributeValues.definition',
             'attributeValues.option',
 
-            'transactions' =>
-                function ($query) {
+            'transactions' => function ($query) {
 
-                    $query->latest('id');
-                },
+                $query->latest('id');
+            },
 
             'transactions.fromUser',
             'transactions.toUser',
             'transactions.creator',
 
-            'repairRequests' =>
-                function ($query) {
-                    $query
-                        ->with([
-                            'requesterUser',
-                        ])
-                        ->latest('id');
-                },
+            'repairRequests' => function ($query) {
+                $query
+                    ->with([
+                        'requesterUser',
+                    ])
+                    ->latest('id');
+            },
         ]);
-
 
         $repairSummary = [
             'total' => $asset->repairRequests->count(),
             'open' => $asset->repairRequests
                 ->whereIn('status', [
-                    \App\Models\AssetRepairRequest::STATUS_DRAFT,
-                    \App\Models\AssetRepairRequest::STATUS_SUBMITTED,
-                    \App\Models\AssetRepairRequest::STATUS_IN_REVIEW,
-                    \App\Models\AssetRepairRequest::STATUS_APPROVED,
-                    \App\Models\AssetRepairRequest::STATUS_IN_REPAIR,
+                    AssetRepairRequest::STATUS_DRAFT,
+                    AssetRepairRequest::STATUS_SUBMITTED,
+                    AssetRepairRequest::STATUS_IN_REVIEW,
+                    AssetRepairRequest::STATUS_APPROVED,
+                    AssetRepairRequest::STATUS_IN_REPAIR,
                 ])
                 ->count(),
             'completed' => $asset->repairRequests
-                ->where('status', \App\Models\AssetRepairRequest::STATUS_COMPLETED)
+                ->where('status', AssetRepairRequest::STATUS_COMPLETED)
                 ->count(),
             'actual_cost' => $asset->repairRequests
-                ->where('status', \App\Models\AssetRepairRequest::STATUS_COMPLETED)
+                ->where('status', AssetRepairRequest::STATUS_COMPLETED)
                 ->sum(
                     fn ($repair) => (float) ($repair->actual_cost ?? 0)
                 ),
@@ -341,7 +325,6 @@ $asset =
 
         $currentHolder =
             null;
-
 
         if (
             $asset->status
@@ -371,11 +354,9 @@ $asset =
                         }
                     );
 
-
             $currentHolder =
                 $lastAssignment?->toUser;
         }
-
 
         return view(
             'assets.show',
@@ -387,7 +368,6 @@ $asset =
         );
     }
 
-
     public function edit(
         Request $request,
         Asset $asset
@@ -398,7 +378,6 @@ $asset =
             $asset
         );
 
-
         $categories =
             AssetCategory::query()
                 ->where(
@@ -407,7 +386,6 @@ $asset =
                 )
                 ->orderBy('name')
                 ->get();
-
 
         $types =
             AssetType::query()
@@ -420,50 +398,45 @@ $asset =
                     true
                 )
                 ->with([
-                    'attributeDefinitions' =>
-                        function ($query) {
+                    'attributeDefinitions' => function ($query) {
 
-                            $query
-                                ->where(
-                                    'is_active',
-                                    true
-                                )
-                                ->with([
-                                    'options' =>
-                                        function ($optionQuery) {
+                        $query
+                            ->where(
+                                'is_active',
+                                true
+                            )
+                            ->with([
+                                'options' => function ($optionQuery) {
 
-                                            $optionQuery
-                                                ->where(
-                                                    'is_active',
-                                                    true
-                                                )
-                                                ->orderBy(
-                                                    'sort_order'
-                                                )
-                                                ->orderBy(
-                                                    'id'
-                                                );
-                                        },
-                                ]);
-                        },
+                                    $optionQuery
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy(
+                                            'sort_order'
+                                        )
+                                        ->orderBy(
+                                            'id'
+                                        );
+                                },
+                            ]);
+                    },
                 ])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get();
-
 
         $asset->load([
             'photos',
             'attributeValues',
         ]);
 
-
         $dynamicValues =
             $asset->attributeValues
                 ->keyBy(
                     'asset_attribute_definition_id'
                 );
-
 
         return view(
             'assets.edit',
@@ -476,12 +449,12 @@ $asset =
         );
     }
 
-
     public function update(
         AssetRequest $request,
         Asset $asset,
         AssetPhotoService $assetPhotoService,
-        AssetAttributeValueService $attributeValueService
+        AssetAttributeValueService $attributeValueService,
+        AuditLogService $auditLogService
     ): RedirectResponse {
 
         $this->ensureAssetIsVisible(
@@ -489,10 +462,8 @@ $asset =
             $asset
         );
 
-
         $data =
             $request->validated();
-
 
         unset(
             $data['company_id'],
@@ -501,36 +472,33 @@ $asset =
             $data['dynamic_attribute_files']
         );
 
-
         DB::transaction(
             function () use (
                 $request,
                 $asset,
                 $data,
                 $assetPhotoService,
-                $attributeValueService
+                $attributeValueService,
+                $auditLogService
             ): void {
+
+                $before = $this->auditSnapshot($asset);
 
                 $asset->update(
                     $data
                 );
 
-
                 $assetPhotoService
                     ->storeUploadedPhotos(
-                        asset:
-                            $asset,
+                        asset: $asset,
 
-                        files:
-                            $request->file(
-                                'photos',
-                                []
-                            ),
+                        files: $request->file(
+                            'photos',
+                            []
+                        ),
 
-                        user:
-                            $request->user()
+                        user: $request->user()
                     );
-
 
                 $attributeValueService
                     ->sync(
@@ -538,9 +506,18 @@ $asset =
                         $request,
                         $request->user()
                     );
+
+                $auditLogService->log(
+                    'asset.updated',
+                    $asset,
+                    $before,
+                    $this->auditSnapshot($asset->fresh()),
+                    'مشخصات فنی/شناسنامه‌ای دارایی ویرایش شد.',
+                    $request,
+                    $request->user()
+                );
             }
         );
-
 
         return redirect()
             ->route(
@@ -552,10 +529,10 @@ $asset =
             );
     }
 
-
     public function destroy(
         Request $request,
-        Asset $asset
+        Asset $asset,
+        AuditLogService $auditLogService
     ): RedirectResponse {
 
         $this->ensureAssetIsVisible(
@@ -563,22 +540,27 @@ $asset =
             $asset
         );
 
-
-        if (
-            $asset->transactions()
-                ->exists()
-        ) {
+        if ($asset->transactions()->exists() || trim((string) $asset->asset_code) !== '') {
 
             return back()
                 ->withErrors([
-                    'asset' =>
-                        'این دارایی دارای سابقه گردش است و قابل حذف نیست.',
+                    'asset' => 'دارایی دارای کد دائمی یا سابقه گردش است و قابل حذف نیست؛ برای خروج از چرخه، آن را غیرفعال یا از فرایند اسقاط استفاده کنید.',
                 ]);
         }
 
-
-        $asset->delete();
-
+        DB::transaction(function () use ($request, $asset, $auditLogService): void {
+            $before = $this->auditSnapshot($asset);
+            $auditLogService->log(
+                'asset.deleted',
+                $asset,
+                $before,
+                [],
+                'پرونده پیش‌نویس دارایی فاقد کد و گردش حذف شد.',
+                $request,
+                $request->user()
+            );
+            $asset->delete();
+        });
 
         return redirect()
             ->route(
@@ -589,7 +571,6 @@ $asset =
                 'دارایی با موفقیت حذف شد.'
             );
     }
-
 
     private function ensureAssetIsVisible(
         User $currentUser,
@@ -602,7 +583,6 @@ $asset =
             return;
         }
 
-
         if (
             $asset->company_id
             ===
@@ -611,7 +591,6 @@ $asset =
             abort(404);
         }
 
-
         if (
             (int) $asset->company_id
             !==
@@ -619,5 +598,26 @@ $asset =
         ) {
             abort(404);
         }
+    }
+
+    private function auditSnapshot(Asset $asset): array
+    {
+        return [
+            'company_id' => $asset->getRawOriginal('company_id'),
+            'asset_category_id' => $asset->getRawOriginal('asset_category_id'),
+            'asset_type_id' => $asset->getRawOriginal('asset_type_id'),
+            'inventory_code' => $asset->getRawOriginal('inventory_code'),
+            'asset_code' => $asset->getRawOriginal('asset_code'),
+            'title' => $asset->getRawOriginal('title'),
+            'brand' => $asset->getRawOriginal('brand'),
+            'model' => $asset->getRawOriginal('model'),
+            'serial_number' => $asset->getRawOriginal('serial_number'),
+            'purchase_date' => $asset->getRawOriginal('purchase_date'),
+            'purchase_price' => $asset->getRawOriginal('purchase_price'),
+            'supplier_name' => $asset->getRawOriginal('supplier_name'),
+            'acquisition_document_number' => $asset->getRawOriginal('acquisition_document_number'),
+            'is_active' => (bool) $asset->getRawOriginal('is_active'),
+            'status' => $asset->getRawOriginal('status'),
+        ];
     }
 }

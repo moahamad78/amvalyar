@@ -16,9 +16,9 @@ use Illuminate\Validation\ValidationException;
 final class AssetMovementFinalizer
 {
     public function __construct(
-        private readonly AssetCustodyService $custodyService
-    ) {
-    }
+        private readonly AssetCustodyService $custodyService,
+        private readonly AuditLogService $auditLog
+    ) {}
 
     public function finalizeCompleted(
         WorkflowInstance $instance,
@@ -40,7 +40,6 @@ final class AssetMovementFinalizer
             return;
         }
 
-
         if (
             $instance->subject_id
             ===
@@ -48,11 +47,9 @@ final class AssetMovementFinalizer
         ) {
 
             throw ValidationException::withMessages([
-                'movement_request' =>
-                    'شناسه درخواست عملیات دارایی در گردش کاری موجود نیست.',
+                'movement_request' => 'شناسه درخواست عملیات دارایی در گردش کاری موجود نیست.',
             ]);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -71,11 +68,9 @@ final class AssetMovementFinalizer
         ) {
 
             throw ValidationException::withMessages([
-                'workflow' =>
-                    'گردش کاری عملیات دارایی هنوز تکمیل نشده است.',
+                'workflow' => 'گردش کاری عملیات دارایی هنوز تکمیل نشده است.',
             ]);
         }
-
 
         DB::transaction(
             function () use (
@@ -92,7 +87,6 @@ final class AssetMovementFinalizer
                         ->lockForUpdate()
                         ->firstOrFail();
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | Tenant / instance integrity
@@ -106,11 +100,9 @@ final class AssetMovementFinalizer
                 ) {
 
                     throw ValidationException::withMessages([
-                        'movement_request' =>
-                            'شرکت درخواست عملیات با گردش کاری مطابقت ندارد.',
+                        'movement_request' => 'شرکت درخواست عملیات با گردش کاری مطابقت ندارد.',
                     ]);
                 }
-
 
                 if (
                     $movementRequest->workflow_instance_id
@@ -123,11 +115,9 @@ final class AssetMovementFinalizer
                 ) {
 
                     throw ValidationException::withMessages([
-                        'movement_request' =>
-                            'گردش کاری متصل به درخواست عملیات معتبر نیست.',
+                        'movement_request' => 'گردش کاری متصل به درخواست عملیات معتبر نیست.',
                     ]);
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -148,7 +138,6 @@ final class AssetMovementFinalizer
                         ->lockForUpdate()
                         ->first();
 
-
                 if (
                     $existingTransaction
                     !==
@@ -163,22 +152,18 @@ final class AssetMovementFinalizer
 
                         $movementRequest->update([
 
-                            'status' =>
-                                AssetMovementRequest::STATUS_COMPLETED,
+                            'status' => AssetMovementRequest::STATUS_COMPLETED,
 
-                            'completed_at' =>
-                                $movementRequest->completed_at
+                            'completed_at' => $movementRequest->completed_at
                                 ?? now(),
                         ]);
                     }
 
-
                     return;
                 }
 
-
                 if (
-                    !in_array(
+                    ! in_array(
                         $movementRequest->status,
                         [
                             AssetMovementRequest::STATUS_SUBMITTED,
@@ -196,13 +181,10 @@ final class AssetMovementFinalizer
                         return;
                     }
 
-
                     throw ValidationException::withMessages([
-                        'movement_request' =>
-                            'درخواست عملیات در وضعیت قابل نهایی‌سازی نیست.',
+                        'movement_request' => 'درخواست عملیات در وضعیت قابل نهایی‌سازی نیست.',
                     ]);
                 }
-
 
                 $asset =
                     Asset::withoutGlobalScopes()
@@ -212,7 +194,6 @@ final class AssetMovementFinalizer
                         ->lockForUpdate()
                         ->firstOrFail();
 
-
                 if (
                     (int) $asset->company_id
                     !==
@@ -220,17 +201,14 @@ final class AssetMovementFinalizer
                 ) {
 
                     throw ValidationException::withMessages([
-                        'asset' =>
-                            'شرکت دارایی با درخواست عملیات مطابقت ندارد.',
+                        'asset' => 'شرکت دارایی با درخواست عملیات مطابقت ندارد.',
                     ]);
                 }
-
 
                 $createdByUserId =
                     $actorUser?->id
                     ??
                     $movementRequest->requested_by_user_id;
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -247,16 +225,14 @@ final class AssetMovementFinalizer
                 ) {
 
                     throw ValidationException::withMessages([
-                        'actor' =>
-                            'پرسنل نهایی‌کننده متعلق به شرکت درخواست نیست.',
+                        'actor' => 'پرسنل نهایی‌کننده متعلق به شرکت درخواست نیست.',
                     ]);
                 }
-
 
                 if (
                     $actorUser !== null
                     &&
-                    !$actorUser->isSuperAdmin()
+                    ! $actorUser->isSuperAdmin()
                     &&
                     (int) $actorUser->company_id
                     !==
@@ -264,11 +240,9 @@ final class AssetMovementFinalizer
                 ) {
 
                     throw ValidationException::withMessages([
-                        'actor' =>
-                            'کاربر نهایی‌کننده متعلق به شرکت درخواست نیست.',
+                        'actor' => 'کاربر نهایی‌کننده متعلق به شرکت درخواست نیست.',
                     ]);
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -282,70 +256,50 @@ final class AssetMovementFinalizer
                     );
 
                 $beforeCustody = $this->custodyService->snapshot($asset);
-
+                $beforeStatus = $asset->status;
 
                 $transactionData = [
 
-                    'company_id' =>
-                        $asset->company_id,
+                    'company_id' => $asset->company_id,
 
-                    'asset_id' =>
-                        $asset->id,
+                    'asset_id' => $asset->id,
 
-                    'asset_movement_request_id' =>
-                        $movementRequest->id,
+                    'asset_movement_request_id' => $movementRequest->id,
 
-                    'from_user_id' =>
-                        null,
+                    'from_user_id' => null,
 
-                    'to_user_id' =>
-                        null,
+                    'to_user_id' => null,
 
-                    'from_custody_type' =>
-                        $beforeCustody['custody_type'] ?? null,
+                    'from_custody_type' => $beforeCustody['custody_type'] ?? null,
 
-                    'to_custody_type' =>
-                        null,
+                    'to_custody_type' => null,
 
-                    'from_employee_id' =>
-                        $beforeCustody['custody_employee_id'] ?? null,
+                    'from_employee_id' => $beforeCustody['custody_employee_id'] ?? null,
 
-                    'to_employee_id' =>
-                        null,
+                    'to_employee_id' => null,
 
-                    'from_department_id' =>
-                        $beforeCustody['custody_department_id'] ?? null,
+                    'from_department_id' => $beforeCustody['custody_department_id'] ?? null,
 
-                    'to_department_id' =>
-                        null,
+                    'to_department_id' => null,
 
-                    'from_site_id' =>
-                        $beforeCustody['site_id'] ?? null,
+                    'from_site_id' => $beforeCustody['site_id'] ?? null,
 
-                    'to_site_id' =>
-                        null,
+                    'to_site_id' => null,
 
-                    'from_location_id' =>
-                        $beforeCustody['location_id'] ?? null,
+                    'from_location_id' => $beforeCustody['location_id'] ?? null,
 
-                    'to_location_id' =>
-                        null,
+                    'to_location_id' => null,
 
-                    'type' =>
-                        null,
+                    'type' => null,
 
-                    'plate_number' =>
-                        $asset->asset_code,
+                    'plate_number' => $asset->asset_code,
 
-                    'description' =>
-                        $movementRequest->reason
+                    'description' => $movementRequest->reason
                         ??
                         $movementRequest->notes,
 
-                    'created_by' =>
-                        $createdByUserId,
+                    'created_by' => $createdByUserId,
                 ];
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -366,11 +320,9 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'asset' =>
-                                'دارایی در زمان نهایی‌سازی انتقال، تحویل‌شده نیست.',
+                            'asset' => 'دارایی در زمان نهایی‌سازی انتقال، تحویل‌شده نیست.',
                         ]);
                     }
-
 
                     if (
                         $currentHolderId
@@ -379,11 +331,9 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'asset' =>
-                                'دارنده فعلی دارایی قابل تشخیص نیست.',
+                            'asset' => 'دارنده فعلی دارایی قابل تشخیص نیست.',
                         ]);
                     }
-
 
                     if (
                         $movementRequest->target_employee_id === null
@@ -391,8 +341,7 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'target_employee_id' =>
-                                'گیرنده انتقال مشخص نشده است.',
+                            'target_employee_id' => 'گیرنده انتقال مشخص نشده است.',
                         ]);
                     }
 
@@ -414,8 +363,7 @@ final class AssetMovementFinalizer
                     if ($targetEmployee === null) {
 
                         throw ValidationException::withMessages([
-                            'target_employee_id' =>
-                                'گیرنده انتقال معتبر یا فعال نیست.',
+                            'target_employee_id' => 'گیرنده انتقال معتبر یا فعال نیست.',
                         ]);
                     }
 
@@ -431,11 +379,9 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'target_employee_id' =>
-                                'دارایی هم‌اکنون در اختیار گیرنده انتخاب‌شده است.',
+                            'target_employee_id' => 'دارایی هم‌اکنون در اختیار گیرنده انتخاب‌شده است.',
                         ]);
                     }
-
 
                     $transactionData['type'] =
                         'transfer';
@@ -467,7 +413,6 @@ final class AssetMovementFinalizer
                     );
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | RETURN
@@ -487,11 +432,9 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'asset' =>
-                                'دارایی در زمان نهایی‌سازی عودت، تحویل‌شده نیست.',
+                            'asset' => 'دارایی در زمان نهایی‌سازی عودت، تحویل‌شده نیست.',
                         ]);
                     }
-
 
                     if (
                         $currentHolderId
@@ -500,11 +443,9 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'asset' =>
-                                'دارنده فعلی دارایی قابل تشخیص نیست.',
+                            'asset' => 'دارنده فعلی دارایی قابل تشخیص نیست.',
                         ]);
                     }
-
 
                     $transactionData['type'] =
                         'return';
@@ -517,7 +458,6 @@ final class AssetMovementFinalizer
 
                     $this->custodyService->applyWarehouse($asset);
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -538,31 +478,23 @@ final class AssetMovementFinalizer
                     ) {
 
                         throw ValidationException::withMessages([
-                            'asset' =>
-                                'برای اجرای اسقاط، دارایی باید در انبار باشد.',
+                            'asset' => 'برای اجرای اسقاط، دارایی باید در انبار باشد.',
                         ]);
                     }
 
-
                     $transactionData['type'] =
                         'destroy';
-
 
                     $asset->status =
                         'destroyed';
 
                     $asset->save();
-                }
-
-
-                else {
+                } else {
 
                     throw ValidationException::withMessages([
-                        'movement_type' =>
-                            'نوع درخواست عملیات دارایی معتبر نیست.',
+                        'movement_type' => 'نوع درخواست عملیات دارایی معتبر نیست.',
                     ]);
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -575,7 +507,6 @@ final class AssetMovementFinalizer
                         $transactionData
                     );
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | Mark movement completed
@@ -584,16 +515,28 @@ final class AssetMovementFinalizer
 
                 $movementRequest->update([
 
-                    'status' =>
-                        AssetMovementRequest::STATUS_COMPLETED,
+                    'status' => AssetMovementRequest::STATUS_COMPLETED,
 
-                    'completed_at' =>
-                        now(),
+                    'completed_at' => now(),
                 ]);
+
+                $asset->refresh();
+                $afterCustody = $this->custodyService->snapshot($asset);
+                $this->auditLog->log(
+                    'asset.movement_finalized',
+                    $asset,
+                    array_merge($beforeCustody, ['status' => $beforeStatus]),
+                    array_merge($afterCustody, [
+                        'status' => $asset->status,
+                        'movement_type' => $movementRequest->movement_type,
+                        'movement_request_id' => $movementRequest->id,
+                    ]),
+                    'عملیات دارایی پس از تکمیل تمام تأییدهای گردش کار نهایی شد.',
+                    actor: $actorUser ?? $actorEmployee?->user
+                );
             }
         );
     }
-
 
     private function currentHolderId(
         Asset $asset
@@ -606,7 +549,6 @@ final class AssetMovementFinalizer
         ) {
             return null;
         }
-
 
         $lastAssignment =
             AssetTransaction::withoutGlobalScopes()
@@ -626,7 +568,6 @@ final class AssetMovementFinalizer
                 )
                 ->latest('id')
                 ->first();
-
 
         return $lastAssignment?->to_user_id
         !==

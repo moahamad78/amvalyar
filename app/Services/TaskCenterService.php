@@ -20,12 +20,17 @@ final class TaskCenterService
             return collect();
         }
 
+        $cacheKey = 'amvalyar.task-center.user.'.$user->id;
+        if (request()->attributes->has($cacheKey)) {
+            return request()->attributes->get($cacheKey);
+        }
+
         $employee =
             $this->employeeFor(
                 $user
             );
 
-        return collect()
+        $tasks = collect()
             ->concat(
                 $this->stepTasks(
                     $user,
@@ -137,6 +142,10 @@ final class TaskCenterService
                 }
             )
             ->values();
+
+        request()->attributes->set($cacheKey, $tasks);
+
+        return $tasks;
     }
 
     public function countFor(

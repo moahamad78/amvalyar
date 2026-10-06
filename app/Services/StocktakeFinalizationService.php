@@ -19,6 +19,8 @@ final class StocktakeFinalizationService
         StocktakeItem::RESULT_DAMAGED,
     ];
 
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     public function requestRecount(Stocktake $stocktake, User $actor): Stocktake
     {
         return DB::transaction(function () use ($stocktake, $actor): Stocktake {
@@ -29,6 +31,8 @@ final class StocktakeFinalizationService
                     'stocktake' => 'Only an active stocktake can enter recount.',
                 ]);
             }
+
+            $this->assertIndependentFinalizer($locked, $actor);
 
             $pending = $this->items($locked)
                 ->where('result_status', StocktakeItem::RESULT_PENDING)
@@ -61,6 +65,15 @@ final class StocktakeFinalizationService
                 'status' => Stocktake::STATUS_RECOUNT,
             ])->save();
 
+            $this->auditLog->log(
+                'stocktake.recount_requested',
+                $locked,
+                ['status' => Stocktake::STATUS_ACTIVE],
+                ['status' => Stocktake::STATUS_RECOUNT, 'discrepancies' => $discrepancyCount],
+                'بازشماری مغایرت‌های انبارگردانی توسط ناظر مستقل درخواست شد.',
+                actor: $actor
+            );
+
             return $locked->fresh(['items']);
         });
     }
@@ -80,6 +93,15 @@ final class StocktakeFinalizationService
                 ]);
             }
 
+            $this->assertIndependentFinalizer($locked, $actor);
+
+            $itemCount = $this->items($locked)->count();
+            if ($itemCount === 0) {
+                throw ValidationException::withMessages([
+                    'stocktake' => 'انبارگردانی بدون قلم قابل نهایی‌سازی نیست.',
+                ]);
+            }
+
             $unresolved = $this->items($locked)
                 ->whereIn('result_status', [
                     StocktakeItem::RESULT_PENDING,
@@ -93,11 +115,27 @@ final class StocktakeFinalizationService
                 ]);
             }
 
+            if ($locked->status === Stocktake::STATUS_ACTIVE
+                && $this->items($locked)->whereIn('result_status', self::DISCREPANCIES)->exists()) {
+                throw ValidationException::withMessages([
+                    'stocktake' => 'انبارگردانی دارای مغایرت باید ابتدا توسط ناظر مستقل وارد بازشماری شود.',
+                ]);
+            }
+
             $locked->forceFill([
                 'status' => Stocktake::STATUS_COMPLETED,
                 'completed_at' => now(),
                 'completed_by' => $actor->id,
             ])->save();
+
+            $this->auditLog->log(
+                'stocktake.completed',
+                $locked,
+                ['status' => $stocktake->status],
+                ['status' => Stocktake::STATUS_COMPLETED, 'item_count' => $itemCount],
+                'انبارگردانی پس از کنترل تفکیک وظایف نهایی شد.',
+                actor: $actor
+            );
 
             return $locked->fresh(['items']);
         });
@@ -126,5 +164,20 @@ final class StocktakeFinalizationService
         return StocktakeItem::withoutGlobalScopes()
             ->where('stocktake_id', $stocktake->id)
             ->where('company_id', $stocktake->company_id);
+    }
+
+    private function assertIndependentFinalizer(Stocktake $stocktake, User $actor): void
+    {
+        if ((int) $stocktake->created_by === (int) $actor->id) {
+            throw ValidationException::withMessages([
+                'stocktake' => 'ایجادکننده انبارگردانی نمی‌تواند بازشماری یا نهایی‌سازی همان دوره را تأیید کند.',
+            ]);
+        }
+
+        if ($this->items($stocktake)->where('counted_by', $actor->id)->exists()) {
+            throw ValidationException::withMessages([
+                'stocktake' => 'شمارش‌کننده اقلام نمی‌تواند نهایی‌کننده همان انبارگردانی باشد.',
+            ]);
+        }
     }
 }

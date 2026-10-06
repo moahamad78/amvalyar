@@ -34,6 +34,8 @@ final class KimiaPolyesterDemoProvisioner
         return DB::transaction(function () use ($password): array {
             $existing = Company::query()->where('code', self::COMPANY_CODE)->first();
             if ($existing) {
+                $this->reconcileFinancialControls($existing);
+
                 return $this->summary($existing);
             }
             app(PermissionRegistryService::class)->sync();
@@ -191,9 +193,9 @@ final class KimiaPolyesterDemoProvisioner
         $all = Permission::query()->where('is_active', true)->pluck('id', 'name');
         $definitions = [
             'company_admin' => ['مدیر سامانه شرکت', $all->keys()->all()],
-            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.view_all', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'stocktakes.finalize', 'stocktakes.reconcile', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage']],
-            'finance_manager' => ['مدیر مالی', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'workflows.view', 'stocktakes.view', 'stocktakes.finalize', 'stocktakes.reconcile']],
-            'accounting_head' => ['رئیس حسابداری', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'asset_transactions.view']],
+            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.view_all', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage']],
+            'finance_manager' => ['مدیر مالی', ['assets.view', 'assets.view_all', 'assets.financial', 'assets.financial_edit', 'assets.create', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'workflows.view', 'stocktakes.view', 'stocktakes.finalize']],
+            'accounting_head' => ['رئیس حسابداری', ['assets.view', 'assets.view_all', 'assets.financial', 'assets.financial_edit', 'assets.create', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'asset_transactions.view']],
             'inspection_head' => ['رئیس بازرسی و نظارت', ['assets.view', 'assets.view_all', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'stocktakes.view', 'stocktakes.count', 'stocktakes.reconcile']],
             'ceo' => ['مدیرعامل', ['assets.view', 'assets.view_all', 'assets.financial', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act']],
             'engineering_head' => ['رئیس مهندسی و خدمات فنی', ['assets.view', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'asset_repairs.view', 'asset_repairs.manage']],
@@ -221,6 +223,120 @@ final class KimiaPolyesterDemoProvisioner
         }
 
         return $result;
+    }
+
+    /**
+     * Reconcile mandatory financial controls on an existing demo tenant.
+     * Passwords and user customizations are left untouched. Only missing
+     * acquisition evidence on synthetic KIMIA-DEMO assets is backfilled.
+     */
+    public function reconcileFinancialControls(Company $company): void
+    {
+        app(PermissionRegistryService::class)->sync();
+
+        $permissionIds = Permission::query()
+            ->whereIn('name', [
+                'assets.create',
+                'assets.financial_edit',
+                'stocktakes.finalize',
+                'stocktakes.reconcile',
+            ])
+            ->pluck('id', 'name');
+
+        foreach (['finance_manager', 'accounting_head'] as $roleName) {
+            $role = Role::withoutGlobalScopes()
+                ->where('company_id', $company->id)
+                ->where('name', $roleName)
+                ->first();
+            if ($role) {
+                $role->permissions()->syncWithoutDetaching(array_filter([
+                    $permissionIds['assets.create'] ?? null,
+                    $permissionIds['assets.financial_edit'] ?? null,
+                ]));
+            }
+        }
+
+        $chief = Role::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('name', 'chief_asset_keeper')
+            ->first();
+        if ($chief) {
+            $chief->permissions()->detach(array_filter([
+                $permissionIds['stocktakes.finalize'] ?? null,
+                $permissionIds['stocktakes.reconcile'] ?? null,
+            ]));
+        }
+
+        $finance = Role::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('name', 'finance_manager')
+            ->first();
+        if ($finance) {
+            if (isset($permissionIds['stocktakes.reconcile'])) {
+                $finance->permissions()->detach($permissionIds['stocktakes.reconcile']);
+            }
+            $finance->permissions()->syncWithoutDetaching(array_filter([
+                $permissionIds['stocktakes.finalize'] ?? null,
+            ]));
+        }
+
+        $inspection = Role::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('name', 'inspection_head')
+            ->first();
+        if ($inspection) {
+            $inspection->permissions()->syncWithoutDetaching(array_filter([
+                $permissionIds['stocktakes.reconcile'] ?? null,
+            ]));
+        }
+
+        $disposal = Workflow::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('code', 'KIMIA-DISPOSAL-01')
+            ->first();
+        if ($disposal && $finance) {
+            WorkflowStep::query()->updateOrCreate(
+                ['workflow_id' => $disposal->id, 'code' => 'FINANCE'],
+                [
+                    'name' => 'کنترل مالی خروج از دفاتر',
+                    'step_type' => 'approval',
+                    'approver_type' => 'role',
+                    'approver_reference_id' => $finance->id,
+                    'sort_order' => 25,
+                    'is_required' => true,
+                    'is_active' => true,
+                    'rejection_action' => 'return_previous',
+                    'due_hours' => 24,
+                    'description' => 'کنترل بهای ثبت‌شده، مستند اسقاط و آثار مالی پیش از تصویب نهایی.',
+                ]
+            );
+        }
+
+        DB::table('assets')
+            ->where('company_id', $company->id)
+            ->where('inventory_code', 'like', 'KIMIA-DEMO-%')
+            ->where(function ($query): void {
+                $query->whereNull('supplier_name')
+                    ->orWhere('supplier_name', '')
+                    ->orWhereNull('acquisition_document_number')
+                    ->orWhere('acquisition_document_number', '');
+            })
+            ->orderBy('id')
+            ->chunkById(200, function ($assets): void {
+                foreach ($assets as $asset) {
+                    DB::table('assets')
+                        ->where('id', $asset->id)
+                        ->update([
+                            'supplier_name' => trim((string) ($asset->supplier_name ?? '')) !== ''
+                                ? $asset->supplier_name
+                                : 'تأمین‌کننده نمونه دمو',
+                            'acquisition_document_number' => trim((string) ($asset->acquisition_document_number ?? '')) !== ''
+                                ? $asset->acquisition_document_number
+                                : 'DEMO-SOURCE-'.$asset->inventory_code,
+                            'updated_at' => now(),
+                        ]);
+                }
+            });
     }
 
     private function users(Company $company, array $roles, string $password): array
@@ -364,6 +480,7 @@ final class KimiaPolyesterDemoProvisioner
             'KIMIA-DISPOSAL-01' => ['اسقاط اموال', 'asset_disposal', [
                 ['ASSET-MANAGER', 'اعلام وضعیت دارایی', 'employee', $assetManager->id],
                 ['INSPECTION', 'رسیدگی بازرسی', 'role', $roles['inspection_head']->id],
+                ['FINANCE', 'کنترل مالی خروج از دفاتر', 'role', $roles['finance_manager']->id],
                 ['CEO', 'تصویب نهایی', 'role', $roles['ceo']->id],
             ]],
         ];
@@ -444,6 +561,8 @@ final class KimiaPolyesterDemoProvisioner
                 'model' => 'KP-'.str_pad((string) (($i % 90) + 10), 3, '0', STR_PAD_LEFT), 'serial_number' => 'KPS'.str_pad((string) $i, 8, '0', STR_PAD_LEFT),
                 'manufacturer' => 'تأمین‌کننده نمونه', 'country' => $i % 4 === 0 ? 'آلمان' : 'ایران',
                 'purchase_date' => now()->subDays(30 + ($i % 1800))->toDateString(), 'purchase_price' => 10000000 + (($i % 97) * 2500000),
+                'supplier_name' => 'تأمین‌کننده نمونه دمو',
+                'acquisition_document_number' => sprintf('DEMO-SOURCE-KIMIA-DEMO-%04d', $i),
                 'description' => 'دارایی ساختگی دمو؛ وضعیت: '.$health.'؛ ثبت‌شده مطابق KPQ-FI-LI-003.',
                 'is_active' => true, 'status' => 'assigned', 'custody_type' => $organizational ? 'organization' : 'employee', 'custody_user_id' => $organizational ? null : $employee->user_id,
                 'custody_employee_id' => $organizational ? null : $employee->id, 'custody_department_id' => $employee->department_id,

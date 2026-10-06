@@ -32,7 +32,6 @@ class Role extends Model
         ];
     }
 
-
     protected static function booted(): void
     {
         static::addGlobalScope(
@@ -88,7 +87,6 @@ class Role extends Model
             }
         );
 
-
         static::creating(
             function (Role $role): void {
 
@@ -101,7 +99,7 @@ class Role extends Model
                 /*
                  * مدیر شرکت فقط Role شرکتی می‌سازد.
                  */
-                if (!$user->isSuperAdmin()) {
+                if (! $user->isSuperAdmin()) {
 
                     $role->company_id =
                         $user->company_id;
@@ -111,7 +109,6 @@ class Role extends Model
                 }
             }
         );
-
 
         static::updating(
             function (Role $role): void {
@@ -139,7 +136,6 @@ class Role extends Model
         );
     }
 
-
     public function company(): BelongsTo
     {
         return $this->belongsTo(
@@ -147,14 +143,12 @@ class Role extends Model
         );
     }
 
-
     public function users(): HasMany
     {
         return $this->hasMany(
             User::class
         );
     }
-
 
     public function permissions(): BelongsToMany
     {
@@ -164,31 +158,30 @@ class Role extends Model
         );
     }
 
-
     public function isActive(): bool
     {
         return $this->is_active === true;
     }
-
 
     public function isSystem(): bool
     {
         return $this->is_system === true;
     }
 
-
     public function hasPermission(
         string $permissionName
     ): bool {
-        return $this->permissions()
-            ->where(
-                'name',
-                $permissionName
-            )
-            ->where(
-                'permissions.is_active',
-                true
-            )
-            ->exists();
+        if (! $this->exists) {
+            return false;
+        }
+
+        if (! $this->relationLoaded('permissions')) {
+            $this->load('permissions:id,name,is_active');
+        }
+
+        return $this->permissions->contains(
+            fn (Permission $permission): bool => $permission->is_active
+                && $permission->name === $permissionName
+        );
     }
 }

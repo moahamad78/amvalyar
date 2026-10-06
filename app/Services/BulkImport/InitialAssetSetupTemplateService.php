@@ -21,14 +21,16 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 final class InitialAssetSetupTemplateService
 {
     public const TEMPLATE_TYPE = 'initial_asset_setup';
-    public const TEMPLATE_VERSION = '1.0';
+
+    public const TEMPLATE_VERSION = '1.1';
+
     // 2,000 rows keeps the workbook practical while covering the expected
     // opening-balance batches; additional rows can be uploaded in another batch.
     public const MAX_ROWS = 2000;
 
     public function build(Company $company): Spreadsheet
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('موجودی اولیه');
         $sheet->setRightToLeft(true);
@@ -36,21 +38,22 @@ final class InitialAssetSetupTemplateService
         $headers = [
             'دسته‌بندی *', 'نوع دارایی *', 'کد اموال داخلی', 'عنوان *',
             'برند', 'مدل', 'شماره سریال', 'سازنده', 'کشور', 'تاریخ خرید',
-            'مبلغ خرید', 'نوع استقرار *', 'کد پرسنلی', 'کد واحد', 'کد سایت فعلی',
-            'کد محل فعلی', 'کد سایت کدگذاری *', 'توضیحات',
+            'مبلغ خرید', 'تأمین‌کننده', 'شماره سند خرید/تحصیل', 'نوع استقرار *',
+            'کد پرسنلی', 'کد واحد', 'کد سایت فعلی', 'کد محل فعلی',
+            'کد سایت کدگذاری *', 'توضیحات',
         ];
         $sheet->fromArray($headers, null, 'A1');
         $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:R1');
-        $sheet->getStyle('A1:R1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:R1')->getFill()->setFillType(Fill::FILL_SOLID)
+        $sheet->setAutoFilter('A1:T1');
+        $sheet->getStyle('A1:T1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:T1')->getFill()->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setARGB('FFE2E8F0');
-        $sheet->getStyle('A1:R'.self::MAX_ROWS)->getAlignment()
+        $sheet->getStyle('A1:T'.self::MAX_ROWS)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER);
 
-        foreach (['A'=>24,'B'=>28,'C'=>20,'D'=>34,'E'=>20,'F'=>20,'G'=>24,
-            'H'=>22,'I'=>18,'J'=>18,'K'=>18,'L'=>18,'M'=>20,'N'=>20,
-            'O'=>20,'P'=>20,'Q'=>20,'R'=>44] as $column => $width) {
+        foreach (['A' => 24, 'B' => 28, 'C' => 20, 'D' => 34, 'E' => 20, 'F' => 20, 'G' => 24,
+            'H' => 22, 'I' => 18, 'J' => 18, 'K' => 18, 'L' => 24, 'M' => 24, 'N' => 18, 'O' => 20,
+            'P' => 20, 'Q' => 20, 'R' => 20, 'S' => 20, 'T' => 44] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
@@ -58,7 +61,7 @@ final class InitialAssetSetupTemplateService
         $spreadsheet->addSheet($lists);
         $lists->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
         $lists->fromArray([
-            'category','type','custody','employee','department','site','location',
+            'category', 'type', 'custody', 'employee', 'department', 'site', 'location',
         ], null, 'A1');
 
         $categories = AssetCategory::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
@@ -72,11 +75,12 @@ final class InitialAssetSetupTemplateService
             foreach ($items as $index => $item) {
                 $target->setCellValue($column.($index + 2), $label($item));
             }
+
             return max(1, count($items) + 1);
         };
         $categoryCount = $write($lists, 'A', $categories, fn ($item) => $item->name);
         $typeCount = $write($lists, 'B', $types, fn ($item) => $item->name);
-        foreach ([['warehouse','انبار'],['employee','پرسنلی'],['organization','سازمانی']] as $index => [$value, $label]) {
+        foreach ([['warehouse', 'انبار'], ['employee', 'پرسنلی'], ['organization', 'سازمانی']] as $index => [$value, $label]) {
             $lists->setCellValue('C'.($index + 2), $label);
         }
         $employeeCount = $write($lists, 'D', $employees, fn ($item) => $item->personnel_code.' | '.$item->display_name);
@@ -94,25 +98,26 @@ final class InitialAssetSetupTemplateService
 
         $this->validation($sheet, 'A', '=BI_INITIAL_SETUP_CATEGORIES');
         $this->validation($sheet, 'B', '=BI_INITIAL_SETUP_TYPES');
-        $this->validation($sheet, 'L', '=BI_INITIAL_SETUP_CUSTODY');
-        $this->validation($sheet, 'M', '=BI_INITIAL_SETUP_EMPLOYEES');
-        $this->validation($sheet, 'N', '=BI_INITIAL_SETUP_DEPARTMENTS');
-        $this->validation($sheet, 'O', '=BI_INITIAL_SETUP_SITES');
-        $this->validation($sheet, 'P', '=BI_INITIAL_SETUP_LOCATIONS');
+        $this->validation($sheet, 'N', '=BI_INITIAL_SETUP_CUSTODY');
+        $this->validation($sheet, 'O', '=BI_INITIAL_SETUP_EMPLOYEES');
+        $this->validation($sheet, 'P', '=BI_INITIAL_SETUP_DEPARTMENTS');
         $this->validation($sheet, 'Q', '=BI_INITIAL_SETUP_SITES');
+        $this->validation($sheet, 'R', '=BI_INITIAL_SETUP_LOCATIONS');
+        $this->validation($sheet, 'S', '=BI_INITIAL_SETUP_SITES');
 
         $this->instructions($spreadsheet, $company);
         $meta = new Worksheet($spreadsheet, '_meta');
         $spreadsheet->addSheet($meta);
         $meta->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
         $meta->fromArray([
-            ['key','value'],
+            ['key', 'value'],
             ['template_type', self::TEMPLATE_TYPE],
             ['template_version', self::TEMPLATE_VERSION],
             ['company_id', (string) $company->id],
             ['generated_at', now()->toIso8601String()],
         ], null, 'A1');
         $spreadsheet->setActiveSheetIndex(0);
+
         return $spreadsheet;
     }
 
@@ -149,7 +154,7 @@ final class InitialAssetSetupTemplateService
             ['کدهای واحد، سایت، محل و سایت کدگذاری از ساختار سازمانی همان شرکت و کد پرسنلی از فهرست پرسنل فعال انتخاب شود. سایت کدگذاری برای همه ردیف‌ها الزامی است.'],
             ['برای دارایی انباری، نوع استقرار را انبار بگذارید و مقصد فعلی را خالی کنید؛ فقط سایت کدگذاری را برای صدور کد وارد کنید.'],
             ['کد اموال داخلی اختیاری است؛ کد دائمی اموال پس از اعتبارسنجی، خودکار و غیرقابل‌تغییر صادر می‌شود.'],
-            ['تاریخ خرید را به‌صورت شمسی مانند ۱۴۰۴/۰۶/۱۹ وارد کنید. مبلغ خرید فقط عدد باشد.'],
+            ['تاریخ خرید را به‌صورت شمسی مانند ۱۴۰۴/۰۶/۱۹ وارد کنید. برای مبلغ بیشتر از صفر، شماره فاکتور/صورت‌جلسه/سند تحصیل الزامی است.'],
             ['قبل از ثبت، دسته‌بندی، نوع دارایی و تنظیمات کدگذاری شرکت باید کامل باشند.'],
         ], null, 'A1');
         $sheet->getColumnDimension('A')->setWidth(125);

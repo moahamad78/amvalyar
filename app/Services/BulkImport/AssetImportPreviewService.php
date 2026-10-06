@@ -38,7 +38,7 @@ final class AssetImportPreviewService
             }
 
             if (
-                !$this->versionsMatch(
+                ! $this->versionsMatch(
                     (string) ($metadata['template_version'] ?? ''),
                     AssetImportTemplateService::TEMPLATE_VERSION
                 )
@@ -69,7 +69,7 @@ final class AssetImportPreviewService
 
             for ($row = 2; $row <= $highestRow; $row++) {
                 $values = [];
-                for ($column = 1; $column <= 13; $column++) {
+                for ($column = 1; $column <= 15; $column++) {
                     $values[$column] = trim((string) $sheet->getCell([$column, $row])->getFormattedValue());
                 }
 
@@ -136,15 +136,24 @@ final class AssetImportPreviewService
                 if ($values[11] !== '') {
                     $numeric = str_replace([',', '٬', ' '], '', $values[11]);
 
-                    if (!is_numeric($numeric) || (float) $numeric < 0) {
+                    if (! is_numeric($numeric) || (float) $numeric < 0) {
                         $errors[] = 'مبلغ خرید معتبر نیست.';
                     } else {
                         $purchasePrice = $numeric;
                     }
                 }
 
+                if ($purchasePrice !== null && (float) $purchasePrice > 0) {
+                    if ($purchaseDate === null) {
+                        $errors[] = 'برای مبلغ خرید بیشتر از صفر، تاریخ خرید الزامی است.';
+                    }
+                    if ($values[13] === '') {
+                        $errors[] = 'برای مبلغ خرید بیشتر از صفر، شماره سند خرید/تحصیل الزامی است.';
+                    }
+                }
+
                 $status = 'warehouse';
-                if ($values[13] !== '' && $values[13] !== 'انبار' && $values[13] !== 'warehouse') {
+                if ($values[15] !== '' && $values[15] !== 'انبار' && $values[15] !== 'warehouse') {
                     $errors[] = 'وضعیت معتبر نیست.';
                 }
 
@@ -173,7 +182,9 @@ final class AssetImportPreviewService
                         'country' => $values[9] !== '' ? $values[9] : null,
                         'purchase_date' => $purchaseDate,
                         'purchase_price' => $purchasePrice,
-                        'description' => $values[12] !== '' ? $values[12] : null,
+                        'supplier_name' => $values[12] !== '' ? $values[12] : null,
+                        'acquisition_document_number' => $values[13] !== '' ? $values[13] : null,
+                        'description' => $values[14] !== '' ? $values[14] : null,
                         'is_active' => true,
                         'status' => $status,
                     ],
@@ -220,6 +231,7 @@ final class AssetImportPreviewService
     private function normalize(string $value): string
     {
         $value = str_replace(['ي', 'ك'], ['ی', 'ک'], trim($value));
+
         return mb_strtolower(preg_replace('/\s+/u', ' ', $value) ?? $value);
     }
 

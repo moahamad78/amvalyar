@@ -6,10 +6,13 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\EnforcesCompanyAssetLimit;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Services\RoleAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Asset extends Model
 {
@@ -21,9 +24,9 @@ class Asset extends Model
      */
     protected static function booted(): void
     {
-        static::addGlobalScope('role-visibility', function (\Illuminate\Database\Eloquent\Builder $query): void {
+        static::addGlobalScope('role-visibility', function (Builder $query): void {
             if ($user = auth()->user()) {
-                app(\App\Services\RoleAccessService::class)->constrainAssets($query, $user);
+                app(RoleAccessService::class)->constrainAssets($query, $user);
             }
         });
         /*
@@ -43,13 +46,12 @@ class Asset extends Model
             function (Asset $asset): void {
 
                 if (
-                    !$asset->isDirty(
+                    ! $asset->isDirty(
                         'asset_code'
                     )
                 ) {
                     return;
                 }
-
 
                 $original =
                     trim(
@@ -61,7 +63,6 @@ class Asset extends Model
                         )
                     );
 
-
                 $new =
                     trim(
                         (string) (
@@ -69,7 +70,6 @@ class Asset extends Model
                             ?? ''
                         )
                     );
-
 
                 /*
                  * First official issuance.
@@ -81,7 +81,6 @@ class Asset extends Model
                 ) {
                     return;
                 }
-
 
                 /*
                  * Once issued, the permanent code
@@ -101,12 +100,27 @@ class Asset extends Model
     public function getPurchasePriceAttribute($value)
     {
         $user = auth()->user();
-        return $user && !app(\App\Services\RoleAccessService::class)->financial($user) ? null : $value;
+
+        return $user && ! app(RoleAccessService::class)->financial($user) ? null : $value;
+    }
+
+    public function getSupplierNameAttribute($value)
+    {
+        $user = auth()->user();
+
+        return $user && ! app(RoleAccessService::class)->financial($user) ? null : $value;
+    }
+
+    public function getAcquisitionDocumentNumberAttribute($value)
+    {
+        $user = auth()->user();
+
+        return $user && ! app(RoleAccessService::class)->financial($user) ? null : $value;
     }
 
     protected $fillable = [
-                'company_id',
-'asset_category_id',
+        'company_id',
+        'asset_category_id',
         'asset_type_id',
         'coding_site_id',
         'coding_site_code_snapshot',
@@ -124,6 +138,8 @@ class Asset extends Model
         'country',
         'purchase_date',
         'purchase_price',
+        'supplier_name',
+        'acquisition_document_number',
         'description',
         'is_active',
         'status',
@@ -134,7 +150,6 @@ class Asset extends Model
         'current_site_id',
         'current_location_id',
     ];
-
 
     /**
      * @deprecated Physical plate code is the permanent asset_code.
@@ -164,13 +179,14 @@ class Asset extends Model
             $this->attributes['plate_number']
         );
     }
+
     protected function casts(): array
     {
         return [
-            'purchase_date'  => 'date',
+            'purchase_date' => 'date',
             'asset_code_issued_at' => 'datetime',
             'purchase_price' => 'decimal:2',
-            'is_active'      => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -186,26 +202,24 @@ class Asset extends Model
     {
         return $this->hasMany(AssetRepairRequest::class);
     }
+
     public function transactions(): HasMany
     {
         return $this->hasMany(AssetTransaction::class);
     }
-
 
     public function isActive(): bool
     {
         return $this->is_active === true;
     }
 
-
-    public function assetType(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function assetType(): BelongsTo
     {
         return $this->belongsTo(
             AssetType::class,
             'asset_type_id'
         );
     }
-
 
     public function photos(): HasMany
     {
@@ -216,8 +230,7 @@ class Asset extends Model
             ->orderBy('id');
     }
 
-
-    public function primaryPhoto(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function primaryPhoto(): HasOne
     {
         return $this->hasOne(
             AssetPhoto::class
@@ -228,37 +241,37 @@ class Asset extends Model
             );
     }
 
-
     public function attributeValues(): HasMany
     {
         return $this->hasMany(
             AssetAttributeValue::class
         );
     }
-    public function custodyEmployee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+
+    public function custodyEmployee(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Employee::class, 'custody_employee_id');
+        return $this->belongsTo(Employee::class, 'custody_employee_id');
     }
 
-    public function custodyDepartment(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function custodyDepartment(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Department::class, 'custody_department_id');
+        return $this->belongsTo(Department::class, 'custody_department_id');
     }
 
-    public function currentSite(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function currentSite(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Site::class, 'current_site_id');
+        return $this->belongsTo(Site::class, 'current_site_id');
     }
 
-    public function currentLocation(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function currentLocation(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Location::class, 'current_location_id');
+        return $this->belongsTo(Location::class, 'current_location_id');
     }
 
-    public function codingSite(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function codingSite(): BelongsTo
     {
         return $this->belongsTo(
-            \App\Models\Site::class,
+            Site::class,
             'coding_site_id'
         );
     }

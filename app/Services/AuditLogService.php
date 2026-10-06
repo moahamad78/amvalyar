@@ -22,9 +22,9 @@ final class AuditLogService
     ): AuditLog {
         $user = $actor ?? auth()->user();
 
-        $companyId = $user?->isSuperAdmin()
+        $companyId = ($user === null || $user->isSuperAdmin())
             ? $subject?->getAttribute('company_id')
-            : $user?->company_id;
+            : $user->company_id;
 
         $subjectLabel = null;
 

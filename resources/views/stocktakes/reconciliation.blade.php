@@ -53,6 +53,8 @@ $fmt=function($type,$user,$employee,$department,$site,$location){
         $current=$fmt($asset?->custody_type,$asset?->custody_user_id,$asset?->custody_employee_id,$asset?->custody_department_id,$asset?->current_site_id,$asset?->current_location_id);
         $canApply=in_array($item->result_status,['misplaced','custody_mismatch'],true);
         $pending=$item->reconciliation_status==='pending';
+        $isIndependent=(int)auth()->id() !== (int)$item->counted_by
+            && (int)auth()->id() !== (int)$stocktake->completed_by;
     @endphp
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -68,14 +70,14 @@ $fmt=function($type,$user,$employee,$department,$site,$location){
 
             @if($item->notes)<div class="mt-3"><strong>یادداشت شمارش:</strong> {{ $item->notes }}</div>@endif
 
-            @if($pending)
+            @if($pending && $isIndependent)
             <div class="row g-3 mt-1">
                 @if($canApply)
                 <div class="col-lg-6">
                     <form method="POST" action="{{ route('stocktakes.reconciliation.apply',[$stocktake,$item]) }}" class="border rounded p-3">
                         @csrf
                         <label class="form-label">یادداشت تصمیم</label>
-                        <textarea name="note" class="form-control mb-2" rows="2" maxlength="4000"></textarea>
+                        <textarea name="note" class="form-control mb-2" rows="2" minlength="10" maxlength="4000" required></textarea>
                         <button class="btn btn-danger" onclick="return confirm('اطلاعات مشاهده‌شده روی رکورد اصلی مال اعمال شود؟')">اعمال اطلاعات مشاهده‌شده</button>
                     </form>
                 </div>
@@ -84,10 +86,14 @@ $fmt=function($type,$user,$employee,$department,$site,$location){
                     <form method="POST" action="{{ route('stocktakes.reconciliation.resolve',[$stocktake,$item]) }}" class="border rounded p-3">
                         @csrf
                         <label class="form-label">یادداشت تصمیم</label>
-                        <textarea name="note" class="form-control mb-2" rows="2" maxlength="4000"></textarea>
+                        <textarea name="note" class="form-control mb-2" rows="2" minlength="10" maxlength="4000" required></textarea>
                         <button class="btn btn-outline-secondary">مختومه بدون تغییر اطلاعات اصلی</button>
                     </form>
                 </div>
+            </div>
+            @elseif($pending)
+            <div class="alert alert-warning mt-3 mb-0">
+                به‌دلیل تفکیک وظایف، شمارش‌کننده یا تأییدکننده نهایی این دوره نمی‌تواند همین مغایرت را مختومه کند؛ رسیدگی باید توسط ناظر مستقل انجام شود.
             </div>
             @else
             <div class="alert alert-light border mt-3 mb-0">

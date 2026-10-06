@@ -9,6 +9,7 @@ use App\Models\AssetCategory;
 use App\Models\AssetTransaction;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\RoleAccessService;
 use App\Services\RoleDashboardService;
 use Illuminate\View\View;
 
@@ -40,7 +41,6 @@ final class DashboardController extends Controller
             ->addDays(30)
             ->endOfDay();
 
-
         /*
         |--------------------------------------------------------------------------
         | Main statistics
@@ -66,104 +66,88 @@ final class DashboardController extends Controller
             AssetTransaction::withoutGlobalScopes()
                 ->count();
 
-
         $stats = [
 
-            'companies' =>
-                $companyCount,
+            'companies' => $companyCount,
 
-            'active_companies' =>
-                Company::query()
-                    ->where(
-                        'status',
-                        'active'
-                    )
-                    ->count(),
+            'active_companies' => Company::query()
+                ->where(
+                    'status',
+                    'active'
+                )
+                ->count(),
 
-            'demo_companies' =>
-                Company::query()
-                    ->where(
-                        'status',
-                        'demo'
-                    )
-                    ->count(),
+            'demo_companies' => Company::query()
+                ->where(
+                    'status',
+                    'demo'
+                )
+                ->count(),
 
-            'suspended_companies' =>
-                Company::query()
-                    ->where(
-                        'status',
-                        'suspended'
-                    )
-                    ->count(),
+            'suspended_companies' => Company::query()
+                ->where(
+                    'status',
+                    'suspended'
+                )
+                ->count(),
 
-            'expired_companies' =>
-                Company::query()
-                    ->where(
-                        'status',
-                        'expired'
-                    )
-                    ->count(),
+            'expired_companies' => Company::query()
+                ->where(
+                    'status',
+                    'expired'
+                )
+                ->count(),
 
-            'overdue_companies' =>
-                Company::query()
-                    ->whereNotNull(
-                        'license_end'
-                    )
-                    ->whereDate(
-                        'license_end',
-                        '<',
-                        $today->toDateString()
-                    )
-                    ->count(),
+            'overdue_companies' => Company::query()
+                ->whereNotNull(
+                    'license_end'
+                )
+                ->whereDate(
+                    'license_end',
+                    '<',
+                    $today->toDateString()
+                )
+                ->count(),
 
-            'users' =>
-                $userCount,
+            'users' => $userCount,
 
-            'assets' =>
-                $assetCount,
+            'assets' => $assetCount,
 
-            'warehouse_assets' =>
-                Asset::withoutGlobalScopes()
-                    ->where(
-                        'status',
-                        'warehouse'
-                    )
-                    ->count(),
+            'warehouse_assets' => Asset::withoutGlobalScopes()
+                ->where(
+                    'status',
+                    'warehouse'
+                )
+                ->count(),
 
-            'assigned_assets' =>
-                Asset::withoutGlobalScopes()
-                    ->where(
-                        'status',
-                        'assigned'
-                    )
-                    ->count(),
+            'assigned_assets' => Asset::withoutGlobalScopes()
+                ->where(
+                    'status',
+                    'assigned'
+                )
+                ->count(),
 
-            'organizational_assets' =>
-                Asset::withoutGlobalScopes()
-                    ->where(
-                        'custody_type',
-                        'organization'
-                    )
-                    ->count(),
+            'organizational_assets' => Asset::withoutGlobalScopes()
+                ->where(
+                    'custody_type',
+                    'organization'
+                )
+                ->count(),
 
-            'destroyed_assets' =>
-                Asset::withoutGlobalScopes()
-                    ->where(
-                        'status',
-                        'destroyed'
-                    )
-                    ->count(),
+            'destroyed_assets' => Asset::withoutGlobalScopes()
+                ->where(
+                    'status',
+                    'destroyed'
+                )
+                ->count(),
 
-            'transactions' =>
-                $transactionCount,
+            'transactions' => $transactionCount,
 
-            'purchase_value' =>
-                (float) Asset::withoutGlobalScopes()
-                    ->sum(
-                        'purchase_price'
-                    ),
+            'purchase_value' => (float) Asset::withoutGlobalScopes()
+                ->sum(
+                    'purchase_price'
+                ),
         ];
-
 
         /*
         |--------------------------------------------------------------------------
@@ -199,7 +183,6 @@ final class DashboardController extends Controller
                 ->limit(10)
                 ->get();
 
-
         /*
         |--------------------------------------------------------------------------
         | Recent companies
@@ -211,7 +194,6 @@ final class DashboardController extends Controller
                 ->latest('id')
                 ->limit(8)
                 ->get();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -231,7 +213,6 @@ final class DashboardController extends Controller
                 ->limit(10)
                 ->get();
 
-
         /*
         |--------------------------------------------------------------------------
         | Company usage overview
@@ -250,34 +231,24 @@ final class DashboardController extends Controller
                         $assets = (int) $company->assets_count;
                         $users = (int) $company->tenant_users_count;
 
-
                         return [
-                            'id' =>
-                                $company->id,
+                            'id' => $company->id,
 
-                            'name' =>
-                                $company->name,
+                            'name' => $company->name,
 
-                            'code' =>
-                                $company->code,
+                            'code' => $company->code,
 
-                            'status' =>
-                                $company->status,
+                            'status' => $company->status,
 
-                            'assets' =>
-                                $assets,
+                            'assets' => $assets,
 
-                            'users' =>
-                                $users,
+                            'users' => $users,
 
-                            'max_assets' =>
-                                (int) $company->max_assets,
+                            'max_assets' => (int) $company->max_assets,
 
-                            'max_users' =>
-                                (int) $company->max_users,
+                            'max_users' => (int) $company->max_users,
 
-                            'asset_percent' =>
-                                $company->max_assets > 0
+                            'asset_percent' => $company->max_assets > 0
                                     ? min(
                                         100,
                                         round(
@@ -291,8 +262,7 @@ final class DashboardController extends Controller
                                     )
                                     : 0,
 
-                            'user_percent' =>
-                                $company->max_users > 0
+                            'user_percent' => $company->max_users > 0
                                     ? min(
                                         100,
                                         round(
@@ -313,7 +283,6 @@ final class DashboardController extends Controller
                 )
                 ->values();
 
-
         return view(
             'dashboard.super_admin',
             compact(
@@ -325,6 +294,7 @@ final class DashboardController extends Controller
             )
         );
     }
+
     private function companyDashboard(
         User $user
     ): View {
@@ -336,13 +306,13 @@ final class DashboardController extends Controller
             'کاربر به هیچ شرکتی متصل نیست.'
         );
 
-        $access = app(\App\Services\RoleAccessService::class);
+        $access = app(RoleAccessService::class);
         if ($access->scope($user) !== 'company') {
             $assets = Asset::query()->with(['category', 'currentSite', 'currentLocation'])->latest('id')->paginate(15);
             $roleDashboard = app(RoleDashboardService::class)->forUser($user);
+
             return view('dashboard.personal', compact('company', 'assets', 'roleDashboard'));
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -350,8 +320,21 @@ final class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $assetCount =
-            Asset::query()->count();
+        $canViewFinancial = $access->financial($user);
+
+        $assetSummaryQuery = Asset::query()
+            ->selectRaw('COUNT(*) AS assets')
+            ->selectRaw("SUM(CASE WHEN status = 'warehouse' THEN 1 ELSE 0 END) AS warehouse_assets")
+            ->selectRaw("SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END) AS assigned_assets")
+            ->selectRaw("SUM(CASE WHEN custody_type = 'organization' THEN 1 ELSE 0 END) AS organizational_assets")
+            ->selectRaw("SUM(CASE WHEN status = 'destroyed' THEN 1 ELSE 0 END) AS destroyed_assets");
+
+        if ($canViewFinancial) {
+            $assetSummaryQuery->selectRaw('COALESCE(SUM(purchase_price), 0) AS purchase_value');
+        }
+
+        $assetSummary = $assetSummaryQuery->firstOrFail();
+        $assetCount = (int) $assetSummary->assets;
 
         $userCount =
             User::query()
@@ -365,58 +348,27 @@ final class DashboardController extends Controller
                 )
                 ->count();
 
-
         $stats = [
 
-            'assets' =>
-                $assetCount,
+            'assets' => $assetCount,
 
-            'warehouse_assets' =>
-                Asset::query()
-                    ->where(
-                        'status',
-                        'warehouse'
-                    )
-                    ->count(),
+            'warehouse_assets' => (int) $assetSummary->warehouse_assets,
 
-            'assigned_assets' =>
-                Asset::query()
-                    ->where(
-                        'status',
-                        'assigned'
-                    )
-                    ->count(),
+            'assigned_assets' => (int) $assetSummary->assigned_assets,
 
-            'organizational_assets' =>
-                Asset::query()
-                    ->where(
-                        'custody_type',
-                        'organization'
-                    )
-                    ->count(),
+            'organizational_assets' => (int) $assetSummary->organizational_assets,
 
-            'destroyed_assets' =>
-                Asset::query()
-                    ->where(
-                        'status',
-                        'destroyed'
-                    )
-                    ->count(),
+            'destroyed_assets' => (int) $assetSummary->destroyed_assets,
 
-            'users' =>
-                $userCount,
+            'users' => $userCount,
 
-            'transactions' =>
-                AssetTransaction::query()
-                    ->count(),
+            'transactions' => AssetTransaction::query()
+                ->count(),
 
-            'purchase_value' =>
-                $access->financial($user) ? (float) Asset::query()
-                    ->sum(
-                        'purchase_price'
-                    ) : null,
+            'purchase_value' => $canViewFinancial
+                    ? (float) $assetSummary->purchase_value
+                    : null,
         ];
-
 
         /*
         |--------------------------------------------------------------------------
@@ -439,7 +391,6 @@ final class DashboardController extends Controller
                 )
                 : 0;
 
-
         $userCapacityPercent =
             $company->max_users > 0
                 ? min(
@@ -455,7 +406,6 @@ final class DashboardController extends Controller
                 )
                 : 0;
 
-
         /*
         |--------------------------------------------------------------------------
         | Recent Assets
@@ -470,7 +420,6 @@ final class DashboardController extends Controller
                 ->latest('id')
                 ->limit(8)
                 ->get();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -489,7 +438,6 @@ final class DashboardController extends Controller
                 ->latest('id')
                 ->limit(8)
                 ->get();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -510,7 +458,6 @@ final class DashboardController extends Controller
                 )
                 ->get();
 
-
         $categoryIds =
             $categoryCounts
                 ->pluck(
@@ -518,7 +465,6 @@ final class DashboardController extends Controller
                 )
                 ->filter()
                 ->values();
-
 
         $categoryNames =
             AssetCategory::query()
@@ -531,24 +477,20 @@ final class DashboardController extends Controller
                     'id'
                 );
 
-
         $categoryStats =
             $categoryCounts
                 ->map(
                     function ($item) use ($categoryNames) {
 
                         return [
-                            'name' =>
-                                $categoryNames[
+                            'name' => $categoryNames[
                                     $item->asset_category_id
                                 ] ?? 'بدون دسته‌بندی',
 
-                            'total' =>
-                                (int) $item->total,
+                            'total' => (int) $item->total,
                         ];
                     }
                 );
-
 
         $roleDashboard =
             app(
