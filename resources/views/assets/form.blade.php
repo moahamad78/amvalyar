@@ -516,27 +516,29 @@
             </div>
 
 
-            <div>
-    <label>
-        کد دارایی
-    </label>
+            <div class="col-12 col-md-6 mb-3">
+                <label for="asset_code_preview" class="form-label">
+                    کد دارایی
+                </label>
 
-    @if(isset($asset) && $asset->asset_code)
-        <input
-            type="text"
-            value="{{ $asset->asset_code }}"
-            readonly
-            style="background:#f3f4f6;"
-        >
-    @else
-        <input
-            type="text"
-            value="پس از ثبت، به صورت خودکار تولید می‌شود"
-            readonly
-            style="background:#f3f4f6;"
-        >
-    @endif
-</div>
+                <input
+                    id="asset_code_preview"
+                    type="text"
+                    class="form-control bg-body-tertiary"
+                    value="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'پس از ثبت، به صورت خودکار تولید می‌شود' }}"
+                    title="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'پس از ثبت، کد دارایی براساس تنظیمات کد اموال سازمان به صورت خودکار تولید می‌شود.' }}"
+                    @unless(isset($asset) && $asset->asset_code)
+                        aria-describedby="asset_code_help"
+                    @endunless
+                    readonly
+                >
+
+                @unless(isset($asset) && $asset->asset_code)
+                    <div id="asset_code_help" class="form-text">
+                        کد دارایی پس از ثبت و براساس تنظیمات کد اموال سازمان تولید می‌شود.
+                    </div>
+                @endunless
+            </div>
 
 
             <div class="col-md-6 mb-3">
