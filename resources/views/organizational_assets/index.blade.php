@@ -3,6 +3,16 @@
 @section('title', 'اموال سازمانی')
 
 @section('content')
+@php
+    $currentUser = auth()->user();
+    $canCreateAsset = $currentUser->isSuperAdmin()
+        || $currentUser->hasPermission('assets.create');
+    $canOperateOrganizationalAssets = $currentUser->isSuperAdmin()
+        || $currentUser->hasPermission('assets.delivery')
+        || $currentUser->hasPermission('assets.transfer')
+        || $currentUser->hasPermission('assets.return');
+@endphp
+
 <div class="container py-4">
 
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
@@ -13,13 +23,42 @@
             </div>
         </div>
 
-        <a
-            href="{{ route('organizational-assets.create') }}"
-            class="btn btn-primary"
-        >
-            + ثبت عملیات سازمانی
-        </a>
+        <div class="d-flex flex-wrap gap-2">
+            @if($canCreateAsset)
+                <a
+                    href="{{ route('assets.create') }}"
+                    class="btn btn-outline-primary"
+                >
+                    + ثبت دارایی جدید
+                </a>
+            @endif
+
+            @if($canOperateOrganizationalAssets)
+                <a
+                    href="{{ route('organizational-assets.create') }}"
+                    class="btn btn-primary"
+                >
+                    استقرار یا جابه‌جایی سازمانی
+                </a>
+            @endif
+        </div>
     </div>
+
+    @if($canCreateAsset || $canOperateOrganizationalAssets)
+        <div class="alert alert-info d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
+            <div>
+                <strong>می‌خواهید یک مال سازمانی جدید اضافه کنید؟</strong>
+                <div class="small mt-1">
+                    ابتدا پروندهٔ دارایی را ثبت کنید؛ دارایی وارد انبار می‌شود. سپس با «استقرار یا جابه‌جایی سازمانی»، سایت، واحد یا محل استقرار آن را مشخص کنید.
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 text-nowrap">
+                <span class="badge text-bg-light border px-3 py-2">۱. ثبت دارایی</span>
+                <span class="badge text-bg-light border px-3 py-2">۲. تعیین محل استقرار</span>
+            </div>
+        </div>
+    @endif
 
     <div class="card shadow-sm mb-3"><div class="card-body"><form method="get" class="row g-2 align-items-end">
         <div class="col-md-3"><label class="form-label">واحد</label><select name="department_id" class="form-select"><option value="">همه واحدها</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected((string) request('department_id') === (string) $department->id)>{{ $department->name }}</option>@endforeach</select></div>
