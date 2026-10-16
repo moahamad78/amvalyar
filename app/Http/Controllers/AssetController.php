@@ -472,6 +472,11 @@ final class AssetController extends Controller
             $data['dynamic_attribute_files']
         );
 
+        $classificationChangeReason = trim(
+            (string) ($data['classification_change_reason'] ?? '')
+        );
+        unset($data['classification_change_reason']);
+
         DB::transaction(
             function () use (
                 $request,
@@ -479,18 +484,40 @@ final class AssetController extends Controller
                 $data,
                 $assetPhotoService,
                 $attributeValueService,
-                $auditLogService
+                $auditLogService,
+                $classificationChangeReason
             ): void {
+                $lockedAsset = Asset::withoutGlobalScopes()
+                    ->whereKey($asset->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                $before = $this->auditSnapshot($asset);
+                $this->ensureAssetIsVisible($request->user(), $lockedAsset);
 
-                $asset->update(
+                $classificationChanged =
+                    (int) $lockedAsset->asset_category_id !== (int) $data['asset_category_id']
+                    || (int) $lockedAsset->asset_type_id !== (int) $data['asset_type_id'];
+
+                if (
+                    $classificationChanged
+                    && trim((string) $lockedAsset->asset_code) !== ''
+                    && $classificationChangeReason === ''
+                ) {
+                    throw ValidationException::withMessages([
+                        'classification_change_reason' =>
+                            'برای تغییر دسته‌بندی یا نوع دارایی دارای کد دائمی، ثبت علت و مستند تغییر الزامی است.',
+                    ]);
+                }
+
+                $before = $this->auditSnapshot($lockedAsset);
+
+                $lockedAsset->update(
                     $data
                 );
 
                 $assetPhotoService
                     ->storeUploadedPhotos(
-                        asset: $asset,
+                        asset: $lockedAsset,
 
                         files: $request->file(
                             'photos',
@@ -502,17 +529,28 @@ final class AssetController extends Controller
 
                 $attributeValueService
                     ->sync(
-                        $asset,
+                        $lockedAsset,
                         $request,
                         $request->user()
                     );
 
+                $after = $this->auditSnapshot($lockedAsset->fresh());
+
+                if ($classificationChanged) {
+                    $after['classification_change_reason'] =
+                        $classificationChangeReason !== ''
+                            ? $classificationChangeReason
+                            : 'دارایی هنوز کد دائمی نداشت.';
+                }
+
                 $auditLogService->log(
                     'asset.updated',
-                    $asset,
+                    $lockedAsset,
                     $before,
-                    $this->auditSnapshot($asset->fresh()),
-                    'مشخصات فنی/شناسنامه‌ای دارایی ویرایش شد.',
+                    $after,
+                    $classificationChanged
+                        ? 'طبقه‌بندی دارایی با ثبت علت کنترل‌شده تغییر کرد.'
+                        : 'مشخصات فنی/شناسنامه‌ای دارایی ویرایش شد.',
                     $request,
                     $request->user()
                 );

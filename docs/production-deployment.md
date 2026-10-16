@@ -21,8 +21,9 @@ Run `powershell -ExecutionPolicy Bypass -File tools/release-preflight.ps1 -SkipE
 4. Run `php artisan app:production-readiness`.
 5. Run `php artisan app:deployment-readiness`.
 6. Verify `GET /up`.
-7. Start/reload the queue worker.
-8. Ensure Laravel scheduler runs every minute.
+7. Verify `GET /health/ready` returns HTTP 200 and confirms database readiness.
+8. Start/reload the queue worker.
+9. Ensure Laravel scheduler runs every minute.
 
 ## Release acceptance
 - The full isolated test suite and production frontend build must pass.
@@ -104,3 +105,5 @@ HTTPS mail provider, and verify database backups and restoration.
 
 Use [`docs/demo-launch-checklist.md`](demo-launch-checklist.md) as the acceptance
 gate for the temporary public demo and before every public redeployment.
+For the temporary free service, apply the two-monitor setup in
+[`docs/uptime-monitoring.md`](uptime-monitoring.md).

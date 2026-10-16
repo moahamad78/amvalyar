@@ -16,7 +16,8 @@ final class AssetRepairRequestService
 {
     public function __construct(
         private readonly WorkflowRuntimeService $workflowRuntimeService,
-        private readonly AuditLogService $auditLogService
+        private readonly AuditLogService $auditLogService,
+        private readonly AssetOperationConflictService $operationConflicts
     ) {}
 
     public function createDraft(
@@ -32,6 +33,7 @@ final class AssetRepairRequestService
         $this->validateAsset($asset);
         $this->validatePriority($priority);
         $this->ensureNoOpenRepair($asset);
+        $this->operationConflicts->assertCanStartRepair($asset);
 
         return DB::transaction(function () use (
             $asset,
@@ -50,6 +52,7 @@ final class AssetRepairRequestService
             $this->validateRequester($lockedAsset, $requesterUser, $requesterEmployee);
             $this->validateAsset($lockedAsset);
             $this->ensureNoOpenRepair($lockedAsset);
+            $this->operationConflicts->assertCanStartRepair($lockedAsset);
 
             $repair = AssetRepairRequest::withoutGlobalScopes()->create([
                 'company_id' => $lockedAsset->company_id,

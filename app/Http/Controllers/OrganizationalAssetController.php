@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AssetCustodyService;
+use App\Services\AssetOperationConflictService;
 use App\Services\AuditLogService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -137,7 +138,8 @@ final class OrganizationalAssetController extends Controller
     public function store(
         OrganizationalAssetRequest $request,
         AssetCustodyService $custodyService,
-        AuditLogService $auditLogService
+        AuditLogService $auditLogService,
+        AssetOperationConflictService $operationConflicts
     ): RedirectResponse {
         $user = $request->user();
         $data = $request->validated();
@@ -155,6 +157,7 @@ final class OrganizationalAssetController extends Controller
                 $operation,
                 $custodyService,
                 $auditLogService,
+                $operationConflicts,
                 $request
             ): void {
                 $asset =
@@ -169,6 +172,8 @@ final class OrganizationalAssetController extends Controller
                     $user,
                     $asset
                 );
+
+                $operationConflicts->assertCanChangeCustodyDirectly($asset);
 
                 $old =
                     $custodyService->snapshot(

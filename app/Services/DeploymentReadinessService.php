@@ -19,6 +19,7 @@ final class DeploymentReadinessService
             'app_key_present' => trim((string) config('app.key')) !== '',
             'health_route_present' => collect(Route::getRoutes()->getRoutes())
                 ->contains(fn ($route): bool => $route->uri() === 'up' && in_array('GET', $route->methods(), true)),
+            'readiness_route_present' => Route::has('health.ready'),
             'backup_retention_valid' => (int) config('backup.retention_days', 0) >= 1,
             'native_backup_tool_available' => $this->nativeToolAvailable($driver),
             'migrations_current' => $this->migrationsCurrent(),

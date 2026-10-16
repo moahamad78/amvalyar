@@ -44,6 +44,12 @@
                        value="{{ old('acquisition_document_number', $asset->acquisition_document_number) }}">
                 <div class="form-text">برای مبالغ بیشتر از صفر الزامی است.</div>
             </div>
+            <div class="col-12">
+                <label class="form-label">علت اصلاح اطلاعات مالی</label>
+                <textarea name="change_reason" class="form-control" rows="3" maxlength="1000" required
+                          placeholder="علت اصلاح، شماره درخواست یا مستند مربوط را وارد کنید.">{{ old('change_reason') }}</textarea>
+                <div class="form-text">این علت همراه با مقادیر قبل و بعد در سابقه حسابرسی ثبت می‌شود.</div>
+            </div>
         </div>
         <div class="card-footer bg-white d-flex justify-content-end">
             <button class="btn btn-success" type="submit">ثبت کنترل‌شده اطلاعات مالی</button>

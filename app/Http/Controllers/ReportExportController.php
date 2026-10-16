@@ -9,6 +9,7 @@ use App\Models\AssetCategory;
 use App\Models\AssetTransaction;
 use App\Models\Company;
 use App\Services\AssetReportFilters;
+use App\Services\AuditLogService;
 use App\Services\RoleAccessService;
 use App\Support\JalaliDate;
 use Illuminate\Http\Request;
@@ -23,7 +24,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 final class ReportExportController extends Controller
 {
     public function __invoke(
-        Request $request
+        Request $request,
+        AuditLogService $auditLog
     ): StreamedResponse {
         $user = $request->user();
         $canViewFinancial = app(RoleAccessService::class)->financial($user);
@@ -306,6 +308,21 @@ final class ReportExportController extends Controller
 
         $filename =
             "asset-management-report-{$fileDate}.xlsx";
+
+        $auditLog->log(
+            action: 'report.assets_exported',
+            newValues: [
+                'filename' => $filename,
+                'company_id' => $selectedCompanyId ?? $user->company_id,
+                'filters' => $filters,
+                'asset_count' => $assetStats['total'],
+                'transaction_count' => $transactionStats['total'],
+                'financial_values_included' => $canViewFinancial,
+            ],
+            description: 'خروجی Excel گزارش اموال تولید شد.',
+            request: $request,
+            actor: $user
+        );
 
         return response()->streamDownload(
             function () use (

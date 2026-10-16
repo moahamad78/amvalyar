@@ -33,6 +33,7 @@ final class AssetFinancialControlTest extends TestCase
                 'purchase_price' => '125000000',
                 'supplier_name' => 'تأمین‌کننده آزمون',
                 'acquisition_document_number' => 'INV-1405-001',
+                'change_reason' => 'اصلاح بر اساس سند خرید قطعی شماره INV-1405-001',
             ])
             ->assertRedirect(route('assets.show', $asset));
 
@@ -51,6 +52,10 @@ final class AssetFinancialControlTest extends TestCase
         $this->assertSame($user->id, $log->user_id);
         $this->assertSame($asset->company_id, $log->company_id);
         $this->assertSame('INV-1405-001', $log->new_values['acquisition_document_number']);
+        $this->assertSame(
+            'اصلاح بر اساس سند خرید قطعی شماره INV-1405-001',
+            $log->new_values['change_reason']
+        );
     }
 
     public function test_positive_acquisition_value_requires_date_and_source_document(): void
@@ -65,6 +70,7 @@ final class AssetFinancialControlTest extends TestCase
                 'purchase_price' => 5000000,
                 'supplier_name' => 'فروشنده',
                 'acquisition_document_number' => '',
+                'change_reason' => 'اصلاح اطلاعات مالی بر اساس سند خرید',
             ])
             ->assertRedirect(route('assets.financial.edit', $asset))
             ->assertSessionHasErrors('purchase_date');
@@ -94,6 +100,66 @@ final class AssetFinancialControlTest extends TestCase
         $this->assertEquals(0, (float) $asset->getRawOriginal('purchase_price'));
         $this->assertNull($asset->getRawOriginal('purchase_date'));
         $this->assertSame('دارایی کنترل مالی', $asset->title);
+    }
+
+    public function test_permanent_asset_classification_change_requires_reason_and_is_audited(): void
+    {
+        [$user, $asset] = $this->fixture(['assets.edit']);
+
+        $key = Str::lower(Str::random(10));
+        $category = AssetCategory::withoutGlobalScopes()->create([
+            'name' => 'دسته اصلاحی '.$key,
+            'code' => 'RC-'.strtoupper($key),
+            'is_active' => true,
+        ]);
+        $type = AssetType::withoutGlobalScopes()->create([
+            'company_id' => $asset->company_id,
+            'asset_category_id' => $category->id,
+            'name' => 'نوع اصلاحی '.$key,
+            'code' => 'RT-'.strtoupper($key),
+            'coding_code' => '099',
+            'is_active' => true,
+            'sort_order' => 20,
+        ]);
+
+        $payload = [
+            'asset_category_id' => $category->id,
+            'asset_type_id' => $type->id,
+            'inventory_code' => $asset->inventory_code,
+            'title' => $asset->title,
+        ];
+
+        $this->actingAs($user)
+            ->withoutMiddleware(EnsureActiveLoginSession::class)
+            ->from(route('assets.edit', $asset))
+            ->put(route('assets.update', $asset), $payload)
+            ->assertRedirect(route('assets.edit', $asset))
+            ->assertSessionHasErrors('classification_change_reason');
+
+        $this->assertNotSame($category->id, $asset->fresh()->asset_category_id);
+
+        $this->actingAs($user)
+            ->withoutMiddleware(EnsureActiveLoginSession::class)
+            ->put(route('assets.update', $asset), $payload + [
+                'classification_change_reason' => 'اصلاح طبقه‌بندی طبق صورت‌جلسه کمیته اموال',
+            ])
+            ->assertRedirect(route('assets.index'));
+
+        $asset->refresh();
+        $this->assertSame($category->id, $asset->asset_category_id);
+        $this->assertSame($type->id, $asset->asset_type_id);
+        $this->assertSame('PERM-'.strtoupper(substr($asset->inventory_code, 4)), $asset->asset_code);
+
+        $log = AuditLog::withoutGlobalScopes()
+            ->where('action', 'asset.updated')
+            ->where('subject_id', $asset->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame(
+            'اصلاح طبقه‌بندی طبق صورت‌جلسه کمیته اموال',
+            $log->new_values['classification_change_reason']
+        );
     }
 
     public function test_permanently_coded_asset_cannot_be_hard_deleted(): void

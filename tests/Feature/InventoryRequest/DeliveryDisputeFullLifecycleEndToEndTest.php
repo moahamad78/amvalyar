@@ -376,6 +376,7 @@ final class DeliveryDisputeFullLifecycleEndToEndTest extends TestCase
 
         self::assertSame('returned', $oldAllocation->status);
         self::assertSame('delivered', $newAllocation->status);
+        self::assertNotNull($newAllocation->receipt_confirmed_at);
         self::assertSame($original->asset_code, $returnTransaction->plate_number);
         self::assertSame($replacement->asset_code, $replacement->plate_number);
     }

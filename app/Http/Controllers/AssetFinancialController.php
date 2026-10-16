@@ -45,6 +45,7 @@ final class AssetFinancialController extends Controller
             'purchase_price' => ['required', 'numeric', 'min:0'],
             'supplier_name' => ['nullable', 'string', 'max:255'],
             'acquisition_document_number' => ['nullable', 'string', 'max:150'],
+            'change_reason' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
 
         if ((float) $data['purchase_price'] > 0) {
@@ -67,20 +68,23 @@ final class AssetFinancialController extends Controller
             'acquisition_document_number' => $this->nullableString($data['acquisition_document_number'] ?? null),
         ];
 
-        DB::transaction(function () use ($request, $asset, $normalized, $auditLog): void {
+        $changeReason = trim($data['change_reason']);
+
+        DB::transaction(function () use ($request, $asset, $normalized, $changeReason, $auditLog): void {
             $locked = Asset::withoutGlobalScopes()->lockForUpdate()->findOrFail($asset->id);
             $this->ensureVisible($request, $locked);
             $old = $this->snapshot($locked);
 
             $locked->forceFill($normalized)->save();
             $new = $this->snapshot($locked->fresh());
+            $new['change_reason'] = $changeReason;
 
             $auditLog->log(
                 'asset.financial_updated',
                 $locked,
                 $old,
                 $new,
-                'اطلاعات مالی و مستند خرید/تحصیل دارایی ویرایش شد.',
+                'اطلاعات مالی و مستند خرید/تحصیل دارایی ویرایش شد. علت: '.$changeReason,
                 $request,
                 $request->user()
             );

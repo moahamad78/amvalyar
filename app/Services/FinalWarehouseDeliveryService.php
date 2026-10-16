@@ -594,6 +594,16 @@ final class FinalWarehouseDeliveryService
                     ? null
                     : now(),
         ]);
+
+        if (! $requiresRequesterReceipt) {
+            InventoryRequestAllocation::withoutGlobalScopes()
+                ->where('inventory_request_id', $inventoryRequest->id)
+                ->where('status', 'delivered')
+                ->whereNull('receipt_confirmed_at')
+                ->update([
+                    'receipt_confirmed_at' => now(),
+                ]);
+        }
     }
 
 

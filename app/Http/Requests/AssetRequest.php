@@ -202,6 +202,12 @@ final class AssetRequest extends FormRequest
                 'string',
             ],
 
+            'classification_change_reason' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+
             'photos' => [
                 'nullable',
                 'array',

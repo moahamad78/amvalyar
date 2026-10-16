@@ -28,6 +28,7 @@ final class DeploymentReadinessTest extends TestCase
         $this->assertTrue($checks['repair_schema_ready']);
         $this->assertTrue($checks['repair_routes_ready']);
         $this->assertTrue($checks['health_route_present']);
+        $this->assertTrue($checks['readiness_route_present']);
         $this->assertTrue($checks['migrations_current']);
         $this->assertTrue($checks['runtime_directories_writable']);
     }

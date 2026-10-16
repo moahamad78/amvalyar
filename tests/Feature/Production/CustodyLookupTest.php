@@ -4,6 +4,7 @@ namespace Tests\Feature\Production;
 
 use App\Models\Asset;
 use App\Models\Employee;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,13 @@ class CustodyLookupTest extends TestCase
         $response = $this->get(route('reports.index', ['custody_type' => 'employee', 'group' => 'department', 'kind' => 'table']));
         $response->assertOk()->assertSee('مرکز گزارش‌های اموال')->assertSee('نمودار توزیع اموال')->assertSee('پرسنلی');
         $this->get(route('reports.export', ['custody_type' => 'employee']))->assertOk();
+        $exportLog = AuditLog::withoutGlobalScopes()
+            ->where('user_id', $admin->id)
+            ->where('action', 'report.assets_exported')
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertSame('employee', $exportLog->new_values['filters']['custody_type']);
+        $this->assertArrayHasKey('asset_count', $exportLog->new_values);
         $this->get(route('reports.print', ['custody_type' => 'employee']))->assertOk()->assertSee('چاپ / ذخیره PDF');
     }
 

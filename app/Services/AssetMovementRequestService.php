@@ -16,7 +16,8 @@ use Illuminate\Validation\ValidationException;
 final class AssetMovementRequestService
 {
     public function __construct(
-        private readonly WorkflowRuntimeService $workflowRuntimeService
+        private readonly WorkflowRuntimeService $workflowRuntimeService,
+        private readonly AssetOperationConflictService $operationConflicts
     ) {
     }
 
@@ -31,54 +32,49 @@ final class AssetMovementRequestService
         ?string $notes = null,
         ?int $targetEmployeeId = null
     ): AssetMovementRequest {
-
-        $this->validateRequester(
+        return DB::transaction(function () use (
             $asset,
+            $movementType,
             $requesterUser,
-            $requesterEmployee
-        );
+            $requesterEmployee,
+            $targetUserId,
+            $reason,
+            $notes,
+            $targetEmployeeId
+        ): AssetMovementRequest {
+            $lockedAsset = Asset::withoutGlobalScopes()
+                ->whereKey($asset->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $this->validateMovementType(
-            $movementType
-        );
-
-        $this->validateAssetState(
-            $asset,
-            $movementType
-        );
-
-
-        $targetEmployee =
-            $this->resolveTargetEmployee(
-                asset:
-                    $asset,
-
-                movementType:
-                    $movementType,
-
-                targetEmployeeId:
-                    $targetEmployeeId,
-
-                targetUserId:
-                    $targetUserId
+            $this->validateRequester(
+                $lockedAsset,
+                $requesterUser,
+                $requesterEmployee
             );
 
-        $targetUser = $targetEmployee?->user;
+            $this->validateMovementType($movementType);
+            $this->validateAssetState($lockedAsset, $movementType);
 
+            $targetEmployee = $this->resolveTargetEmployee(
+                asset: $lockedAsset,
+                movementType: $movementType,
+                targetEmployeeId: $targetEmployeeId,
+                targetUserId: $targetUserId
+            );
 
-        $this->ensureNoOpenRequest(
-            $asset
-        );
+            $targetUser = $targetEmployee?->user;
 
+            $this->ensureNoOpenRequest($lockedAsset);
+            $this->operationConflicts->assertCanStartMovement($lockedAsset);
 
-        return AssetMovementRequest::withoutGlobalScopes()
-            ->create([
+            return AssetMovementRequest::withoutGlobalScopes()->create([
 
                 'company_id' =>
-                    $asset->company_id,
+                    $lockedAsset->company_id,
 
                 'asset_id' =>
-                    $asset->id,
+                    $lockedAsset->id,
 
                 'movement_type' =>
                     $movementType,
@@ -107,6 +103,7 @@ final class AssetMovementRequestService
                 'notes' =>
                     $notes,
             ]);
+        });
     }
 
 

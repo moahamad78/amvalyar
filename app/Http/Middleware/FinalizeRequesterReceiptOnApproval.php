@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Models\DeliveryDispute;
 use App\Models\DeliveryDisputeItem;
 use App\Models\InventoryRequest;
+use App\Models\InventoryRequestAllocation;
 use App\Models\WorkflowInstance;
 use App\Models\WorkflowInstanceStep;
 use Closure;
@@ -220,6 +221,14 @@ final class FinalizeRequesterReceiptOnApproval
                     'fulfilled_at' =>
                         now(),
                 ]);
+
+                InventoryRequestAllocation::withoutGlobalScopes()
+                    ->where('inventory_request_id', $inventoryRequest->id)
+                    ->where('status', 'delivered')
+                    ->whereNull('receipt_confirmed_at')
+                    ->update([
+                        'receipt_confirmed_at' => now(),
+                    ]);
 
                 return $response;
             }

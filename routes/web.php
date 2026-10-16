@@ -32,6 +32,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FinalWarehouseDeliveryController;
 use App\Http\Controllers\FinalWarehousePlatePrintController;
+use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\InitialAssetSetupController;
 use App\Http\Controllers\InventoryRequestController;
 use App\Http\Controllers\LocationController;
@@ -69,6 +70,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/health/ready', HealthCheckController::class)
+    ->middleware('throttle:30,1')
+    ->name('health.ready');
 
 Route::view('/features', 'public.features')->name('public.features');
 Route::view('/asset-management', 'public.asset-management')->name('public.asset-management');

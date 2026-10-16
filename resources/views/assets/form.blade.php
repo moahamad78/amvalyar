@@ -525,8 +525,8 @@
                     id="asset_code_preview"
                     type="text"
                     class="form-control bg-body-tertiary"
-                    value="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'پس از ثبت، به صورت خودکار تولید می‌شود' }}"
-                    title="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'پس از ثبت، کد دارایی براساس تنظیمات کد اموال سازمان به صورت خودکار تولید می‌شود.' }}"
+                    value="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'پس از تکمیل و تأیید پرونده صادر می‌شود' }}"
+                    title="{{ isset($asset) && $asset->asset_code ? $asset->asset_code : 'کد دائمی پس از تکمیل اطلاعات و تأیید جمعدار اموال، براساس سیاست کدگذاری سازمان صادر می‌شود.' }}"
                     @unless(isset($asset) && $asset->asset_code)
                         aria-describedby="asset_code_help"
                     @endunless
@@ -535,10 +535,29 @@
 
                 @unless(isset($asset) && $asset->asset_code)
                     <div id="asset_code_help" class="form-text">
-                        کد دارایی پس از ثبت و براساس تنظیمات کد اموال سازمان تولید می‌شود.
+                        کد دائمی پس از تکمیل پرونده و تأیید جمعدار اموال صادر می‌شود.
                     </div>
                 @endunless
             </div>
+
+            @if(isset($asset) && $asset->asset_code)
+                <div class="col-12 mb-3">
+                    <label for="classification_change_reason" class="form-label">
+                        علت تغییر دسته‌بندی یا نوع دارایی
+                    </label>
+                    <textarea
+                        id="classification_change_reason"
+                        name="classification_change_reason"
+                        class="form-control"
+                        rows="2"
+                        maxlength="1000"
+                        placeholder="فقط اگر دسته‌بندی یا نوع دارایی کددار را تغییر می‌دهید، علت و مستند تغییر را وارد کنید."
+                    >{{ old('classification_change_reason') }}</textarea>
+                    <div class="form-text">
+                        کد دائمی و سوابق قبلی تغییر نمی‌کنند؛ علت تغییر طبقه‌بندی در سابقه حسابرسی ذخیره می‌شود.
+                    </div>
+                </div>
+            @endif
 
 
             <div class="col-md-6 mb-3">

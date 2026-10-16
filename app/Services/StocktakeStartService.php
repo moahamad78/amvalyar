@@ -13,7 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 final class StocktakeStartService
 {
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly AssetOperationConflictService $operationConflicts
+    ) {}
 
     public function start(Stocktake $stocktake, User $actor): Stocktake
     {
@@ -25,7 +28,11 @@ final class StocktakeStartService
 
             $this->assertCanStart($locked, $actor);
 
-            $assets = $this->eligibleAssets($locked)->get();
+            $assets = $this->eligibleAssets($locked)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $this->operationConflicts->assertCanStartStocktake($assets);
 
             foreach ($assets as $asset) {
                 StocktakeItem::withoutGlobalScopes()->create([
