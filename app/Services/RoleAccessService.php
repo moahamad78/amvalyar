@@ -21,6 +21,12 @@ final class RoleAccessService
         if (! $user->role?->is_active) {
             return 'self';
         }
+        // Warehouse roles are intentionally constrained by their explicit
+        // site-warehouse assignment, even if an old role accidentally still
+        // carries view_all from an earlier setup.
+        if (in_array($user->role?->name, ['warehouse_manager', 'warehouse_supervisor'], true)) {
+            return 'warehouse';
+        }
         if ($user->hasPermission('assets.view_all')) {
             return 'company';
         }
@@ -57,6 +63,13 @@ final class RoleAccessService
     {
         $scope = $this->scope($user);
         if ($scope === 'company') {
+            return;
+        }
+        if ($scope === 'warehouse') {
+            $siteIds = app(WarehouseSiteAccessService::class)->siteIds($user, 'view');
+            $query->where($query->qualifyColumn('status'), 'warehouse')
+                ->where($query->qualifyColumn('custody_type'), AssetCustodyService::TYPE_WAREHOUSE)
+                ->whereIn($query->qualifyColumn('current_site_id'), $siteIds);
             return;
         }
         $profiles = Employee::query()->where('company_id', $user->company_id)->where('user_id', $user->id);

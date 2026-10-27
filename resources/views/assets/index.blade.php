@@ -27,6 +27,9 @@
 
 
         <div class="d-flex flex-wrap gap-2">
+            @if(auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('warehouse_inventory.view'))
+                <a href="{{ route('warehouse-inventory.index') }}" class="btn btn-outline-success">موجودی انبار سایت</a>
+            @endif
             @if(auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('assets.view'))
                 <a href="{{ route('asset-scanner.index') }}" class="btn btn-outline-primary">اسکن پلاک</a>
             @endif
@@ -41,6 +44,7 @@
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-md-3"><label class="form-label">تحویل‌گیرنده</label><select class="form-select" name="employee_id"><option value="">همه پرسنل</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected((string) request('employee_id') === (string) $employee->id)>{{ $employee->display_name }} — {{ $employee->personnel_code }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label class="form-label">وضعیت</label><select class="form-select" name="status"><option value="">همه</option><option value="warehouse" @selected(request('status')==='warehouse')>موجود در انبار</option><option value="assigned" @selected(request('status')==='assigned')>تحویل‌شده</option><option value="destroyed" @selected(request('status')==='destroyed')>اسقاط</option></select></div>
                 <div class="col-md-2"><label class="form-label">نوع تحویل</label><select class="form-select" name="custody_type"><option value="">همه</option><option value="employee" @selected(request('custody_type')==='employee')>پرسنلی</option><option value="organization" @selected(request('custody_type')==='organization')>سازمانی</option><option value="user" @selected(request('custody_type')==='user')>کاربری</option></select></div>
                 <div class="col-md-2"><label class="form-label">واحد</label><select class="form-select" name="department_id"><option value="">همه واحدها</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected((string) request('department_id') === (string) $department->id)>{{ $department->name }}</option>@endforeach</select></div>
                 <div class="col-md-2"><label class="form-label">سایت</label><select class="form-select" name="site_id"><option value="">همه سایت‌ها</option>@foreach($sites as $site)<option value="{{ $site->id }}" @selected((string) request('site_id') === (string) $site->id)>{{ $site->name }}</option>@endforeach</select></div>

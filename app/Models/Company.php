@@ -23,6 +23,7 @@ final class Company extends Model
         'max_users',
         'max_assets',
         'plan',
+        'feature_overrides',
         'status',
         'brand_logo_path',
         'brand_primary_color',
@@ -36,6 +37,7 @@ final class Company extends Model
         return [
             'license_start' => 'date',
             'license_end' => 'date',
+            'feature_overrides' => 'array',
         ];
     }
 

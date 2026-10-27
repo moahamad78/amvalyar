@@ -24,7 +24,7 @@ final class InventoryRequestDraftRequest extends FormRequest
         return [
 
             'site_id' => [
-                'nullable',
+                'required',
                 'integer',
             ],
 
@@ -308,6 +308,8 @@ final class InventoryRequestDraftRequest extends FormRequest
     public function messages(): array
     {
         return [
+
+            'site_id.required' => 'انبار سایتِ تأمین‌کننده را انتخاب کنید.',
 
             'delivery_target_type.required' =>
                 'نوع مقصد درخواست مشخص نشده است.',

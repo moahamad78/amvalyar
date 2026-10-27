@@ -226,6 +226,24 @@ $this->push(
         $this->push(
             $assets,
             $user,
+            'موجودی انبار سایت',
+            'warehouse-inventory.index',
+            'warehouse-inventory.*',
+            'warehouse_inventory.view'
+        );
+
+        $this->push(
+            $assets,
+            $user,
+            'دسترسی انبارهای سایت',
+            'warehouse-accesses.index',
+            'warehouse-accesses.*',
+            'warehouse_accesses.manage'
+        );
+
+        $this->push(
+            $assets,
+            $user,
             'اسکن پلاک با موبایل',
             'asset-scanner.index',
             'asset-scanner.*',
@@ -453,6 +471,16 @@ $this->push(
         ?string $permission = null,
         ?int $badge = null
     ): void {
+
+        $feature = app(CompanyFeatureService::class)
+            ->featureForRoute($routeName);
+
+        if (
+            $feature !== null
+            && ! app(CompanyFeatureService::class)->enabledForUser($user, $feature)
+        ) {
+            return;
+        }
 
         if ($routeName === 'organizational-assets.index' && app(RoleAccessService::class)->scope($user) === 'self') {
             return;

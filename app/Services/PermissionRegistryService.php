@@ -122,6 +122,8 @@ final class PermissionRegistryService
             'finalize',
             'reconcile',
         ],
+        'warehouse_inventory' => ['view'],
+        'warehouse_accesses' => ['manage'],
         'asset_repairs' => [
             'view',
             'create',
@@ -187,6 +189,9 @@ final class PermissionRegistryService
         'final_warehouse_deliveries' => 'تحویل نهایی انبار',
 
         'warehouse_recoveries' => 'بازیابی انبار',
+
+        'warehouse_inventory' => 'موجودی انبارهای سایت',
+        'warehouse_accesses' => 'دسترسی انبارهای سایت',
 
         'specialist_approvals' => 'تأیید تخصصی',
 

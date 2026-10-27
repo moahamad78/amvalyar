@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\InventoryRequest;
+use App\Models\AssetMovementRequest;
+use App\Models\Asset;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WorkflowInstance;
 use App\Models\WorkflowInstanceStep;
+use App\Models\WarehouseSiteAccess;
 use Illuminate\Validation\ValidationException;
 
 final class WorkflowApproverResolver
@@ -31,6 +35,13 @@ final class WorkflowApproverResolver
             'requesterEmployee',
             'requesterUser',
         ]);
+
+        // Warehouse steps are resolved from the source site of the request,
+        // not from a hard-coded person in the workflow template.
+        if (in_array($step->code, ['WAREHOUSE', 'FINAL-WAREHOUSE-DELIVERY'], true) || $step->approver_type === 'warehouse_manager') {
+            $siteId = $this->warehouseSiteId($instance);
+            if ($siteId !== null) return $this->resolveSiteWarehouse($instance, $siteId, $this->warehouseAbility($instance));
+        }
 
 
         return match (
@@ -83,6 +94,41 @@ final class WorkflowApproverResolver
                         'نوع تأییدکننده این مرحله توسط موتور گردش کار پشتیبانی نمی‌شود.',
                 ]),
         };
+    }
+
+    private function warehouseSiteId(WorkflowInstance $instance): ?int
+    {
+        if ($instance->subject_id === null) return null;
+        if ($instance->subject_type === InventoryRequest::class) {
+            return InventoryRequest::withoutGlobalScopes()->where('company_id', $instance->company_id)->whereKey($instance->subject_id)->value('site_id');
+        }
+        if ($instance->subject_type === AssetMovementRequest::class) {
+            $assetId = AssetMovementRequest::withoutGlobalScopes()->where('company_id', $instance->company_id)->whereKey($instance->subject_id)->value('asset_id');
+            return $assetId ? Asset::withoutGlobalScopes()->where('company_id', $instance->company_id)->whereKey($assetId)->value('current_site_id') : null;
+        }
+        return null;
+    }
+
+    private function warehouseAbility(WorkflowInstance $instance): string
+    {
+        if ($instance->subject_type === AssetMovementRequest::class && $instance->subject_id !== null) {
+            $type = AssetMovementRequest::withoutGlobalScopes()->whereKey($instance->subject_id)->value('movement_type');
+            if ($type === AssetMovementRequest::TYPE_RETURN) return 'receive';
+        }
+        return 'issue';
+    }
+
+    private function resolveSiteWarehouse(WorkflowInstance $instance, int $siteId, string $ability): array
+    {
+        $access = WarehouseSiteAccess::query()->where('company_id', $instance->company_id)->where('site_id', $siteId)
+            ->where('can_'.$ability, true)->whereHas('user', fn ($query) => $query->where('is_active', true)
+                ->whereHas('role', fn ($role) => $role->whereIn('name', ['warehouse_manager', 'warehouse_supervisor'])->where('is_active', true)))
+            ->with('user')->orderBy('id')->first();
+        if ($access === null) {
+            throw ValidationException::withMessages(['warehouse_site_id' => 'برای انبار سایت این فرایند، انباردارِ دارای دسترسی عملیاتی تعریف نشده است.']);
+        }
+        $employee = Employee::withoutGlobalScopes()->where('company_id', $instance->company_id)->where('user_id', $access->user_id)->where('is_active', true)->first();
+        return ['employee' => $employee, 'user' => $access->user];
     }
 
 

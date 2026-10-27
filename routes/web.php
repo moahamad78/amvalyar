@@ -50,6 +50,7 @@ use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TaskCenterController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseRecoveryController;
+use App\Http\Controllers\WarehouseInventoryController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\WorkflowStepController;
 use App\Http\Controllers\WorkspaceController;
@@ -304,6 +305,18 @@ Route::get('/inventory-assets', [
         'permission:assets.view',
     ])
     ->name('assets.index');
+
+Route::get('/warehouse-inventory', [WarehouseInventoryController::class, 'index'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:warehouse_inventory.view'])
+    ->name('warehouse-inventory.index');
+
+Route::get('/warehouse-accesses', [WarehouseInventoryController::class, 'accessIndex'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:warehouse_accesses.manage'])
+    ->name('warehouse-accesses.index');
+
+Route::put('/warehouse-accesses/{site}', [WarehouseInventoryController::class, 'updateAccess'])
+    ->middleware([EnsureActiveLoginSession::class, 'permission:warehouse_accesses.manage'])
+    ->name('warehouse-accesses.update');
 
 Route::get('/asset-scanner', [AssetScannerController::class, 'index'])
     ->middleware([

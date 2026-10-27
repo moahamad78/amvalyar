@@ -78,7 +78,10 @@ final class InitialAssetSetupCommitService
                         'to_location_id' => $asset->current_location_id,
                     ]);
                 } else {
-                    $this->custody->applyWarehouse($asset);
+                    $site = Site::withoutGlobalScopes()->where('company_id', $company->id)->findOrFail($data['site_id']);
+                    $this->custody->applyWarehouse($asset, $site);
+                    $asset->refresh();
+                    $transaction = $this->openingTransaction($asset, $before, $actor?->id, ['to_site_id' => $asset->current_site_id]);
                 }
 
                 $this->audit->log('asset.initial_setup_imported', $asset, [], [

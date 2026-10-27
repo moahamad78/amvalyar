@@ -120,8 +120,13 @@ final class InitialAssetSetupPreviewService
                         $errors[] = 'محل انتخاب‌شده متعلق به سایت انتخاب‌شده نیست.';
                     }
                 }
-                if ($custody === 'warehouse' && ($values[15] !== '' || $values[16] !== '' || $values[17] !== '' || $values[18] !== '')) {
-                    $errors[] = 'برای استقرار انبار، اطلاعات مقصد فعلی را خالی بگذارید.';
+                if ($custody === 'warehouse') {
+                    if ($values[15] !== '' || $values[16] !== '' || $values[18] !== '') {
+                        $errors[] = 'برای استقرار انبار فقط کد سایت (انبار سایت) را وارد کنید؛ پرسنل، واحد و محل باید خالی باشند.';
+                    }
+                    if ($site === null) {
+                        $errors[] = 'برای استقرار انبار، کد سایتِ انبار الزامی و باید معتبر باشد.';
+                    }
                 }
 
                 $purchaseDate = null;

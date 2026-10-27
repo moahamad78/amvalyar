@@ -20,6 +20,8 @@ final class InventoryAssetAllocationService
         'approved',
     ];
 
+    public function __construct(private readonly WarehouseSiteAccessService $warehouseAccess) {}
+
 
     public function reserve(
         InventoryRequest $request,
@@ -107,6 +109,11 @@ final class InventoryAssetAllocationService
                             'این دارایی در حال حاضر قابل تخصیص نیست.',
                     ]);
                 }
+
+                if ($request->site_id === null || (int) $lockedAsset->current_site_id !== (int) $request->site_id) {
+                    throw ValidationException::withMessages(['asset' => 'دارایی باید از موجودی همان انبار سایتِ درخواست انتخاب شود.']);
+                }
+                $this->warehouseAccess->assertCan($actor, $lockedAsset->current_site_id, 'issue');
 
 
                 /*
@@ -299,7 +306,9 @@ final class InventoryAssetAllocationService
 
 
     public function availableAssets(
-        int $companyId
+        int $companyId,
+        ?int $warehouseSiteId = null,
+        ?User $actor = null
     ) {
         return Asset::withoutGlobalScopes()
             ->where(
@@ -314,6 +323,8 @@ final class InventoryAssetAllocationService
                 'status',
                 'warehouse'
             )
+            ->when($warehouseSiteId !== null, fn ($query) => $query->where('current_site_id', $warehouseSiteId))
+            ->when($actor !== null && ! $this->warehouseAccess->isCompanyWide($actor), fn ($query) => $query->whereIn('current_site_id', $this->warehouseAccess->siteIds($actor, 'issue')))
             ->whereNotExists(
                 function ($query): void {
 

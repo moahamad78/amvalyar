@@ -32,6 +32,7 @@ final class AssetController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'employee_id' => ['nullable', 'integer'],
             'custody_type' => ['nullable', 'in:employee,organization,user'],
+            'status' => ['nullable', 'in:warehouse,assigned,destroyed'],
             'department_id' => ['nullable', 'integer'],
             'site_id' => ['nullable', 'integer'],
         ]);
@@ -52,6 +53,7 @@ final class AssetController extends Controller
                 $query->where('custody_employee_id', $employeeId);
             })
             ->when($filters['custody_type'] ?? null, fn ($query, string $type) => $query->where('custody_type', $type))
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->when($filters['department_id'] ?? null, function ($query, $departmentId): void {
                 $departmentId = (int) $departmentId;
                 abort_unless(Department::query()->whereKey($departmentId)->exists(), 404);
@@ -142,10 +144,12 @@ final class AssetController extends Controller
         $dynamicValues =
             collect();
 
+        $sites = Site::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'code']);
+
         return view(
             'assets.create',
             compact(
-                'categories',
+                'categories', 'sites',
                 'types',
                 'dynamicValues'
             )
@@ -170,6 +174,13 @@ final class AssetController extends Controller
 
         $data['status'] =
             'warehouse';
+        $data['custody_type'] = 'warehouse';
+        $data['current_site_id'] = (int) $data['warehouse_site_id'];
+        $data['current_location_id'] = null;
+        $data['custody_user_id'] = null;
+        $data['custody_employee_id'] = null;
+        $data['custody_department_id'] = null;
+        unset($data['warehouse_site_id']);
 
         /*
          * Permanent asset code is intentionally NOT issued

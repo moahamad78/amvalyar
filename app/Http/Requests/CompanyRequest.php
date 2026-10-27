@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Services\CompanyFeatureService;
 use App\Support\JalaliDate;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,6 +12,28 @@ use Illuminate\Validation\Rule;
 
 final class CompanyRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $overrides = $this->input('feature_overrides');
+
+        if (! is_array($overrides)) {
+            return;
+        }
+
+        $allowed = array_keys(
+            app(CompanyFeatureService::class)->definitions()
+        );
+
+        $normalized = [];
+        foreach ($overrides as $feature => $value) {
+            if (in_array($feature, $allowed, true)) {
+                $normalized[$feature] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        $this->merge(['feature_overrides' => $normalized]);
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->isSuperAdmin()
@@ -138,9 +161,19 @@ final class CompanyRequest extends FormRequest
                     'basic',
                     'professional',
                     'enterprise',
+                    'enterprise-demo',
                     'demo',
                     'internal',
                 ]),
+            ],
+
+            'feature_overrides' => [
+                'nullable',
+                'array',
+            ],
+
+            'feature_overrides.*' => [
+                'boolean',
             ],
 
             'status' => [

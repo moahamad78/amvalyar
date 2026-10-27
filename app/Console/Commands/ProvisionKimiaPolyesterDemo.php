@@ -22,8 +22,8 @@ final class ProvisionKimiaPolyesterDemo extends Command
         }
 
         if ($company = Company::query()->where('code', 'KIMIA-DEMO')->first()) {
-            $provisioner->reconcileFinancialControls($company);
-            $this->components->info('Kimia demo company already exists; financial controls and missing synthetic acquisition evidence were reconciled without changing passwords.');
+            $provisioner->provision('existing-tenant-password-is-not-changed');
+            $this->components->info('Kimia demo company already exists; feature access, warehouse access and financial controls were reconciled without changing passwords.');
 
             return self::SUCCESS;
         }

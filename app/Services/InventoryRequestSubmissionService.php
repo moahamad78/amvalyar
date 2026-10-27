@@ -136,6 +136,10 @@ final class InventoryRequestSubmissionService
                     ]);
                 }
 
+                if ($inventoryRequest->site_id === null) {
+                    throw ValidationException::withMessages(['site_id' => 'انبار سایتِ تأمین‌کننده برای درخواست مشخص نشده است.']);
+                }
+
 
                 /*
                 |--------------------------------------------------------------------------
@@ -210,6 +214,8 @@ final class InventoryRequestSubmissionService
 
                             'items_count' =>
                                 $inventoryRequest->items->count(),
+
+                            'warehouse_site_id' => $inventoryRequest->site_id,
 
                             'source' =>
                                 'inventory_request_submission',

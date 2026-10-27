@@ -38,6 +38,18 @@
         </tr>
 
         <tr>
+            <th>قابلیت‌های فعال</th>
+            <td>
+                @php($featureService = app(\App\Services\CompanyFeatureService::class))
+                @foreach($featureService->featureStates($company) as $featureKey => $enabled)
+                    @if($enabled)
+                        <span class="badge bg-success mb-1">{{ $featureService->definitions()[$featureKey]['label'] }}</span>
+                    @endif
+                @endforeach
+            </td>
+        </tr>
+
+        <tr>
             <th>وضعیت</th>
             <td>{{ $company->status }}</td>
         </tr>

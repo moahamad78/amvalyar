@@ -23,7 +23,8 @@ final class FinalWarehouseDeliveryService
 {
     public function __construct(
         private readonly AssetCompletenessService $completenessService,
-        private readonly AssetCustodyService $custodyService
+        private readonly AssetCustodyService $custodyService,
+        private readonly WarehouseSiteAccessService $warehouseAccess
     ) {
     }
 
@@ -88,6 +89,11 @@ final class FinalWarehouseDeliveryService
                 ->findOrFail(
                     $instance->subject_id
                 );
+
+        if ($inventoryRequest->site_id === null) {
+            throw ValidationException::withMessages(['site_id' => 'انبار سایتِ درخواست مشخص نشده است.']);
+        }
+        $this->warehouseAccess->assertCan($actorUser, $inventoryRequest->site_id, 'issue');
 
 
         $deliveryTargetType =
@@ -338,6 +344,10 @@ final class FinalWarehouseDeliveryService
                     'asset' =>
                         'یکی از دارایی‌ها متعلق به شرکت درخواست نیست.',
                 ]);
+            }
+
+            if ((int) $asset->current_site_id !== (int) $inventoryRequest->site_id) {
+                throw ValidationException::withMessages(['asset' => 'همه دارایی‌های تحویلی باید از انبار سایتِ درخواست باشند.']);
             }
 
 

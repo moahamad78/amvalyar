@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AssetAttributeDefinition;
 use App\Models\AssetAttributeOption;
 use App\Models\AssetType;
+use App\Models\Site;
 use App\Support\JalaliDate;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -75,6 +76,17 @@ final class AssetRequest extends FormRequest
         }
 
         $rules = [
+
+            'warehouse_site_id' => [
+                $asset instanceof Asset ? 'nullable' : 'required',
+                'integer',
+                function (string $attribute, mixed $value, Closure $fail) use ($companyId): void {
+                    if ($value === null || $value === '') return;
+                    $valid = Site::withoutGlobalScopes()->whereKey($value)->where('is_active', true)
+                        ->when($companyId !== null, fn ($q) => $q->where('company_id', $companyId))->exists();
+                    if (! $valid) $fail('انبار سایت انتخاب‌شده معتبر یا فعال نیست.');
+                },
+            ],
 
             'asset_category_id' => [
                 'required',
@@ -500,6 +512,7 @@ final class AssetRequest extends FormRequest
             'inventory_code.unique' => 'این کد انبار قبلاً در همین شرکت ثبت شده است.',
 
             'title.required' => 'عنوان دارایی الزامی است.',
+            'warehouse_site_id.required' => 'برای ثبت دارایی باید انبار سایت را مشخص کنید.',
 
             'purchase_price.numeric' => 'مبلغ خرید معتبر نیست.',
 

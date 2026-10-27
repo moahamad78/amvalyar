@@ -19,7 +19,8 @@ final class WarehouseSpecialistGateService
 {
     public function __construct(
         private readonly InventoryRequestSpecialistRoutingService $routingService,
-        private readonly WorkflowApproverResolver $approverResolver
+        private readonly WorkflowApproverResolver $approverResolver,
+        private readonly WarehouseSiteAccessService $warehouseAccess
     ) {
     }
 
@@ -602,6 +603,11 @@ final class WarehouseSpecialistGateService
                     'شرکت درخواست و گردش کاری مطابقت ندارد.',
             ]);
         }
+
+        if ($inventoryRequest->site_id === null) {
+            throw ValidationException::withMessages(['site_id' => 'انبار سایتِ درخواست مشخص نشده است.']);
+        }
+        $this->warehouseAccess->assertCan($actorUser, $inventoryRequest->site_id, 'issue');
 
 
         if (

@@ -21,7 +21,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\Workflow;
 use App\Models\WorkflowStep;
+use App\Models\WarehouseSiteAccess;
 use App\Services\PermissionRegistryService;
+use App\Services\CompanyFeatureService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -34,7 +36,15 @@ final class KimiaPolyesterDemoProvisioner
         return DB::transaction(function () use ($password): array {
             $existing = Company::query()->where('code', self::COMPANY_CODE)->first();
             if ($existing) {
+                $existing->forceFill([
+                    'feature_overrides' => array_fill_keys(
+                        array_keys(app(CompanyFeatureService::class)->definitions()),
+                        true
+                    ),
+                ])->save();
                 $this->reconcileFinancialControls($existing);
+                $this->reconcileWarehousePermissions($existing);
+                $this->warehouseAccesses($existing);
 
                 return $this->summary($existing);
             }
@@ -48,6 +58,7 @@ final class KimiaPolyesterDemoProvisioner
             $roles = $this->roles($company);
             $users = $this->users($company, $roles, $password);
             $employees = $this->employees($company, $sites, $departments, $locations, $users);
+            $this->warehouseAccesses($company);
             $types = $this->types($company, $categories);
 
             $this->codingSettings($company);
@@ -72,6 +83,28 @@ final class KimiaPolyesterDemoProvisioner
         ];
     }
 
+    private function warehouseAccesses(Company $company): void
+    {
+        $warehouseUsers = User::withoutGlobalScopes()->where('company_id', $company->id)->where('is_active', true)
+            ->whereHas('role', fn ($query) => $query->whereIn('name', ['warehouse_manager', 'warehouse_supervisor']))->get();
+        $sites = Site::withoutGlobalScopes()->where('company_id', $company->id)->where('is_active', true)->get();
+        foreach ($warehouseUsers as $user) foreach ($sites as $site) {
+            WarehouseSiteAccess::query()->updateOrCreate(['site_id' => $site->id, 'user_id' => $user->id], [
+                'company_id' => $company->id, 'can_view' => true, 'can_issue' => true, 'can_receive' => true,
+                'can_transfer' => true, 'can_stocktake' => true,
+            ]);
+        }
+    }
+
+    private function reconcileWarehousePermissions(Company $company): void
+    {
+        $ids = Permission::query()->whereIn('name', ['warehouse_inventory.view', 'warehouse_accesses.manage'])->pluck('id', 'name');
+        foreach (['warehouse_supervisor' => ['warehouse_inventory.view'], 'chief_asset_keeper' => ['warehouse_inventory.view', 'warehouse_accesses.manage']] as $roleName => $permissions) {
+            $role = Role::withoutGlobalScopes()->where('company_id', $company->id)->where('name', $roleName)->first();
+            if ($role !== null) $role->permissions()->syncWithoutDetaching($ids->only($permissions)->all());
+        }
+    }
+
     private function company(): Company
     {
         return Company::query()->updateOrCreate(
@@ -87,6 +120,10 @@ final class KimiaPolyesterDemoProvisioner
                 'max_users' => 80,
                 'max_assets' => 1200,
                 'plan' => 'enterprise-demo',
+                'feature_overrides' => array_fill_keys(
+                    array_keys(app(CompanyFeatureService::class)->definitions()),
+                    true
+                ),
                 'status' => 'demo',
                 'brand_logo_path' => 'branding/kimia-polyester-logo.gif',
                 'brand_primary_color' => '#151515',
@@ -193,7 +230,7 @@ final class KimiaPolyesterDemoProvisioner
         $all = Permission::query()->where('is_active', true)->pluck('id', 'name');
         $definitions = [
             'company_admin' => ['مدیر سامانه شرکت', $all->keys()->all()],
-            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.view_all', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage']],
+            'chief_asset_keeper' => ['سرجمع‌دار اموال', ['assets.view', 'assets.view_all', 'assets.create', 'assets.edit', 'assets.transfer', 'assets.delivery', 'assets.return', 'asset_transactions.view', 'asset_manager_requests.view', 'approvals.view', 'approvals.act', 'reports.view', 'reports.export', 'employees.view', 'sites.view', 'departments.view', 'locations.view', 'stocktakes.view', 'stocktakes.create', 'stocktakes.start', 'stocktakes.count', 'asset_repairs.view', 'asset_repairs.create', 'asset_repairs.manage', 'warehouse_inventory.view', 'warehouse_accesses.manage']],
             'finance_manager' => ['مدیر مالی', ['assets.view', 'assets.view_all', 'assets.financial', 'assets.financial_edit', 'assets.create', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'workflows.view', 'stocktakes.view', 'stocktakes.finalize']],
             'accounting_head' => ['رئیس حسابداری', ['assets.view', 'assets.view_all', 'assets.financial', 'assets.financial_edit', 'assets.create', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'asset_transactions.view']],
             'inspection_head' => ['رئیس بازرسی و نظارت', ['assets.view', 'assets.view_all', 'reports.view', 'reports.export', 'approvals.view', 'approvals.act', 'stocktakes.view', 'stocktakes.count', 'stocktakes.reconcile']],
@@ -207,7 +244,7 @@ final class KimiaPolyesterDemoProvisioner
             'administrative_head' => ['رئیس امور اداری', ['assets.view', 'approvals.view', 'approvals.act']],
             'factory_manager' => ['مدیر امور کارخانه', ['assets.view', 'assets.transfer', 'approvals.view', 'approvals.act', 'asset_repairs.view']],
             'commercial_manager' => ['مدیر امور بازرگانی', ['assets.view', 'approvals.view', 'approvals.act']],
-            'warehouse_supervisor' => ['سرپرست انبارها', ['assets.view', 'assets.view_all', 'assets.delivery', 'assets.return', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'final_warehouse_deliveries.view', 'warehouse_recoveries.view']],
+            'warehouse_supervisor' => ['سرپرست انبارها', ['assets.view', 'assets.delivery', 'assets.return', 'inventory_requests.view', 'approvals.view', 'approvals.act', 'final_warehouse_deliveries.view', 'warehouse_recoveries.view', 'warehouse_inventory.view', 'stocktakes.view', 'stocktakes.count']],
             'unit_manager' => ['مدیر واحد', ['assets.view', 'asset_movement_requests.view', 'asset_movement_requests.create', 'approvals.view', 'approvals.act', 'reports.view']],
             'employee' => ['پرسنل', ['assets.view', 'inventory_requests.view', 'inventory_requests.create', 'inventory_requests.edit', 'inventory_requests.submit', 'asset_movement_requests.view', 'asset_movement_requests.create', 'asset_repairs.view', 'asset_repairs.create']],
         ];

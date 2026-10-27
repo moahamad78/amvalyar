@@ -7,6 +7,25 @@
 
             <div class="col-md-6 mb-3">
 
+                @if(!isset($asset))
+                    <label class="form-label">انبار سایت <span class="text-danger">*</span></label>
+                    <select name="warehouse_site_id" class="form-select" required>
+                        <option value="">انتخاب انبار سایت</option>
+                        @foreach($sites as $site)
+                            <option value="{{ $site->id }}" @selected((string) old('warehouse_site_id') === (string) $site->id)>{{ $site->name }}{{ $site->code ? ' — '.$site->code : '' }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">هر سایت دقیقاً یک انبار دارایی ثابت دارد. انتقال میان سایت‌ها فقط از مسیر گردش اموال انجام می‌شود.</div>
+                @elseif($asset->status === 'warehouse')
+                    <label class="form-label">انبار فعلی</label>
+                    <input class="form-control bg-body-tertiary" value="{{ $asset->currentSite?->name ?? 'نیازمند تعیین در راه‌اندازی اولیه' }}" readonly>
+                    <div class="form-text">برای تغییر سایت انبار از گردش اموال استفاده کنید.</div>
+                @endif
+
+            </div>
+
+            <div class="col-md-6 mb-3">
+
                 <label class="form-label">
                     عنوان دارایی
                 </label>

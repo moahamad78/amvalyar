@@ -15,6 +15,7 @@ use App\Services\StocktakeCountingService;
 use App\Services\StocktakeFinalizationService;
 use App\Services\StocktakeReconciliationService;
 use App\Services\StocktakeStartService;
+use App\Services\WarehouseSiteAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,6 +29,10 @@ final class StocktakeController extends Controller
         if (! $user->isSuperAdmin()) {
             $query->where('company_id', $user->company_id);
         }
+        $access = app(WarehouseSiteAccessService::class);
+        if ($access->isSiteScoped($user)) {
+            $query->where('scope_type', 'site')->whereIn('site_id', $access->siteIds($user, 'stocktake'));
+        }
 
         return view('stocktakes.index', ['stocktakes' => $query->paginate(20)]);
     }
@@ -37,7 +42,9 @@ final class StocktakeController extends Controller
         $companyId = $this->companyId($request);
 
         return view('stocktakes.create', [
-            'sites' => Site::withoutGlobalScopes()->where('company_id', $companyId)->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
+            'sites' => Site::withoutGlobalScopes()->where('company_id', $companyId)->where('is_active', true)
+                ->when(app(WarehouseSiteAccessService::class)->isSiteScoped($request->user()), fn ($q) => $q->whereIn('id', app(WarehouseSiteAccessService::class)->siteIds($request->user(), 'stocktake')))
+                ->orderBy('sort_order')->orderBy('name')->get(),
             'departments' => Department::withoutGlobalScopes()->where('company_id', $companyId)->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
             'locations' => Location::withoutGlobalScopes()->where('company_id', $companyId)->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
         ]);
@@ -55,6 +62,10 @@ final class StocktakeController extends Controller
             'notes' => ['nullable', 'string', 'max:4000'],
         ]);
         $companyId = $this->companyId($request);
+        $warehouseAccess = app(WarehouseSiteAccessService::class);
+        if ($warehouseAccess->isSiteScoped($request->user()) && $data['scope_type'] !== 'site') {
+            return back()->withInput()->withErrors(['scope_type' => 'انباردار فقط می‌تواند برای انبار سایت مجاز خود انبارگردانی ایجاد کند.']);
+        }
         foreach (['site_id' => Site::class, 'department_id' => Department::class, 'location_id' => Location::class] as $key => $model) {
             if (! empty($data[$key])) {
                 abort_unless($model::withoutGlobalScopes()->where('company_id', $companyId)->whereKey((int) $data[$key])->exists(), 422);
@@ -63,6 +74,9 @@ final class StocktakeController extends Controller
         $required = ['site' => 'site_id', 'department' => 'department_id', 'location' => 'location_id'];
         if (isset($required[$data['scope_type']]) && empty($data[$required[$data['scope_type']]])) {
             return back()->withInput()->withErrors([$required[$data['scope_type']] => 'انتخاب محدوده الزامی است.']);
+        }
+        if ($data['scope_type'] === 'site') {
+            $warehouseAccess->assertCan($request->user(), (int) $data['site_id'], 'stocktake');
         }
         $stocktake = Stocktake::withoutGlobalScopes()->create([
             'company_id' => $companyId,
@@ -245,6 +259,10 @@ final class StocktakeController extends Controller
         $fresh = Stocktake::withoutGlobalScopes()->findOrFail($stocktake->id);
         if (! $request->user()->isSuperAdmin()) {
             abort_unless((int) $fresh->company_id === (int) $request->user()->company_id, 404);
+        }
+        $access = app(WarehouseSiteAccessService::class);
+        if ($access->isSiteScoped($request->user())) {
+            abort_unless($fresh->scope_type === 'site' && $fresh->site_id !== null && $access->can($request->user(), $fresh->site_id, 'stocktake'), 403);
         }
 
         return $fresh;

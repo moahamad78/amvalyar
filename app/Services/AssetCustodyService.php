@@ -45,7 +45,8 @@ final class AssetCustodyService
     }
 
     public function applyWarehouse(
-        Asset $asset
+        Asset $asset,
+        ?Site $warehouseSite = null
     ): void {
         $this->ensureWritable(
             $asset
@@ -63,8 +64,15 @@ final class AssetCustodyService
         $asset->custody_department_id =
             null;
 
-        $asset->current_site_id =
-            null;
+        // There is exactly one fixed-asset warehouse per site.  A warehouse
+        // asset must therefore keep (or be given) a site rather than losing
+        // its physical location when it is returned.
+        $warehouseSite ??= $this->resolveWarehouseSite($asset);
+        $this->ensureSameCompany($asset, $warehouseSite->company_id, 'warehouse_site_id');
+        if (! $warehouseSite->is_active) {
+            throw ValidationException::withMessages(['warehouse_site_id' => 'سایت انبار انتخاب‌شده فعال نیست.']);
+        }
+        $asset->current_site_id = $warehouseSite->id;
 
         $asset->current_location_id =
             null;
@@ -73,6 +81,22 @@ final class AssetCustodyService
             'warehouse';
 
         $asset->save();
+    }
+
+    private function resolveWarehouseSite(Asset $asset): Site
+    {
+        $site = null;
+        if ($asset->current_site_id !== null) {
+            $site = Site::withoutGlobalScopes()->where('company_id', $asset->company_id)->whereKey($asset->current_site_id)->where('is_active', true)->first();
+        }
+        if ($site === null && $asset->coding_site_id !== null) {
+            $site = Site::withoutGlobalScopes()->where('company_id', $asset->company_id)->whereKey($asset->coding_site_id)->where('is_active', true)->first();
+        }
+        $site ??= Site::withoutGlobalScopes()->where('company_id', $asset->company_id)->where('is_active', true)->orderBy('sort_order')->orderBy('id')->first();
+        if ($site === null) {
+            throw ValidationException::withMessages(['warehouse_site_id' => 'برای ثبت در انبار باید حداقل یک سایت فعال برای شرکت تعریف شود.']);
+        }
+        return $site;
     }
 
     public function applyEmployee(
@@ -560,7 +584,7 @@ final class AssetCustodyService
             'from_department_id' => $before['custody_department_id'] ?? null,
             'to_department_id' => null,
             'from_site_id' => $before['site_id'] ?? null,
-            'to_site_id' => null,
+            'to_site_id' => $asset->current_site_id,
             'from_location_id' => $before['location_id'] ?? null,
             'to_location_id' => null,
         ]);
@@ -605,7 +629,7 @@ final class AssetCustodyService
             'to_department_id' => null,
 
             'from_site_id' => $before['site_id'] ?? null,
-            'to_site_id' => null,
+            'to_site_id' => $asset->current_site_id,
 
             'from_location_id' => $before['location_id'] ?? null,
             'to_location_id' => null,

@@ -33,7 +33,7 @@ final class KimiaRoleAccessMatrixTest extends TestCase
             'administrative_head' => ['department', false],
             'factory_manager' => ['department', false],
             'commercial_manager' => ['department', false],
-            'warehouse_supervisor' => ['company', false],
+            'warehouse_supervisor' => ['warehouse', false],
             'unit_manager' => ['department', false],
             'employee' => ['self', false],
         ];

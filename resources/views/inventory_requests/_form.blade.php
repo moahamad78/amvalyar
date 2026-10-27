@@ -258,16 +258,17 @@ $existingItems =
             <div class="col-md-4">
 
                 <label class="form-label">
-                    سایت
+                    انبار سایتِ تأمین‌کننده
                 </label>
 
                 <select
                     name="site_id"
                     class="form-select"
+                    required
                 >
 
                     <option value="">
-                        بدون انتخاب
+                        انتخاب انبار سایت
                     </option>
 
                     @foreach($sites as $site)
@@ -299,6 +300,7 @@ $existingItems =
                     </div>
 
                 @endif
+                <div class="form-text">هر سایت یک انبار دارایی ثابت دارد و دارایی فقط از موجودی همین سایت تأمین می‌شود.</div>
 
             </div>
 

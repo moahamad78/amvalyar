@@ -3,6 +3,7 @@
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureActiveLoginSession;
 use App\Http\Middleware\EnsureCompanySubscription;
+use App\Http\Middleware\EnsureCompanyFeatureAccess;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\WorkspaceRequestSupport;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup(
             'web',
             EnsureCompanySubscription::class
+        );
+        $middleware->appendToGroup(
+            'web',
+            EnsureCompanyFeatureAccess::class
         );
         $middleware->appendToGroup('web', WorkspaceRequestSupport::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\EnsureWorkspaceAccess::class);

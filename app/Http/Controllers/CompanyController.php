@@ -74,6 +74,7 @@ final class CompanyController extends Controller
                 'max_users',
                 'max_assets',
                 'plan',
+                'feature_overrides',
                 'status',
             ]
         );
