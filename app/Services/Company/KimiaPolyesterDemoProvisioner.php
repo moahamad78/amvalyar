@@ -98,6 +98,20 @@ final class KimiaPolyesterDemoProvisioner
 
     private function reconcileWarehousePermissions(Company $company): void
     {
+        // A company administrator owns the configuration of the company's
+        // single-site warehouses.  Unlike the operational warehouse roles,
+        // this role must keep every active permission as new modules are
+        // introduced; feature entitlements still decide which modules appear.
+        $companyAdmin = Role::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('name', 'company_admin')
+            ->first();
+        if ($companyAdmin !== null) {
+            $companyAdmin->permissions()->syncWithoutDetaching(
+                Permission::query()->where('is_active', true)->pluck('id')->all()
+            );
+        }
+
         $ids = Permission::query()->whereIn('name', ['warehouse_inventory.view', 'warehouse_accesses.manage'])->pluck('id', 'name');
         foreach (['warehouse_supervisor' => ['warehouse_inventory.view'], 'chief_asset_keeper' => ['warehouse_inventory.view', 'warehouse_accesses.manage']] as $roleName => $permissions) {
             $role = Role::withoutGlobalScopes()->where('company_id', $company->id)->where('name', $roleName)->first();

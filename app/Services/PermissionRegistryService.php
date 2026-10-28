@@ -325,9 +325,11 @@ final class PermissionRegistryService
         }
 
         /*
-         * Super-admin itself bypasses role checks.
-         * The built-in system "admin" role is kept complete too,
-         * so ordinary users assigned to this role don't miss new permissions.
+         * Super-admin itself bypasses role checks. System administrators and
+         * each tenant's company administrator are the configuration owners;
+         * keep their permission set complete when a module is introduced.
+         * Feature entitlements and tenant scope continue to limit what a
+         * company can actually use or see.
          */
         $allPermissionIds =
             Permission::query()
@@ -342,15 +344,16 @@ final class PermissionRegistryService
                 ->all();
 
         Role::query()
-            ->whereNull('company_id')
-            ->where(
-                'is_system',
-                true
-            )
-            ->where(
-                'name',
-                'admin'
-            )
+            ->where(function ($query): void {
+                $query
+                    ->where(function ($system): void {
+                        $system
+                            ->whereNull('company_id')
+                            ->where('is_system', true)
+                            ->where('name', 'admin');
+                    })
+                    ->orWhere('name', 'company_admin');
+            })
             ->each(
                 function (Role $role) use (
                     $allPermissionIds
