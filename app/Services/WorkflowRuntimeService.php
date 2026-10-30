@@ -234,7 +234,9 @@ final class WorkflowRuntimeService
                 ]);
 
 
-                return $instance->fresh([
+                return $this->progressAutomatedSteps(
+                    $instance
+                )->fresh([
                     'steps',
                     'currentStep',
                     'requesterEmployee',
@@ -529,7 +531,9 @@ final class WorkflowRuntimeService
                 ]);
 
 
-                return $instance->fresh([
+                return $this->progressAutomatedSteps(
+                    $instance
+                )->fresh([
                     'steps',
                     'currentStep',
                 ]);
@@ -820,6 +824,204 @@ final class WorkflowRuntimeService
             'steps',
             'currentStep',
         ]);
+    }
+
+
+    /**
+     * Run system-owned workflow steps without requiring a person to press an
+     * approval button.  Older workflows already contain notification,
+     * condition and system-action steps, so treating them as human approvals
+     * left real requests permanently pending.  Each automated transition is
+     * persisted as an action, which keeps the execution trail auditable.
+     */
+    private function progressAutomatedSteps(
+        WorkflowInstance $instance
+    ): WorkflowInstance {
+
+        $safetyCounter = 0;
+
+        while ($instance->status === 'pending' && $safetyCounter++ < 100) {
+            $currentStep = WorkflowInstanceStep::query()
+                ->where('workflow_instance_id', $instance->id)
+                ->whereKey($instance->current_step_id)
+                ->first();
+
+            if ($currentStep === null || !$this->isAutomatedStep($currentStep)) {
+                break;
+            }
+
+            $fromStatus = $currentStep->status;
+            $conditionMatches = $currentStep->step_type !== 'condition'
+                || $this->conditionMatches($instance, $currentStep);
+
+            if (!$conditionMatches && $currentStep->is_required) {
+                $currentStep->update([
+                    'status' => 'rejected',
+                    'acted_at' => now(),
+                    'comment' => 'کنترل خودکار مرحله با اطلاعات درخواست منطبق نبود.',
+                ]);
+
+                $this->recordAction(
+                    instance: $instance,
+                    step: $currentStep,
+                    action: 'condition_failed',
+                    fromStatus: $fromStatus,
+                    toStatus: 'rejected',
+                    comment: 'کنترل خودکار مرحله با اطلاعات درخواست منطبق نبود.'
+                );
+
+                return $this->finishRejected($instance);
+            }
+
+            $toStatus = $conditionMatches ? 'approved' : 'skipped';
+            $action = match ($currentStep->step_type) {
+                'notification' => 'notification_recorded',
+                'condition' => $conditionMatches ? 'condition_passed' : 'condition_skipped',
+                default => 'system_action_completed',
+            };
+            $comment = match ($currentStep->step_type) {
+                'notification' => 'اعلان داخلی در تاریخچهٔ گردش‌کار ثبت شد.',
+                'condition' => $conditionMatches
+                    ? 'کنترل خودکار مرحله با اطلاعات درخواست منطبق بود.'
+                    : 'کنترل اختیاری مرحله منطبق نبود و از آن عبور شد.',
+                default => 'اقدام سیستمی مرحله اجرا و ثبت شد.',
+            };
+
+            $currentStep->update([
+                'status' => $toStatus,
+                'acted_at' => now(),
+                'comment' => $comment,
+            ]);
+
+            $this->recordAction(
+                instance: $instance,
+                step: $currentStep,
+                action: $action,
+                fromStatus: $fromStatus,
+                toStatus: $toStatus,
+                comment: $comment,
+                metadata: [
+                    'automatic' => true,
+                    'step_type' => $currentStep->step_type,
+                ]
+            );
+
+            $nextStep = $this->nextWaitingStep($instance, $currentStep);
+
+            if ($nextStep === null) {
+                return $this->finishCompleted($instance, $currentStep);
+            }
+
+            $this->activateStep($instance, $nextStep);
+            $instance->update(['current_step_id' => $nextStep->id]);
+            $instance->refresh();
+        }
+
+        if ($safetyCounter >= 100) {
+            throw ValidationException::withMessages([
+                'workflow' => 'گردش‌کار بیش از حد مرحلهٔ خودکار متوالی دارد و برای جلوگیری از حلقه متوقف شد.',
+            ]);
+        }
+
+        return $instance;
+    }
+
+
+    private function isAutomatedStep(WorkflowInstanceStep $step): bool
+    {
+        return in_array($step->step_type, ['notification', 'condition'], true)
+            || ($step->step_type === 'action' && $step->approver_type === 'system');
+    }
+
+
+    private function nextWaitingStep(
+        WorkflowInstance $instance,
+        WorkflowInstanceStep $currentStep
+    ): ?WorkflowInstanceStep {
+        return WorkflowInstanceStep::query()
+            ->where('workflow_instance_id', $instance->id)
+            ->where('sort_order', '>', $currentStep->sort_order)
+            ->where('status', 'waiting')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+    }
+
+
+    private function finishCompleted(
+        WorkflowInstance $instance,
+        WorkflowInstanceStep $lastStep
+    ): WorkflowInstance {
+        $instance->update([
+            'status' => 'completed',
+            'current_step_id' => null,
+            'completed_at' => now(),
+        ]);
+
+        $this->recordAction(
+            instance: $instance,
+            step: $lastStep,
+            action: 'complete',
+            fromStatus: 'pending',
+            toStatus: 'completed',
+            comment: 'گردش‌کار پس از اجرای مراحل خودکار تکمیل شد.',
+            metadata: ['automatic' => true]
+        );
+
+        $this->assetMovementFinalizer->finalizeCompleted($instance);
+        $this->assetRepairWorkflowFinalizer->finalizeCompleted($instance);
+
+        return $instance->fresh(['steps', 'currentStep']);
+    }
+
+
+    /**
+     * A condition is deliberately limited to request context.  It cannot run
+     * arbitrary code or query unrelated tenant data.  Empty legacy conditions
+     * are considered a pass so existing published workflows remain usable.
+     */
+    private function conditionMatches(
+        WorkflowInstance $instance,
+        WorkflowInstanceStep $step
+    ): bool {
+        $conditions = $step->conditions;
+
+        if (!is_array($conditions) || $conditions === []) {
+            return true;
+        }
+
+        $rules = isset($conditions['all']) && is_array($conditions['all'])
+            ? $conditions['all']
+            : [$conditions];
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule) || empty($rule['field'])) {
+                return false;
+            }
+
+            $actual = data_get($instance->context ?? [], (string) $rule['field']);
+            $expected = $rule['value'] ?? null;
+            $operator = $rule['operator'] ?? 'equals';
+
+            $matches = match ($operator) {
+                'equals' => $actual == $expected,
+                'not_equals' => $actual != $expected,
+                'exists' => filled($actual),
+                'empty' => blank($actual),
+                'greater_than' => is_numeric($actual) && is_numeric($expected) && (float) $actual > (float) $expected,
+                'greater_than_or_equal' => is_numeric($actual) && is_numeric($expected) && (float) $actual >= (float) $expected,
+                'less_than' => is_numeric($actual) && is_numeric($expected) && (float) $actual < (float) $expected,
+                'less_than_or_equal' => is_numeric($actual) && is_numeric($expected) && (float) $actual <= (float) $expected,
+                'in' => is_array($expected) && in_array($actual, $expected, true),
+                default => false,
+            };
+
+            if (!$matches) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
 

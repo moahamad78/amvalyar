@@ -63,10 +63,7 @@ final class WorkflowStepRequest extends FormRequest
             'step_type' => [
                 'required',
                 Rule::in([
-                    'approval',
-                    'action',
-                    'notification',
-                    'condition',
+                    ...$this->allowedStepTypes(),
                 ]),
             ],
 
@@ -219,17 +216,30 @@ final class WorkflowStepRequest extends FormRequest
                 |
                 */
 
+                $stepType = (string) $this->input('step_type');
+
                 if (
-                    $this->input('step_type')
-                    ===
-                    'approval'
-                    &&
-                    empty($approverType)
+                    in_array($stepType, ['approval', 'action'], true)
+                    && (empty($approverType) || ($stepType === 'approval' && $approverType === 'system'))
                 ) {
 
                     $validator->errors()->add(
                         'approver_type',
-                        'برای مرحله تأیید، تعیین تأییدکننده الزامی است.'
+                        $stepType === 'approval'
+                            ? 'برای مرحله تأیید، تعیین تأییدکننده انسانی الزامی است.'
+                            : 'برای مرحله اقدام، مسئول انسانی یا «سیستم» را مشخص کنید.'
+                    );
+
+                    return;
+                }
+
+                if (
+                    in_array($stepType, ['notification', 'condition'], true)
+                    && !in_array($approverType, [null, '', 'system'], true)
+                ) {
+                    $validator->errors()->add(
+                        'approver_type',
+                        'مرحله خودکار فقط می‌تواند بدون مسئول یا با مسئول «سیستم» ذخیره شود.'
                     );
 
                     return;
@@ -437,5 +447,17 @@ final class WorkflowStepRequest extends FormRequest
             'due_hours.max' =>
                 'مهلت انجام بیش از حد مجاز است.',
         ];
+    }
+
+
+    /** @return list<string> */
+    private function allowedStepTypes(): array
+    {
+        // New workflow designs expose only the two fully configurable manual
+        // stages.  Legacy automatic stages remain editable so a published
+        // workflow is never made impossible to maintain.
+        return $this->isMethod('post')
+            ? ['approval', 'action']
+            : ['approval', 'action', 'notification', 'condition'];
     }
 }

@@ -10,6 +10,7 @@ use App\Models\AssetCategory;
 use App\Models\AssetTransaction;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkflowInstance;
 use App\Services\AssetMovementFinalizer;
@@ -289,6 +290,13 @@ final class AssetMovementLifecycleEndToEndTest extends TestCase
         $company = Company::withoutGlobalScopes()->create([
             'name' => 'Movement E2E Company ' . uniqid(),
             'code' => 'MOVE-' . strtoupper(substr(uniqid(), -8)),
+            'is_active' => true,
+        ]);
+
+        Site::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'name' => 'سایت اصلی آزمون جابه‌جایی',
+            'code' => 'MOVE-SITE-' . strtoupper(substr(uniqid(), -6)),
             'is_active' => true,
         ]);
 

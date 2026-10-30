@@ -10,6 +10,7 @@ use App\Models\AssetMovementRequest;
 use App\Models\AssetTransaction;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\Site;
 use App\Models\User;
 use App\Models\Workflow;
 use App\Models\WorkflowStep;
@@ -328,6 +329,13 @@ final class AssetMovementTrueWorkflowEndToEndTest extends TestCase
         $company = Company::withoutGlobalScopes()->create([
             'name' => 'True Movement E2E Company ' . uniqid(),
             'code' => 'TMOV-' . strtoupper(substr(uniqid(), -8)),
+            'is_active' => true,
+        ]);
+
+        Site::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'name' => 'سایت اصلی آزمون جابه‌جایی واقعی',
+            'code' => 'TMOV-SITE-' . strtoupper(substr(uniqid(), -6)),
             'is_active' => true,
         ]);
 
