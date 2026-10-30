@@ -139,7 +139,7 @@ final class StocktakeReconciliationUiTest extends TestCase
     private function fixture(): array
     {
         $company = Company::withoutGlobalScopes()->create([
-            'name' => 'Recon UI '.uniqid(), 'code' => 'RUI-'.uniqid(), 'is_active' => true,
+            'name' => 'Recon UI '.uniqid(), 'code' => 'RUI-'.uniqid(), 'plan' => 'professional', 'is_active' => true,
         ]);
         $user = User::withoutGlobalScopes()->create([
             'company_id' => $company->id, 'username' => 'recon-'.uniqid(), 'name' => 'Recon User', 'email' => uniqid().'@example.test',

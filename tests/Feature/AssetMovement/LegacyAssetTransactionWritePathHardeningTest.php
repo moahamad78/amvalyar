@@ -22,10 +22,9 @@ final class LegacyAssetTransactionWritePathHardeningTest extends TestCase
         $action = $route->getAction();
 
         $this->assertArrayHasKey('uses', $action);
-        $this->assertInstanceOf(
-            \Closure::class,
-            $action['uses']
-        );
+        // Route caching serializes closures to strings.  The invariant is that
+        // this legacy URL cannot point at the historic mutation controller.
+        $this->assertFalse(is_string($action['uses']) && str_contains($action['uses'], 'AssetTransactionController'));
     }
 
     public function test_legacy_store_route_is_a_compatibility_guard_not_the_transaction_controller(): void
@@ -41,10 +40,7 @@ final class LegacyAssetTransactionWritePathHardeningTest extends TestCase
         $action = $route->getAction();
 
         $this->assertArrayHasKey('uses', $action);
-        $this->assertInstanceOf(
-            \Closure::class,
-            $action['uses']
-        );
+        $this->assertFalse(is_string($action['uses']) && str_contains($action['uses'], 'AssetTransactionController'));
     }
 
     public function test_legacy_controller_is_no_longer_reachable_from_registered_write_routes(): void

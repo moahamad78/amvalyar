@@ -121,6 +121,7 @@ final class AssetRepairSlaOperationalTest extends TestCase
         $company = Company::withoutGlobalScopes()->create([
             'name' => 'Repair SLA Company '.$suffix,
             'code' => 'RSLA-'.$suffix.'-'.strtoupper(substr(uniqid(), -5)),
+            'plan' => 'professional',
             'is_active' => true,
         ]);
 

@@ -340,6 +340,28 @@ final class OrganizationalFinalDeliveryEndToEndTest extends TestCase
         Employee $employee,
         ?Site $targetSite
     ): array {
+        $warehouseSite = Site::withoutGlobalScopes()
+            ->where('company_id', 2)
+            ->where('is_active', true)
+            ->when($asset->current_site_id !== null, fn ($query) => $query->whereKey($asset->current_site_id))
+            ->first();
+
+        if ($warehouseSite === null) {
+            $warehouseSite = Site::withoutGlobalScopes()->create([
+                'company_id' => 2,
+                'name' => 'E2E Organizational Warehouse '.bin2hex(random_bytes(4)),
+                'code' => 'OW'.strtoupper(bin2hex(random_bytes(3))),
+                'type' => 'warehouse',
+                'is_active' => true,
+                'sort_order' => 993,
+            ]);
+        }
+
+        if ((int) $asset->current_site_id !== (int) $warehouseSite->id) {
+            $asset->current_site_id = $warehouseSite->id;
+            $asset->save();
+        }
+
         $requestNumber =
             'ORG-E2E-'
             . strtoupper(
@@ -353,7 +375,7 @@ final class OrganizationalFinalDeliveryEndToEndTest extends TestCase
                     'request_number' => $requestNumber,
                     'requester_employee_id' => $employee->id,
                     'requester_user_id' => $actor->id,
-                    'site_id' => $employee->site_id,
+                    'site_id' => $warehouseSite->id,
                     'department_id' => $employee->department_id,
 
                     'delivery_target_type' =>

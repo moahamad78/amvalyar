@@ -118,6 +118,7 @@ final class AssetRepairHistoryUiTest extends TestCase
         $company = Company::query()->create([
             'name' => 'Repair V5 Company ' . $suffix,
             'code' => 'RV5-' . $suffix . '-' . strtoupper(substr(uniqid(), -5)),
+            'plan' => 'professional',
             'is_active' => true,
         ]);
 

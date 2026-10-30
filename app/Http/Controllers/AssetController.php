@@ -17,6 +17,7 @@ use App\Services\AssetAttributeValueService;
 use App\Services\AssetPhotoService;
 use App\Services\AuditLogService;
 use App\Services\RoleAccessService;
+use App\Services\WarehouseSiteAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -160,11 +161,20 @@ final class AssetController extends Controller
         AssetRequest $request,
         AssetPhotoService $assetPhotoService,
         AssetAttributeValueService $attributeValueService,
-        AuditLogService $auditLogService
+        AuditLogService $auditLogService,
+        WarehouseSiteAccessService $warehouseAccess
     ): RedirectResponse {
 
         $data =
             $request->validated();
+
+        // A new asset enters the site warehouse.  Permission to create an
+        // asset must never bypass the warehouse boundary selected on the form.
+        $warehouseAccess->assertCan(
+            $request->user(),
+            (int) $data['warehouse_site_id'],
+            'receive'
+        );
 
         unset(
             $data['photos'],

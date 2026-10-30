@@ -21,9 +21,11 @@ try {
     $env:DB_DATABASE = $AuditDatabase
     # A cached production configuration must never override the isolated DB.
     $env:APP_CONFIG_CACHE = Join-Path $AuditDirectory 'no-config-cache.php'
-    & php artisan migrate --force --no-interaction
+    # Migration/seeding progress is intentionally quiet so a failing test's
+    # assertion remains visible in CI and local audit output.
+    & php artisan migrate --force --no-interaction --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Audit migrations failed.' }
-    & php artisan db:seed --class='Tests\Support\AuditFixtureSeeder' --force --no-interaction
+    & php artisan db:seed --class='Tests\Support\AuditFixtureSeeder' --force --no-interaction --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Audit fixtures failed.' }
     & php artisan test @TestArguments
     $AuditExitCode = $LASTEXITCODE

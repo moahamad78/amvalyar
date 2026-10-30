@@ -110,7 +110,7 @@ final class AssetRepairProductionEndToEndTest extends TestCase
 
     private function fixture(string $suffix): array
     {
-        $company = Company::withoutGlobalScopes()->create(['name' => 'V68 '.$suffix, 'code' => 'V68-'.$suffix.'-'.substr(uniqid(), -5), 'is_active' => true]);
+        $company = Company::withoutGlobalScopes()->create(['name' => 'V68 '.$suffix, 'code' => 'V68-'.$suffix.'-'.substr(uniqid(), -5), 'plan' => 'professional', 'is_active' => true]);
         $role = Role::withoutGlobalScopes()->create(['company_id' => $company->id, 'name' => 'V68-'.$suffix, 'display_name' => 'V68', 'is_active' => true]);
         $password = 'V68!password';
         $user = User::withoutGlobalScopes()->create(['company_id' => $company->id, 'role_id' => $role->id, 'name' => 'V68 User', 'username' => 'v68_'.strtolower($suffix).substr(uniqid(), -5), 'email' => strtolower($suffix).substr(uniqid(), -5).'@v68.test', 'password' => Hash::make($password), 'is_active' => true]);

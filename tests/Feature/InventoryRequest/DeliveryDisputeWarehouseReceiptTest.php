@@ -5,6 +5,7 @@ namespace Tests\Feature\InventoryRequest;
 
 use App\Models\Asset;
 use App\Models\Employee;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AssetCustodyService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -43,12 +44,26 @@ final class DeliveryDisputeWarehouseReceiptTest extends TestCase
         self::assertNotNull($employee);
         self::assertNotNull($asset);
 
+        $warehouseSite = Site::withoutGlobalScopes()
+            ->where('company_id', 2)
+            ->where('is_active', true)
+            ->first();
+        if ($warehouseSite === null) {
+            $warehouseSite = Site::withoutGlobalScopes()->create([
+                'company_id' => 2,
+                'name' => 'Warehouse receipt test site',
+                'code' => 'WRT'.strtoupper(substr(uniqid(), -5)),
+                'type' => 'warehouse',
+                'is_active' => true,
+            ]);
+        }
+
         $asset->status = 'assigned';
         $asset->custody_type = AssetCustodyService::TYPE_EMPLOYEE;
         $asset->custody_user_id = $employee->user_id;
         $asset->custody_employee_id = $employee->id;
         $asset->custody_department_id = $employee->department_id;
-        $asset->current_site_id = $employee->site_id;
+        $asset->current_site_id = $warehouseSite->id;
         $asset->current_location_id = $employee->location_id;
         $asset->save();
 

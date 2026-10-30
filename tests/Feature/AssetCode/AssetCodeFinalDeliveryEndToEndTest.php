@@ -621,6 +621,9 @@ final class AssetCodeFinalDeliveryEndToEndTest extends TestCase
                     'status' =>
                         'warehouse',
 
+                    'current_site_id' =>
+                        $site->id,
+
                     'plate_number' =>
                         null,
 
@@ -728,6 +731,33 @@ final class AssetCodeFinalDeliveryEndToEndTest extends TestCase
         Employee $employee
     ): array {
 
+        // Every physical delivery is issued from the single warehouse of the
+        // request site.  Older fixtures predated that invariant and created
+        // warehouse assets without a site.
+        if ($asset->current_site_id === null) {
+            $warehouseSite = $employee->site_id !== null
+                ? Site::withoutGlobalScopes()
+                    ->where('company_id', 2)
+                    ->whereKey($employee->site_id)
+                    ->where('is_active', true)
+                    ->first()
+                : null;
+
+            if ($warehouseSite === null) {
+                $warehouseSite = Site::withoutGlobalScopes()->create([
+                    'company_id' => 2,
+                    'name' => 'E2E Final Delivery Warehouse '.bin2hex(random_bytes(4)),
+                    'code' => 'EW'.strtoupper(bin2hex(random_bytes(3))),
+                    'type' => 'warehouse',
+                    'is_active' => true,
+                    'sort_order' => 992,
+                ]);
+            }
+
+            $asset->current_site_id = $warehouseSite->id;
+            $asset->save();
+        }
+
         $requestNumber =
             'E2E-'
             .
@@ -756,7 +786,7 @@ final class AssetCodeFinalDeliveryEndToEndTest extends TestCase
                         $actor->id,
 
                     'site_id' =>
-                        $employee->site_id,
+                        $asset->current_site_id,
 
                     'department_id' =>
                         $employee->department_id,

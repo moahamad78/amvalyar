@@ -26,7 +26,9 @@ final class RoleVisibilityTest extends TestCase
     public function test_employee_cannot_read_other_holders_or_financial_values_even_with_excess_permissions(): void
     {
         $key = Str::random(12);
-        $company = Company::create(['name' => $key, 'code' => $key, 'status' => 'active', 'plan' => 'basic', 'max_users' => 100, 'max_assets' => 100]);
+        // Repairs are a Professional module.  The visibility assertions below
+        // exercise a permitted employee inside a plan that actually includes it.
+        $company = Company::create(['name' => $key, 'code' => $key, 'status' => 'active', 'plan' => 'professional', 'max_users' => 100, 'max_assets' => 100]);
         $role = Role::create(['company_id' => $company->id, 'name' => 'employee', 'display_name' => 'پرسنل', 'is_active' => true]);
         $permission = Permission::firstOrCreate(['name' => 'assets.edit'], ['display_name' => 'ویرایش', 'is_active' => true]);
         $role->permissions()->attach($permission);
