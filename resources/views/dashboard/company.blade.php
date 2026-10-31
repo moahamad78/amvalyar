@@ -108,6 +108,7 @@
     .dash-card {
         padding: 18px;
         min-height: 115px;
+        min-width: 0;
     }
 
     .dash-card .label {
@@ -119,12 +120,32 @@
     .dash-card .value {
         font-size: 27px;
         font-weight: 800;
+        min-width: 0;
     }
 
     .dash-card .sub {
         margin-top: 5px;
         font-size: 12px;
         color: #94a3b8;
+    }
+
+    /* Monetary values can be much longer than ordinary dashboard counters. */
+    .dash-card--financial .value {
+        font-size: clamp(14px, 1.25vw, 20px) !important;
+        line-height: 1.45;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .financial-number {
+        direction: ltr;
+        unicode-bidi: isolate;
+        display: inline-block;
+    }
+
+    .dash-card--financial .sub {
+        margin-top: 2px;
     }
 
     .dash-section {
@@ -485,18 +506,23 @@
         </div>
 
 
-        <div class="dash-card">
+        <div class="dash-card dash-card--financial">
 
             <div class="label">
                 {{ app(\App\Services\RoleAccessService::class)->financial(auth()->user()) ? 'ارزش خرید اموال' : 'اطلاعات مالی' }}
             </div>
 
-            <div class="value"
-                 style="font-size:22px;">
-
-                {{ app(\App\Services\RoleAccessService::class)->financial(auth()->user()) ? number_format($stats['purchase_value'] ?? 0) : 'دسترسی ندارید' }}
-
+            <div class="value" title="{{ app(\App\Services\RoleAccessService::class)->financial(auth()->user()) ? number_format($stats['purchase_value'] ?? 0).' ریال' : 'دسترسی ندارید' }}">
+                @if(app(\App\Services\RoleAccessService::class)->financial(auth()->user()))
+                    <span class="financial-number">{{ number_format($stats['purchase_value'] ?? 0) }}</span>
+                @else
+                    دسترسی ندارید
+                @endif
             </div>
+
+            @if(app(\App\Services\RoleAccessService::class)->financial(auth()->user()))
+                <div class="sub">ریال</div>
+            @endif
 
         </div>
 
