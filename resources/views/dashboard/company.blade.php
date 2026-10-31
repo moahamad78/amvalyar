@@ -131,11 +131,14 @@
 
     /* Monetary values can be much longer than ordinary dashboard counters. */
     .dash-card--financial .value {
-        font-size: clamp(14px, 1.25vw, 20px) !important;
+        font-size: clamp(17px, 1.45vw, 22px) !important;
         line-height: 1.45;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        text-align: center;
+    }
+
+    .dash-card--financial {
+        grid-column: span 2;
     }
 
     .financial-number {
@@ -241,6 +244,10 @@
 
         .dashboard-columns {
             grid-template-columns: 1fr;
+        }
+
+        .dash-card--financial {
+            grid-column: span 1;
         }
 
     }
