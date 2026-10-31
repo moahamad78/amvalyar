@@ -100,6 +100,13 @@
         font-weight: 800;
     }
 
+    /* Keep grouped monetary digits in their natural order inside the RTL dashboard. */
+    .financial-number {
+        direction: ltr;
+        unicode-bidi: isolate;
+        display: inline-block;
+    }
+
     .section-card {
         padding: 20px;
         margin-bottom: 20px;
@@ -341,7 +348,8 @@
                 class="number"
                 style="font-size:21px;"
             >
-                {{ number_format($stats['purchase_value']) }}
+                <span class="financial-number">{{ number_format($stats['purchase_value']) }}</span>
+                <span class="fs-6 fw-normal text-muted">ریال</span>
             </div>
         </div>
 

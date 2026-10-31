@@ -2131,6 +2131,7 @@ Route::middleware([
 });
 Route::middleware(['auth'])->group(function () {
     Route::get('/company-storage-profiles', [CompanyStorageProfileController::class, 'index'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.index');
+    Route::get('/company-storage-profiles/guide', [CompanyStorageProfileController::class, 'guide'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.guide');
     Route::get('/company-storage-profiles/create', [CompanyStorageProfileController::class, 'create'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.create');
     Route::post('/company-storage-profiles', [CompanyStorageProfileController::class, 'store'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.store');
     Route::get('/company-storage-profiles/{companyStorageProfile}/edit', [CompanyStorageProfileController::class, 'edit'])->middleware('permission:company_storage.manage')->name('company-storage-profiles.edit');

@@ -13,7 +13,7 @@ final class CompanyStorageProfileUiTest extends TestCase
  public function test_routes_are_permission_protected(): void
  {
    $routes=collect(app('router')->getRoutes()->getRoutes())->keyBy(fn($r)=>$r->getName());
-   foreach(['company-storage-profiles.index','company-storage-profiles.store','company-storage-profiles.update','company-storage-profiles.test','company-storage-profiles.default'] as $name){
+   foreach(['company-storage-profiles.index','company-storage-profiles.guide','company-storage-profiles.store','company-storage-profiles.update','company-storage-profiles.test','company-storage-profiles.default'] as $name){
      $this->assertTrue($routes->has($name));$this->assertContains('permission:company_storage.manage',$routes[$name]->gatherMiddleware());
    }
  }

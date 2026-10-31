@@ -34,10 +34,18 @@ final class AssetPhotoStorageService
         $profile = $this->profiles->defaultForCompany($companyId);
 
         if ($profile === null) {
-            $path = $file->store(
-                'assets/' . $companyId . '/' . $asset->id,
-                'public'
-            );
+            try {
+                $path = $file->store(
+                    'assets/' . $companyId . '/' . $asset->id,
+                    'public'
+                );
+            } catch (Throwable $exception) {
+                report($exception);
+
+                throw ValidationException::withMessages([
+                    'photos' => 'تصویر ذخیره نشد. فضای پیش‌فرض برنامه در دسترس نیست؛ دوباره تلاش کنید یا از بخش «فضای ذخیره‌سازی شرکت» اتصال اختصاصی را بررسی کنید.',
+                ]);
+            }
 
             if (!is_string($path) || $path === '') {
                 throw ValidationException::withMessages([
@@ -83,6 +91,12 @@ final class AssetPhotoStorageService
                     'visibility' => 'private',
                     'ContentType' => $file->getMimeType(),
                 ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw ValidationException::withMessages([
+                'photos' => 'تصویر در فضای اختصاصی شرکت ذخیره نشد. از بخش «فضای ذخیره‌سازی شرکت»، اتصال این پروفایل را تست و تنظیمات Bucket، Endpoint و دسترسی‌ها را بررسی کنید.',
+            ]);
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);

@@ -18,6 +18,12 @@ final class CompanyStorageProfileController extends Controller
         $profiles=CompanyStorageProfile::withoutGlobalScopes()->where('company_id',$companyId)->orderByDesc('is_default')->orderBy('id')->get();
         return view('company_storage_profiles.index',compact('profiles'));
     }
+    public function guide(Request $request): View
+    {
+        $this->companyId($request);
+
+        return view('company_storage_profiles.guide');
+    }
     public function create(Request $request): View { $this->companyId($request); return view('company_storage_profiles.create'); }
     public function store(Request $request): RedirectResponse
     {

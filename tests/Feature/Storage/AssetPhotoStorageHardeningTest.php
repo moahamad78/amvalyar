@@ -104,6 +104,33 @@ final class AssetPhotoStorageHardeningTest extends TestCase
         }
     }
 
+    public function test_remote_storage_failure_is_presented_as_a_safe_validation_message(): void
+    {
+        $company=Company::query()->create([
+            'name'=>'Photo failure Co','code'=>'HF-'.uniqid(),'status'=>'active'
+        ]);
+        $asset=$this->assetFor($company);
+        $profile=CompanyStorageProfile::withoutGlobalScopes()->create([
+            'company_id'=>$company->id,'name'=>'Broken remote storage','driver'=>'s3',
+            'bucket'=>'assets','is_active'=>true,'is_default'=>true,
+        ]);
+
+        $profiles=Mockery::mock(CompanyStorageProfileService::class);
+        $profiles->shouldReceive('defaultForCompany')->once()->with($company->id)->andReturn($profile);
+        $profiles->shouldReceive('objectKey')->once()->andReturn('companies/'.$company->id.'/assets/'.$asset->id.'/photos/failure.jpg');
+        $profiles->shouldReceive('disk')->once()->with($profile)->andThrow(new \RuntimeException('Provider is unavailable'));
+
+        try {
+            (new AssetPhotoStorageService($profiles))->store(
+                $asset,
+                UploadedFile::fake()->image('failure.jpg')
+            );
+            $this->fail('Expected a validation error for the failed remote write.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('فضای اختصاصی شرکت', $exception->errors()['photos'][0]);
+        }
+    }
+
     public function test_primary_rotation_is_scoped_to_same_company(): void
     {
         Storage::fake('public');
